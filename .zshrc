@@ -1,9 +1,9 @@
-export ZSH="/Users/joelove/.oh-my-zsh"
+export ZSH="/Users/$(id -un)/.oh-my-zsh"
 export EDITOR="atom"
 export GIT_EDITOR="vi"
 
 ZSH_THEME="agnoster"
-DEFAULT_USER="joelove"
+DEFAULT_USER="$(id -un)"
 
 plugins=(git)
 
