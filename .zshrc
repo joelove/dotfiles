@@ -15,7 +15,6 @@ plugins=(
   node
   aws
   history
-  dotenv
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -81,6 +80,9 @@ ty() {
 }
 
 alias zshrc="$EDITOR ~/.zshrc"
+alias yabairc="$EDITOR ~/.yabairc"
+alias skhdrc="$EDITOR ~/.skhdrc"
+alias karabinerrc="$EDITOR ~/.config/karabiner/karabiner.json"
 
 alias atom="code"
 alias apm="code --install-extension"

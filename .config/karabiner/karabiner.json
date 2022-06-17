@@ -228,7 +228,7 @@
                             },
                             "to": [
                                 {
-                                    "consumer_key_code": "play_or_pause"
+                                  "shell_command": "open -a 'Spotify.app'"
                                 }
                             ]
                         },
