@@ -19,16 +19,6 @@ plugins=(
 
 source $ZSH/oh-my-zsh.sh
 
-# NVM path and autocompletion
-export NVM_DIR="$HOME/.nvm"
-[ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"  # This loads nvm
-[ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
-
-# Use pyenv for Python version
-if command -v pyenv 1>/dev/null 2>&1; then
-  eval "$(pyenv init -)"
-fi
-
 # Add global yarn packages to PATH
 export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
 
@@ -40,9 +30,6 @@ export PATH="$HOME/node_modules/.bin:$PATH"
 
 # Add Make
 export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"
-
-# Add Groovy home directory
-export GROOVY_HOME="/usr/local/opt/groovy/libexec"
 
 # Trigger branch name update before any commands are run
 precmd() {
@@ -80,6 +67,7 @@ ty() {
 }
 
 alias zshrc="$EDITOR ~/.zshrc"
+alias zprofile="$EDITOR ~/.zprofile"
 alias yabairc="$EDITOR ~/.yabairc"
 alias skhdrc="$EDITOR ~/.skhdrc"
 alias karabinerrc="$EDITOR ~/.config/karabiner/karabiner.json"
