@@ -1,2 +1,8 @@
 sudo yabai --load-sa
 yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa"
+
+Default window positions
+yabai -m rule --add app=Slack display=1 space=1
+yabai -m rule --add app=iTerm display=1 space=2 native-fullscreen=true
+yabai -m rule --add app=Chrome display=2 space=1
+yabai -m rule --add app="Visual Studio Code" display=2 space=2 native-fullscreen=true

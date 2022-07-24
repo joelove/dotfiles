@@ -1,2 +1,29 @@
+# Full screen
+ctrl + alt + cmd - space : yabai -m window --grid 1:1:0:0:1:1
+ctrl + alt + cmd - return : yabai -m window --grid 1:1:0:0:1:1
+
+# Half screen
+ctrl + alt + cmd - left : yabai -m window --grid 1:2:0:0:1:1
+ctrl + alt + cmd - right : yabai -m window --grid 1:2:1:0:1:1
+ctrl + alt + cmd - up : yabai -m window --grid 2:1:0:0:1:1
+ctrl + alt + cmd - down : yabai -m window --grid 2:1:0:1:1:1
+
+# Two-thirds screen
+ctrl + cmd - left : yabai -m window --grid 1:3:0:0:2:1
+ctrl + cmd - right : yabai -m window --grid 1:3:1:0:2:1
+ctrl + cmd - up : yabai -m window --grid 3:1:0:0:1:2
+ctrl + cmd - down : yabai -m window --grid 3:1:0:1:1:2
+
+# One-third screen
+ctrl + cmd + shift - left : yabai -m window --grid 1:3:0:0:1:1
+ctrl + cmd + shift - right : yabai -m window --grid 1:3:2:0:1:1
+ctrl + cmd + shift - up : yabai -m window --grid 3:1:0:0:1:1
+ctrl + cmd + shift - down : yabai -m window --grid 3:1:0:2:1:1
+
+# Change display
+ctrl + alt - left : yabai -m window --display prev
+ctrl + alt - right : yabai -m window --display next
+
+# Focus space
 hyper - return : yabai -m space --focus $(yabai -m query --displays --display | jq -er '.spaces[0]') || yabai -m space --focus $(yabai -m query --displays --display | jq -er '.spaces[1]')
 hyper - space : yabai -m display --focus mouse && yabai -m space --focus $(yabai -m query --displays --display mouse | jq -er '.spaces[0]') || yabai -m space --focus $(yabai -m query --displays --display mouse | jq -er '.spaces[1]')
