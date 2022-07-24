@@ -1,7 +1,6 @@
 # dotfiles
 
 - [iterm](https://github.com/gnachman/iTerm2)
-- [zsh](https://github.com/zsh-users/zsh)
 - [oh-my-zsh](https://github.com/ohmyzsh/ohmyzsh)
 - [skhd](https://github.com/koekeishiya/skhd)
 - [yabai](https://github.com/koekeishiya/yabai)
