@@ -1,5 +1,6 @@
 export ZSH="$HOME/.oh-my-zsh"
 export NVM="$HOME/.nvm"
+export VOLTA_HOME="$HOME/.volta"
 
 export EDITOR="code"
 export GIT_EDITOR="vi"
@@ -19,16 +20,19 @@ plugins=(
 
 source $ZSH/oh-my-zsh.sh
 
+# Add Volta to PATH
+export PATH="$VOLTA_HOME/bin:$PATH"
+
 # Add global yarn packages to PATH
 export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
 
 # Add local binaries to PATH
 export PATH="/usr/local/bin:$PATH"
 
-# Add node home directory modules to PATH
+# Add Node home directory modules to PATH
 export PATH="$HOME/node_modules/.bin:$PATH"
 
-# Add Make
+# Add Make to PATH
 export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"
 
 # Trigger branch name update before any commands are run
@@ -63,7 +67,7 @@ die() {
 
 # Shorthand for installing types for an NPM package
 ty() {
-  yarn add --dev ${*/#/@types\/}
+  npm add -D ${*/#/@types\/}
 }
 
 alias zshrc="$EDITOR ~/.zshrc"
@@ -74,9 +78,12 @@ alias karabinerrc="$EDITOR ~/.config/karabiner/karabiner.json"
 
 alias atom="code"
 alias apm="code --install-extension"
-
-alias rmnodemodules="find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +"
+alias ts="npx ts-node"
 alias yarncl="yarn cache clean && rm -rf node_modules yarn.lock && yarn"
+
+alias dsa="docker stop $(docker ps -q)"
+alias drma="docker rm $(docker ps -q)"
+alias dpra="docker image prune -a"
 
 alias gch="git checkout"
 alias gn="git checkout -b"
@@ -98,7 +105,3 @@ alias gpm="git pull origin master:master"
 alias grbm="gpm && grb master"
 alias gpsht='git push origin "$current_branch_name":test'
 alias glg='git log --graph --pretty=oneline --all --abbrev-commit'
-
-# alias dsa="docker stop $(docker ps -q)"
-# alias drma="docker rm $(docker ps -q)"
-# alias dpra="docker image prune -a"
