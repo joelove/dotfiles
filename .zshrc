@@ -75,6 +75,7 @@ alias karabinerrc="$EDITOR ~/.config/karabiner/karabiner.json"
 alias atom="code"
 alias apm="code --install-extension"
 
+alias rmnodemodules="find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +"
 alias yarncl="yarn cache clean && rm -rf node_modules yarn.lock && yarn"
 
 alias gch="git checkout"
