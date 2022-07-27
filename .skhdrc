@@ -17,8 +17,8 @@ ctrl + cmd + shift - left : yabai -m window --grid 1:3:0:0:1:1
 ctrl + cmd + shift - right : yabai -m window --grid 1:3:2:0:1:1
 
 # Change display
-ctrl + alt - left : yabai -m window --display prev
-ctrl + alt - right : yabai -m window --display next
+ctrl + alt - left : yabai -m window --display prev && yabai -m display --focus prev && yabai -m window --grid 1:1:0:0:1:1
+ctrl + alt - right : yabai -m window --display next && yabai -m display --focus next && yabai -m window --grid 1:1:0:0:1:1
 
 # Switch space
 cmd + alt - tab : yabai -m space --focus $(yabai -m query --displays --display | jq -er '.spaces[0]') || yabai -m space --focus $(yabai -m query --displays --display | jq -er '.spaces[1]')
