@@ -2,7 +2,7 @@ sudo yabai --load-sa
 
 # Signals
 yabai -m signal --add event=dock_did_restart action='sudo yabai --load-sa'
-yabai -m signal --add event=window_minimized action='yabai -m window --focus $YABAI_WINDOW_ID'
+yabai -m signal --add event=window_minimized active=no action='yabai -m window --focus $YABAI_WINDOW_ID'
 
 # Default window positions
 yabai -m rule --add app=Slack display=1 space=1 grid=1:1:0:0:1:1
