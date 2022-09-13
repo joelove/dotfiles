@@ -10,7 +10,3 @@ export NVM_DIR="$HOME/.nvm"
 if [ -f '$HOME/Projects/google-cloud-sdk/path.zsh.inc' ]; then . '$HOME/Projects/google-cloud-sdk/path.zsh.inc'; fi
 if [ -f '$HOME/Projects/google-cloud-sdk/completion.zsh.inc' ]; then . '$HOME/Projects/google-cloud-sdk/completion.zsh.inc'; fi
 
-# Use pyenv for Python version
-if command -v pyenv 1>/dev/null 2>&1; then
-  eval "$(pyenv init -)"
-fi

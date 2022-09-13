@@ -20,6 +20,11 @@ plugins=(
 
 source $ZSH/oh-my-zsh.sh
 
+# Use pyenv for Python version
+if command -v pyenv 1>/dev/null 2>&1; then
+  eval "$(pyenv init -)"
+fi
+
 # Add Volta to PATH
 export PATH="$VOLTA_HOME/bin:$PATH"
 
@@ -78,8 +83,10 @@ alias karabinerrc="$EDITOR ~/.config/karabiner/karabiner.json"
 
 alias atom="code"
 alias apm="code --install-extension"
-alias ts="npx ts-node"
 alias yarncl="yarn cache clean && rm -rf node_modules yarn.lock && yarn"
+
+alias ts="npx ts-node"
+alias pg="PGPASSWORD=pg-docker-pass pgcli -h 0.0.0.0 -u postgres"
 
 alias dsa="docker stop $(docker ps -q)"
 alias drma="docker rm $(docker ps -q)"
@@ -105,3 +112,5 @@ alias gpm="git pull origin master:master"
 alias grbm="gpm && grb master"
 alias gpsht='git push origin "$current_branch_name":test'
 alias glg='git log --graph --pretty=oneline --all --abbrev-commit'
+alias gca='git commit --amend -C head'
+alias gcc='git commit -C head'
