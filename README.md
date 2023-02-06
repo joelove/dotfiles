@@ -6,7 +6,7 @@
 - [skhd](https://github.com/koekeishiya/skhd)
 - [yabai](https://github.com/koekeishiya/yabai)
 - [karabiner-elements](https://github.com/pqrs-org/Karabiner-Elements)
-- [fira-code-powerline](https://github.com/ryanoasis/nerd-fonts/tree/master/patched-fonts/FiraCode)
+- [fira-code](https://github.com/tonsky/FiraCode)
 
 > _**yabai doesn't play well with Apple Silicon and MacOS Monterey yet, go nuts**:_
 >
