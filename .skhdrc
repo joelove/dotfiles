@@ -43,7 +43,7 @@ cmd + alt + shift - tab : yabai -m display --focus mouse && yabai -m space --foc
 cmd - 0x35 : skhd -k "cmd - space"
 
 ## Direct app launch
-hyper - 1 : open ~/keymap-preview.png
+hyper - 1 : open ~/Projects/dotfiles/qmk/current-preview.png
 hyper - 2 : open -a "iTerm"
 hyper - 3 : open -a "Visual Studio Code"
 hyper - 4 : open -a "Google Chrome"
