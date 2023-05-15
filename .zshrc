@@ -1,9 +1,11 @@
 export ZSH="$HOME/.oh-my-zsh"
 export NVM="$HOME/.nvm"
-export VOLTA_HOME="$HOME/.volta"
+export VOLTA_HOME="$HOME/.volta--="
 
 export EDITOR="code"
 export GIT_EDITOR="vi"
+
+export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 ZSH_THEME="agnoster"
 DEFAULT_USER="$(id -un)"
@@ -18,7 +20,16 @@ plugins=(
   history
 )
 
+bold=$(tput bold)
+normal=$(tput sgr0)
+red=$(tput setaf 1)
+green=$(tput setaf 2)
+orange=$(tput setaf 3)
+purple=$(tput setaf 4)
+cyan=$(tput setaf 6)
+
 source $ZSH/oh-my-zsh.sh
+source /Users/joelove/.docker/init-zsh.sh || true
 
 # Use pyenv for Python version
 if command -v pyenv 1>/dev/null 2>&1; then
@@ -75,6 +86,22 @@ ty() {
   npm add -D ${*/#/@types\/}
 }
 
+recent() {
+  git for-each-ref --sort=-committerdate --count="${1:-5}" --format='%(refname:short)' refs/heads/
+}
+
+💨() {
+  env=${1:-'sandbox'}
+  echo "Set up smoke test data on ${green}${env}${normal}...\n"
+  copilot svc exec --yes -e "${env}" -n api -c "npm run seeds:smoke:setup"
+}
+
+💣() {
+  env=${1:-'sandbox'}
+  echo "Tear down smoke test data on ${green}${env}${normal}...\n"
+  copilot svc exec --yes -e "${env}" -n api -c "npm run seeds:smoke:tearDown"
+}
+
 alias zshrc="$EDITOR ~/.zshrc"
 alias zprofile="$EDITOR ~/.zprofile"
 alias yabairc="$EDITOR ~/.yabairc"
@@ -83,13 +110,16 @@ alias karabinerrc="$EDITOR ~/.config/karabiner/karabiner.json"
 
 alias atom="code"
 alias apm="code --install-extension"
+alias mouse="brew list cliclick || brew install cliclick; while :; do cliclick dd:0,40 du:40,80 w:15000; done"
 alias yarncl="yarn cache clean && rm -rf node_modules yarn.lock && yarn"
 
 alias ts="npx ts-node"
-alias pg="PGPASSWORD=pg-docker-pass pgcli -h 0.0.0.0 -u postgres"
+alias pg="PGPASSWORD=pg-docker-pass pgcli -h 0.0.0.0 -u postgres -d calypso_db"
+alias sandbox="aws ecs execute-command --profile=sandbox-admin --container main --command "sh" --interactive --cluster sapi-cluster --task $(aws ecs list-tasks --profile=sandbox-admin --cluster sapi-cluster --family calypso-api | jq -rc '.taskArns[0]')"
 
 alias dsa="docker stop $(docker ps -q)"
-alias drma="docker rm $(docker ps -q)"
+alias drm="docker rm -f $(docker ps -a -q)"
+alias dvrm="docker volume rm $(docker volume ls -q)"
 alias dpra="docker image prune -a"
 
 alias gch="git checkout"
@@ -101,7 +131,6 @@ alias gp="git pull"
 alias gf="git fetch"
 alias gpu='git push --set-upstream origin $current_branch_name'
 alias grhh='git reset --hard origin/$current_branch_name'
-alias recent="git for-each-ref --sort=-committerdate --count=5 --format='%(refname:short)' refs/heads/"
 alias gdc="git diff --cached"
 alias gr="git reset"
 alias gpsh="git push"
