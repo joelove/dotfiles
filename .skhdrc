@@ -37,7 +37,7 @@ ctrl + alt - c : yabai -m window --grid 3:3:1:1:1:1 && yabai -m window --display
 cmd + alt - tab : yabai -m space --focus $(yabai -m query --displays --display | jq -er '.spaces[0]') || yabai -m space --focus $(yabai -m query --displays --display | jq -er '.spaces[1]') 
 
 ## Switch space on display with mouse cursor
-cmd + alt + shift - tab : yabai -m display --focus mouse && yabai -m space --focus $(yabai -m query --displays --display mouse | jq -er '.spaces[0]') || yabai -m space --focus $(yabai -m query --displays --display mouse | jq -er '.spac
+cmd + alt + shift - tab : yabai -m display --focus mouse && yabai -m space --focus $(yabai -m query --displays --display mouse | jq -er '.spaces[0]') || yabai -m space --focus $(yabai -m query --displays --display mouse | jq -er '.spaces[1]')
 
 ## Dual mac default shortcuts
 cmd - 0x35 : skhd -k "cmd - space"
