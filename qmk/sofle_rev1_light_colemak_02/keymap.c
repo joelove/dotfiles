@@ -20,7 +20,7 @@ enum sofle_layers {
  £ - = > ? \          ^ { } . + *
  ⌫ _ ; : , !          ' ( ) " | ␣
  § @ < $ ` ~          % [ ] / # &
-        ➏ ➎ ␀       ␀ ␀ ␀
+        ␀ ␀ ␀        ␀ ␀ ␀
 
 2. NAVIGATION
  ␀ ↞ ↡ ↟ ↠ ␀          ␀ ↥ ↧ ⇞ ⇟ ␀
@@ -38,7 +38,7 @@ enum sofle_layers {
  ␀ ␀ ␀ ␀ ␀ ␀          / 7 8 9 - ␀
  ␀ ⇧   ⌃   ⌥   ⌘ ⌁          * 4 5 6 + ␀
  ␀ ␀ ␀ ␀ ␀ ␀          = 1 2 3 ⇥ ␀
-        ␀ ␀ ␀        ␀ 0 .
+        ␀ ␀ ␀        ␣ 0 .
 
 */
 
@@ -217,24 +217,27 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 #ifdef ENCODER_ENABLE
 
-bool encoder_update_user(uint8_t index, bool anticlockwise) {
+bool encoder_update_user(uint8_t index, bool clockwise) {
     if (index == 0) {
-        if (anticlockwise) {
-            tap_code(KC_F1);
-            return false;
-        } else {
+        if (clockwise) {
             tap_code(KC_F2);
-            return false;
-        }
-    } else if (index == 1) {
-        if (anticlockwise) {
-            tap_code(KC_VOLD);
-            return false;
         } else {
-            tap_code(KC_VOLU);
-            return false;
+            tap_code(KC_F1);
         }
+
+        return false;
+    } 
+    
+    if (index == 1) {
+        if (clockwise) {
+            tap_code(KC_VOLU);
+        } else {
+            tap_code(KC_VOLD);
+        }
+
+        return false;
     }
+
     return true;
 }
 
