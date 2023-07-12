@@ -8,7 +8,7 @@ for more options.
 */
 
 #undef TAPPING_TERM
-#define TAPPING_TERM 150
+#define TAPPING_TERM 200
 #define RETRO_TAPPING
 #define WPM_LAUNCH_CONTROL
 #define SPLIT_WPM_ENABLE
