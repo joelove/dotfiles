@@ -64,13 +64,13 @@ set_branch_name() {
   fi
 }
 
-# Push current branch to git remote master, defaulting to Heroku
+# Push current branch to git remote main, defaulting to Heroku
 gher() {
   remote=${1:-heroku}
-  if [[ "$current_branch_name" == "master" ]] then
-    git push $remote master
+  if [[ "$current_branch_name" == "main" ]] then
+    git push $remote main
   else
-    git push $remote $current_branch_name:master
+    git push $remote $current_branch_name:main
   fi
 }
 
@@ -121,8 +121,8 @@ alias gpsh="git push"
 alias gl="git log"
 alias gstk="git stash --keep-index"
 alias grb="git rebase"
-alias gpm="git pull origin master:master"
-alias grbm="gpm && grb master"
+alias gpm="git pull origin main:main"
+alias grbm="gpm && grb main"
 alias gpsht='git push origin "$current_branch_name":test'
 alias glg='git log --graph --pretty=oneline --all --abbrev-commit'
 alias gca='git commit --amend -C head'
