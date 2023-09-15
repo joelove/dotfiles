@@ -1,11 +1,5 @@
 export ZSH="$HOME/.oh-my-zsh"
 export NVM="$HOME/.nvm"
-export VOLTA_HOME="$HOME/.volta--="
-
-export EDITOR="code"
-export GIT_EDITOR="vi"
-
-export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 ZSH_THEME="agnoster"
 DEFAULT_USER="$(id -un)"
@@ -19,14 +13,6 @@ plugins=(
   aws
   history
 )
-
-bold=$(tput bold)
-normal=$(tput sgr0)
-red=$(tput setaf 1)
-green=$(tput setaf 2)
-orange=$(tput setaf 3)
-purple=$(tput setaf 4)
-cyan=$(tput setaf 6)
 
 source $ZSH/oh-my-zsh.sh
 source /Users/joelove/.docker/init-zsh.sh || true
@@ -50,6 +36,19 @@ export PATH="$HOME/node_modules/.bin:$PATH"
 
 # Add Make to PATH
 export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"
+
+# Set default editors
+export EDITOR="code"
+export GIT_EDITOR="vi"
+
+# Output colors
+bold=$(tput bold)
+normal=$(tput sgr0)
+red=$(tput setaf 1)
+green=$(tput setaf 2)
+orange=$(tput setaf 3)
+purple=$(tput setaf 4)
+cyan=$(tput setaf 6)
 
 # Trigger branch name update before any commands are run
 precmd() {
@@ -86,20 +85,9 @@ ty() {
   npm add -D ${*/#/@types\/}
 }
 
+# List recent Git branches
 recent() {
   git for-each-ref --sort=-committerdate --count="${1:-5}" --format='%(refname:short)' refs/heads/
-}
-
-💨() {
-  env=${1:-'sandbox'}
-  echo "Set up smoke test data on ${green}${env}${normal}...\n"
-  copilot svc exec --yes -e "${env}" -n api -c "npm run seeds:smoke:setup"
-}
-
-💣() {
-  env=${1:-'sandbox'}
-  echo "Tear down smoke test data on ${green}${env}${normal}...\n"
-  copilot svc exec --yes -e "${env}" -n api -c "npm run seeds:smoke:tearDown"
 }
 
 alias zshrc="$EDITOR ~/.zshrc"
@@ -108,14 +96,10 @@ alias yabairc="$EDITOR ~/.yabairc"
 alias skhdrc="$EDITOR ~/.skhdrc"
 alias karabinerrc="$EDITOR ~/.config/karabiner/karabiner.json"
 
-alias atom="code"
-alias apm="code --install-extension"
-alias mouse="brew list cliclick || brew install cliclick; while :; do cliclick dd:0,40 du:40,80 w:15000; done"
+alias v="vim"
+alias vim="nvim"
 alias yarncl="yarn cache clean && rm -rf node_modules yarn.lock && yarn"
-
 alias ts="npx ts-node"
-alias pg="PGPASSWORD=pg-docker-pass pgcli -h 0.0.0.0 -u postgres -d calypso_db"
-alias sandbox="aws ecs execute-command --profile=sandbox-admin --container main --command "sh" --interactive --cluster sapi-cluster --task $(aws ecs list-tasks --profile=sandbox-admin --cluster sapi-cluster --family calypso-api | jq -rc '.taskArns[0]')"
 
 alias dsa="docker stop $(docker ps -q)"
 alias drm="docker rm -f $(docker ps -a -q)"
