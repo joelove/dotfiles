@@ -55,6 +55,19 @@ precmd() {
   set_branch_name
 }
 
+# Don't add delete history commands to ZSH history
+zshaddhistory() {
+ [[ $1 != 'dc '* ]]
+}
+
+# Delete a line from history by index, i.e. dc -2
+dc () {
+  local HISTORY_IGNORE="${(b)$(fc -ln $1 $1)}"
+  fc -W
+  fc -p $HISTFILE $HISTSIZE $SAVEHIST
+  print "Deleted '$green$HISTORY_IGNORE$normal' from history."
+}
+
 # Find current branch name and export to current environment
 set_branch_name() {
   if git ls-files >& /tmp/null; then
@@ -90,22 +103,29 @@ recent() {
   git for-each-ref --sort=-committerdate --count="${1:-5}" --format='%(refname:short)' refs/heads/
 }
 
+# Turn on or off local SSL proxy
+proxy() {
+  kill %?local-ssl-proxy || local-ssl-proxy --source ${1:-3010} --target ${2:-3000} --cert ~/localhost.pem --key ~/localhost-key.pem &
+}
+
+alias v="vim"
+alias vim="nvim"
+alias ts="npx ts-node"
+
+# Configs
 alias zshrc="$EDITOR ~/.zshrc"
 alias zprofile="$EDITOR ~/.zprofile"
 alias yabairc="$EDITOR ~/.yabairc"
 alias skhdrc="$EDITOR ~/.skhdrc"
 alias karabinerrc="$EDITOR ~/.config/karabiner/karabiner.json"
 
-alias v="vim"
-alias vim="nvim"
-alias yarncl="yarn cache clean && rm -rf node_modules yarn.lock && yarn"
-alias ts="npx ts-node"
-
+# Docker
 alias dsa="docker stop $(docker ps -q)"
 alias drm="docker rm -f $(docker ps -a -q)"
 alias dvrm="docker volume rm $(docker volume ls -q)"
 alias dpra="docker image prune -a"
 
+# Git
 alias gch="git checkout"
 alias gn="git checkout -b"
 alias gbd="git branch -d"
