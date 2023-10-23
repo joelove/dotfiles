@@ -1,49 +1,49 @@
 # Escape 0x35
 # Tilde  0x32
 
-## Full screen 
-ctrl + alt + cmd - space : yabai -m window --grid 1:1:0:0:1:1
-ctrl + alt + cmd - 0x35 : yabai -m window --grid 1:1:0:0:1:1
+## Full screen
+ctrl + alt + cmd - space : size_to_display
+ctrl + alt + cmd - 0x35 : size_to_display
 
 ## Resize window to left half
-ctrl + alt + cmd - x : yabai -m window --grid 1:2:0:0:1:1
+ctrl + alt + cmd - x : size_to_left_half
 
 ## Resize window to right half
-ctrl + alt + cmd - c : yabai -m window --grid 1:2:1:0:1:1
-
-## Resize window to left two-thirds
-ctrl + cmd - 0x32 : yabai -m window --grid 1:3:0:0:2:1
-ctrl + shift + alt - 0x32 : yabai -m window --grid 1:3:0:0:2:1
-
-## Resize window to right two-thirds
-ctrl + cmd - z : yabai -m window --grid 1:3:1:0:2:1
-ctrl + shift + alt - z : yabai -m window --grid 1:3:1:0:2:1
+ctrl + alt + cmd - c : size_to_right_half
 
 ## Resize window to left third
-ctrl + cmd + shift - 0x32 : yabai -m window --grid 1:3:0:0:1:1
-ctrl + alt + cmd + shift - 0x32 : yabai -m window --grid 1:3:0:0:1:1
+ctrl + cmd + shift - 0x32 : size_to_left_third
+ctrl + alt + cmd + shift - 0x32 : size_to_left_third
 
 ## Resize window to right third
-ctrl + cmd + shift - z : yabai -m window --grid 1:3:2:0:1:1
-ctrl + alt + cmd + shift - z : yabai -m window --grid 1:3:2:0:1:1
+ctrl + cmd + shift - z : size_to_right_third
+ctrl + alt + cmd + shift - z : size_to_right_third
+
+## Resize window to left two-thirds
+ctrl + cmd - 0x32 : size_to_left_two_thirds
+ctrl + shift + alt - 0x32 : size_to_left_two_thirds
+
+## Resize window to right two-thirds
+ctrl + cmd - z : size_to_right_two_thirds
+ctrl + shift + alt - z : size_to_right_two_thirds
 
 ## Move window to previous display
-ctrl + alt - x : yabai -m window --grid 3:3:1:1:1:1 && yabai -m window --display prev && yabai -m display --focus prev && yabai -m window --grid 1:1:0:0:1:1
+ctrl + alt - x : move_to_previous_display && focus_previous_display && size_to_display
 
 ## Move window to next display
-ctrl + alt - c : yabai -m window --grid 3:3:1:1:1:1 && yabai -m window --display next && yabai -m display --focus next && yabai -m window --grid 1:1:0:0:1:1
+ctrl + alt - c : move_to_next_display && focus_next_display && size_to_display
 
 ## Switch space on display with focused window
-cmd + alt - tab : yabai -m space --focus $(yabai -m query --displays --display | jq -er '.spaces[0]') || yabai -m space --focus $(yabai -m query --displays --display | jq -er '.spaces[1]') 
+cmd + alt - tab : swap_active_space_on_focused_display
 
 ## Switch space on display with mouse cursor
-cmd + alt + shift - tab : yabai -m display --focus mouse && yabai -m space --focus $(yabai -m query --displays --display mouse | jq -er '.spaces[0]') || yabai -m space --focus $(yabai -m query --displays --display mouse | jq -er '.spaces[1]')
+cmd + alt + shift - tab : focus_display_with_mouse && swap_active_space_on_focused_display
 
-## Dual mac default shortcuts
+## Dual mac default shortcutss
 cmd - 0x35 : skhd -k "cmd - space"
 
 ## Direct app launch
-hyper - 1 : open ~/Projects/dotfiles/qmk/current-preview.png
+hyper - 1 : open ~/Projects/dotfiles/qmk/current-preview.png  ; /usr/bin/osascript -e 'tell application "Preview"' -e "activate" -e 'tell application "System Events"' -e 'keystroke "f" using {control down, command down}' -e "end tell" -e "end tell"
 hyper - 2 : open -a "iTerm"
 hyper - 3 : open -a "Visual Studio Code"
 hyper - 4 : open -a "Google Chrome"
