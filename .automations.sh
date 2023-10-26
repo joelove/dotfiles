@@ -30,6 +30,10 @@ size_to_right_two_thirds() {
   yabai -m window --grid 1:3:1:0:2:1
 }
 
+size_to_centre() {
+   yabai -m window --grid 3:3:1:1:1:1
+}
+
 move_to_previous_display() {
   yabai -m window --display prev
 }
