@@ -14,6 +14,10 @@ size_to_right_half() {
   yabai -m window --grid 1:2:1:0:1:1
 }
 
+size_to_center_half() {
+  yabai -m window --grid 1:5:1:0:3:1
+}
+
 size_to_left_third() {
   yabai -m window --grid 1:3:0:0:1:1
 }
@@ -30,7 +34,7 @@ size_to_right_two_thirds() {
   yabai -m window --grid 1:3:1:0:2:1
 }
 
-size_to_centre() {
+size_to_middle() {
    yabai -m window --grid 3:3:1:1:1:1
 }
 
