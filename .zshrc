@@ -15,7 +15,6 @@ plugins=(
 )
 
 source $ZSH/oh-my-zsh.sh
-source /Users/joelove/.docker/init-zsh.sh || true
 
 # Use pyenv for Python version
 if command -v pyenv 1>/dev/null 2>&1; then

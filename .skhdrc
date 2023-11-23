@@ -11,6 +11,9 @@ ctrl + alt + cmd - x : size_to_left_half
 ## Resize window to right half
 ctrl + alt + cmd - c : size_to_right_half
 
+## Resize window to center half
+shift + alt + cmd - space : size_to_center_half
+
 ## Resize window to left third
 ctrl + cmd + shift - 0x32 : size_to_left_third
 ctrl + alt + cmd + shift - 0x32 : size_to_left_third
@@ -28,10 +31,10 @@ ctrl + cmd - z : size_to_right_two_thirds
 ctrl + shift + alt - z : size_to_right_two_thirds
 
 ## Move window to previous display
-ctrl + alt - x : size_to_centre && move_to_previous_display && focus_previous_display && size_to_display
+ctrl + alt - x : size_to_middle && move_to_previous_display && focus_previous_display && size_to_display
 
 ## Move window to next display
-ctrl + alt - c : size_to_centre && move_to_next_display && focus_next_display && size_to_display
+ctrl + alt - c : size_to_middle && move_to_next_display && focus_next_display && size_to_display
 
 ## Switch space on display with focused window
 cmd + alt - tab : swap_active_space_on_focused_display
