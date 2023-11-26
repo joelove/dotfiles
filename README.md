@@ -62,7 +62,7 @@ defaults write -g KeyRepeat -int 1
 
 > _**yabai doesn't play well with Apple Silicon and MacOS Monterey yet, go nuts**:_
 >
-> _https://github.com/koekeishiya/yabai/wiki/Installing-yabai-(from-HEAD)_
+> ~~_https://github.com/koekeishiya/yabai/wiki/Installing-yabai-(from-HEAD)_~~
 > _https://github.com/koekeishiya/yabai/wiki/Disabling-System-Integrity-Protection_
 >
 > 🚀 _https://github.com/koekeishiya/yabai/issues/1054_
