@@ -1,4 +1,4 @@
 # This is Git's per-user configuration file.
 [user]
 	name = Joe Love
-	email = git@joelove.uk
+	email = git@joelove.dev
