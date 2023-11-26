@@ -119,10 +119,10 @@ alias skhdrc="$EDITOR ~/.skhdrc"
 alias karabinerrc="$EDITOR ~/.config/karabiner/karabiner.json"
 
 # Docker
-alias dsa="docker stop $(docker ps -q)"
-alias drm="docker rm -f $(docker ps -a -q)"
-alias dvrm="docker volume rm $(docker volume ls -q)"
-alias dpra="docker image prune -a"
+# alias dsa="docker stop $(docker ps -q)"
+# alias drm="docker rm -f $(docker ps -a -q)"
+# alias dvrm="docker volume rm $(docker volume ls -q)"
+# alias dpra="docker image prune -a"
 
 # Git
 alias gch="git checkout"
