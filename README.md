@@ -23,22 +23,23 @@ brew install koekeishiya/formulae/yabai
 - [skhd](https://github.com/koekeishiya/skhd)
 - [yabai](https://github.com/koekeishiya/yabai)
 
-### Manual
-- [Logitech Options +](https://support.logi.com/hc/en-ch/articles/8335872743575-Download-MX-Master-3S-for-Mac)
-- [Fira Code](https://github.com/tonsky/FiraCode)
-- [oh-my-zsh](https://ohmyz.sh/#install)
-
 ### Symlinks
 
 ```sh
 ln -s ~/Projects/dotfiles/.zshrc ~/.zshrc
 ln -s ~/Projects/dotfiles/.zprofile ~/.zprofile
+ln -s ~/Projects/dotfiles/.zshenv ~/.zshenv
 ln -s ~/Projects/dotfiles/.skhdrc ~/.skhdrc
 ln -s ~/Projects/dotfiles/.yabairc ~/.yabairc
-ln -s ~/Projects/dotfiles/.automations.sh .automations.sh
+ln -s ~/Projects/dotfiles/.automations.sh ~/.automations.sh
 ln -s ~/Projects/dotfiles/.gitconfig ~/.gitconfig
 ln -s ~/Projects/dotfiles/.gitignore ~/.gitignore
 ```
+
+### Manual
+- [Logitech Options +](https://support.logi.com/hc/en-ch/articles/8335872743575-Download-MX-Master-3S-for-Mac)
+- [Fira Code](https://github.com/tonsky/FiraCode)
+- [oh-my-zsh](https://ohmyz.sh/#install)
 
 ### Optional
 
