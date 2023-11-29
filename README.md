@@ -34,6 +34,7 @@ ln -s ~/Projects/dotfiles/.yabairc ~/.yabairc
 ln -s ~/Projects/dotfiles/.automations.sh ~/.automations.sh
 ln -s ~/Projects/dotfiles/.gitconfig ~/.gitconfig
 ln -s ~/Projects/dotfiles/.gitignore ~/.gitignore
+touch ~/.secrets
 ```
 
 ### Manual
