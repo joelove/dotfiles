@@ -7,7 +7,7 @@
 ### 🍺
 
 ```sh
-brew install sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 brew install jq
 brew tap homebrew/cask-fonts
 brew install --cask font-fira-code
