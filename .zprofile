@@ -10,3 +10,6 @@ export NVM_DIR="$HOME/.nvm"
 if [ -f '/Users/joelove/Projects/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/joelove/Projects/google-cloud-sdk/path.zsh.inc'; fi
 if [ -f '/Users/joelove/Projects/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/joelove/Projects/google-cloud-sdk/completion.zsh.inc'; fi
 
+
+# Added by OrbStack: command-line tools and integration
+source ~/.orbstack/shell/init.zsh 2>/dev/null || :
