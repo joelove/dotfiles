@@ -1,5 +1,4 @@
 export ZSH="$HOME/.oh-my-zsh"
-export NVM="$HOME/.nvm"
 
 ZSH_THEME="agnoster"
 DEFAULT_USER="$(id -un)"
@@ -16,18 +15,25 @@ plugins=(
 
 source $ZSH/oh-my-zsh.sh
 
+# Use zoxide for directory navigation
+if command -v zoxide 1>/dev/null 2>&1; then
+  eval "$(zoxide init zsh --cmd cd)"
+fi
+
+# Use fzf for fuzzy matching
+if command -v zoxide 1>/dev/null 2>&1; then
+  eval "$(fzf --zsh)"
+fi
+
+# Use mise for Node version
+if command -v mise 1>/dev/null 2>&1; then
+  eval "$(/opt/homebrew/bin/mise activate zsh)"
+fi
+
 # Use pyenv for Python version
 if command -v pyenv 1>/dev/null 2>&1; then
   eval "$(pyenv init -)"
 fi
-
-# Use rtx for Node version
-if command -v rtx 1>/dev/null 2>&1; then
-  eval "$($(which rtx) activate zsh)"
-fi
-
-# Add Volta to PATH
-export PATH="$VOLTA_HOME/bin:$PATH"
 
 # Add global yarn packages to PATH
 export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
@@ -43,7 +49,7 @@ export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"
 
 # Set default editors
 export EDITOR="code"
-export GIT_EDITOR="vi"
+export GIT_EDITOR="nvim"
 
 # Output colors
 bold=$(tput bold)
@@ -61,7 +67,7 @@ precmd() {
 
 # Don't add delete history commands to ZSH history
 zshaddhistory() {
- [[ $1 != 'dc '* ]]
+  [[ $1 != 'dc '* ]]
 }
 
 # Delete a line from history by index, i.e. dc -2
@@ -81,9 +87,9 @@ set_branch_name() {
   fi
 }
 
-# Push current branch to git remote main, defaulting to Heroku
-gher() {
-  remote=${1:-heroku}
+# Push current branch to git remote main, defaulting to origin
+gpshr() {
+  remote=${1:-origin}
   if [[ "$current_branch_name" == "main" ]] then
     git push $remote main
   else
@@ -115,6 +121,7 @@ proxy() {
 alias v="vim"
 alias vim="nvim"
 alias ts="npx ts-node"
+alias r="recent"
 
 # Configs
 alias zshrc="$EDITOR ~/.zshrc"
@@ -124,29 +131,30 @@ alias skhdrc="$EDITOR ~/.skhdrc"
 alias karabinerrc="$EDITOR ~/.config/karabiner/karabiner.json"
 
 # Docker
-# alias dsa="docker stop $(docker ps -q)"
-# alias drm="docker rm -f $(docker ps -a -q)"
-# alias dvrm="docker volume rm $(docker volume ls -q)"
-# alias dpra="docker image prune -a"
+alias dsa='docker stop "$(docker ps -q)"'
+alias drm='docker rm -f "$(docker ps -a -q)"'
+alias dvrm='docker volume rm "$(docker volume ls -q)"'
+alias dpra='docker image prune -a'
 
 # Git
-alias gch="git checkout"
-alias gn="git checkout -b"
-alias gbd="git branch -d"
-alias gs="git status"
-alias gst="git stash"
-alias gp="git pull"
-alias gf="git fetch"
+alias gch='git checkout'
+alias gn='git checkout -b'
+alias gbd='git branch -d'
+alias gs='git status'
+alias gst='git stash'
+alias gp='git pull'
+alias gf='git fetch'
 alias gpu='git push --set-upstream origin $current_branch_name'
 alias grhh='git reset --hard origin/$current_branch_name'
-alias gdc="git diff --cached"
-alias gr="git reset"
-alias gpsh="git push"
-alias gl="git log"
-alias gstk="git stash --keep-index"
-alias grb="git rebase"
-alias gpm="git pull origin main:main"
-alias grbm="gpm && grb main"
+alias gdc='git diff --cached'
+alias gdn='git diff --name-only'
+alias gr='git reset'
+alias gpsh='git push'
+alias gl='git log'
+alias gstk='git stash --keep-index'
+alias grb='git rebase'
+alias gpm='git pull origin main:main'
+alias grbm='gpm && grb main'
 alias gpsht='git push origin "$current_branch_name":test'
 alias glg='git log --graph --pretty=oneline --all --abbrev-commit'
 alias gca='git commit --amend -C head'
