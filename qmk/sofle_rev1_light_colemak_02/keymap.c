@@ -170,9 +170,9 @@ static void print_dividers(void) {
 }
 
 static void print_primary_oled(void) {
+    print_dividers();
     print_wpm();
     print_mods();
-    print_dividers();
 }
 
 static void print_secondary_oled(void) {
