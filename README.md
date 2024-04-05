@@ -34,16 +34,23 @@ ln -s ~/Projects/dotfiles/.yabairc ~/.yabairc
 ln -s ~/Projects/dotfiles/.automations.sh ~/.automations.sh
 ln -s ~/Projects/dotfiles/.gitconfig ~/.gitconfig
 ln -s ~/Projects/dotfiles/.gitignore ~/.gitignore
+ln -s ~/Projects/dotfiles/.tmux.conf ~/.tmux.conf
+ln -s ~/Projects/dotfiles/.p10k.zsh ~/.p10k.zsh
 touch ~/.secrets
 ```
 
 ### Manual
-- [Logitech Options +](https://support.logi.com/hc/en-ch/articles/8335872743575-Download-MX-Master-3S-for-Mac)
-- [Fira Code](https://github.com/tonsky/FiraCode)
+- [Logitech Options+](https://support.logi.com/hc/en-ch/articles/8335872743575-Download-MX-Master-3S-for-Mac)
 - [oh-my-zsh](https://ohmyz.sh/#install)
+- [Meslo Nerd Font for Powerlevel10k](https://github.com/romkatv/powerlevel10k/blob/master/README.md#fonts)
+
+```sh
+git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
+```
 
 ### Optional
 
+- [Fira Code](https://github.com/tonsky/FiraCode)
 - [karabiner-elements](https://github.com/pqrs-org/Karabiner-Elements)
 
 ### Useful
