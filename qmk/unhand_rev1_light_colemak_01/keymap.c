@@ -24,9 +24,9 @@ enum crkbd_layers {
          — – #        ␀ ␀ ␀
 
 2. NAVIGATION
-    ↞ ↡ ↟ ↠ ␀          ␀ ↥ ↧ ⇞ ⇟
-  ⇤ ⇺ ⇷ ⇸ ⇻ ␀          ␀ ⬅ ⬇ ⬆ ➡ ⇥
-    ⇠ ⇣ ⇡ ⇢ ␀          ␀ ⇱ ⇲ ⍉ ⏏
+    ␀ ␀ ␀ ␀ ␀          ␀ ↥ ↧ ⇞ ⇟
+  ␀ ␀ ␀ ␀ ␀ ␀          ␀ ⬅ ⬇ ⬆ ➡ ⇥
+    ␀ ␀ ␀ ␀ ␀          ␀ ⇱ ⇲ ⍉ ⏏
          ␀ ␀ ⇧        ␀ ␀ ␀
 
 3. MODS_NUM_PAD
@@ -36,30 +36,30 @@ enum crkbd_layers {
          ␀ ␀ ␀        ␣ 0 .
 
 4. APP_CONTROL
-    ⅰ ⅱ ⅲ ⅳ ⤭          ␀ ␀ ␀ ␀ ␀
-  ☓ ⤎  ⤏ ⤌  ⤍ ⤢          ␀ ␀ ␀ ␀ ␀ ␀
-    ⤎  ⤏   ↜  ↝    ↯          ␀ ␀ ␀ ␀ ␀
+    ⅰ ⅱ ⅲ ⅳ ⤭         ␀ ␀ ␀ ␀ ␀
+  ☓ ⤎  ⤏ ⤌  ⤍ ⤢       ␀ ␀ ␀ ␀ ␀ ␀
+    ⤎  ⤏   ↜  ↝    ↯  ␀ ␀ ␀ ␀ ␀
          ␀ ␀ ⚲        ␀ ␀ ␀
 
 */
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [_BASE] = LAYOUT_split_3x6_3(
-        KC_NO, KC_Q, KC_W, KC_F, KC_P, KC_B, KC_J, KC_L, KC_U, KC_Y, KC_SCLN, KC_NO,
+        KC_NO, KC_Q, KC_W, KC_F, KC_P, KC_B, KC_J, KC_L, KC_U, KC_Y, KC_QUOT, KC_NO,
         KC_BSPC, KC_A, KC_R, KC_S, KC_T, KC_G, KC_M, KC_N, KC_E, KC_I, KC_O, KC_ENT,
         KC_NO, KC_Z, KC_X, KC_C, KC_D, KC_V, KC_K, KC_H, KC_COMM, KC_DOT, KC_SLSH, KC_NO,
         MO(_APP_CONTROL), MO(_MODS_NUM_PAD), KC_LSFT, KC_SPC, MO(_SYMBOLS), MO(_NAVIGATION)
     ),
     [_SYMBOLS] = LAYOUT_split_3x6_3(
-        KC_NO, KC_TILDE, KC_AT, KC_HASH, KC_LT, KC_LBRC, KC_RBRC, KC_GT, KC_DLR, KC_PERC, KC_CIRC, KC_NO,
-        KC_GRV, KC_PIPE, KC_AMPR, KC_DQUO, KC_QUOT, KC_LPRN, KC_RPRN, KC_COLN, KC_SCLN, KC_EXLM, KC_QUES, KC_EQL,
-        KC_NO, KC_BSLS, KC_PLUS, KC_ASTR, KC_UNDS, KC_LCBR, KC_RCBR, KC_MINS, KC_COMM, KC_DOT, KC_SLSH, KC_NO,
+        KC_NO, KC_TILDE, KC_AT, KC_HASH, KC_GT, KC_RBRC, KC_LBRC, KC_LT, KC_DLR, KC_PERC, KC_CIRC, KC_NO,
+        KC_GRV, KC_PIPE, KC_AMPR, KC_DQUO, KC_QUOT, KC_RPRN, KC_LPRN, KC_COLN, KC_SCLN, KC_QUES, KC_EXLM, KC_EQL,
+        KC_NO, KC_BSLS, KC_PLUS, KC_ASTR, KC_UNDS, KC_RCBR, KC_LCBR, KC_MINS, KC_COMM, KC_DOT, KC_SLSH, KC_NO,
         LSA(KC_MINS), LALT(KC_MINS), LALT(KC_3), RGUI(KC_SPC), KC_TRNS, KC_NO
     ),
     [_NAVIGATION] = LAYOUT_split_3x6_3(
-        KC_NO, RGUI(KC_LEFT), RGUI(KC_DOWN), RGUI(KC_UP), RGUI(KC_RGHT), KC_NO, KC_NO, KC_F1, KC_F2, KC_F11, KC_F12, KC_NO,
-        LSFT(KC_TAB), LGUI(KC_BSPC), LALT(KC_BSPC), LALT(KC_DEL), LCTL(KC_K), KC_NO, KC_NO, KC_LEFT, KC_DOWN, KC_UP, KC_RGHT, KC_TAB,
-        KC_NO, RALT(KC_LEFT), RALT(KC_DOWN), RALT(KC_UP), RALT(KC_RGHT), KC_NO, KC_NO, RGUI(KC_MINS), RGUI(KC_EQL), RGUI(KC_0), KC_F10, KC_NO,
+        KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_F1, KC_F2, KC_F11, KC_F12, KC_NO,
+        KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_LEFT, KC_DOWN, KC_UP, KC_RGHT, KC_TAB,
+        KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, RGUI(KC_MINS), RGUI(KC_EQL), RGUI(KC_0), KC_F10, KC_NO,
         KC_NO, KC_NO, KC_LSFT, KC_NO, KC_NO, KC_TRNS
     ),
     [_MODS_NUM_PAD] = LAYOUT_split_3x6_3(
@@ -69,10 +69,10 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         KC_NO, KC_TRNS, LGUI(KC_SPC), KC_SPACE, KC_P0, KC_PDOT
     ),
     [_APP_CONTROL] = LAYOUT_split_3x6_3(
-        KC_NO, HYPR(KC_1), HYPR(KC_2), HYPR(KC_3), HYPR(KC_4), LGUI(KC_ENT), KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO,
-        KC_ESC, MEH(KC_GRV), MEH(KC_Z), LCAG(KC_X), LCAG(KC_C), LCAG(KC_SPC), KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO,
-        KC_NO, HYPR(KC_GRV), HYPR(KC_Z), LCA(KC_X), LCA(KC_C), LAG(KC_TAB), KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO,
-        KC_TRNS, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO
+        KC_NO, HYPR(KC_1), LSFT(LAG(KC_SPC)), LCAG(KC_SPC), LAG(KC_TAB), KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO,
+        KC_ESC, MEH(KC_GRV), MEH(KC_Z), LCAG(KC_X), LCAG(KC_C), KC_NO, KC_NO, KC_MS_LEFT, KC_MS_DOWN, KC_MS_UP, KC_MS_RIGHT, KC_MS_BTN2,
+        KC_NO, HYPR(KC_GRV), HYPR(KC_Z), LCA(KC_X), LCA(KC_C), KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO,
+        KC_TRNS, KC_NO, KC_NO, KC_MS_BTN1, KC_NO, QK_BOOTLOADER
     )
 };
 
