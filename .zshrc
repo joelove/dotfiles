@@ -25,15 +25,26 @@ if command -v zoxide 1>/dev/null 2>&1; then
   eval "$(fzf --zsh)"
 fi
 
-# Use mise for Node version
-if command -v mise 1>/dev/null 2>&1; then
-  eval "$(/opt/homebrew/bin/mise activate zsh)"
-fi
-
 # Use pyenv for Python version
 if command -v pyenv 1>/dev/null 2>&1; then
   eval "$(pyenv init -)"
 fi
+
+# Use mise for Node version
+if command -v mise 1>/dev/null 2>&1; then
+  eval "$($(which mise) activate zsh)"
+fi
+
+# Add PNPM to PATH
+export PNPM_HOME="$HOME/Library/pnpm"
+
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+
+# Add Volta to PATH
+export PATH="$VOLTA_HOME/bin:$PATH"
 
 # Add global yarn packages to PATH
 export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
@@ -110,7 +121,7 @@ ty() {
 
 # List recent Git branches
 recent() {
-  git for-each-ref --sort=-committerdate --count="${1:-5}" --format='%(refname:short)' refs/heads/
+  git for-each-ref --sort=-committerdate --count="${1:-10}" --format='%(refname:short)' refs/heads/
 }
 
 # Turn on or off local SSL proxy
