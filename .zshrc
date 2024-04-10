@@ -1,9 +1,17 @@
-# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
-# Initialization code that may require console input (password prompts, [y/n]
-# confirmations, etc.) must go above this block; everything else may go below.
+if [[ "$TERM" != "screen" ]] && [[ "$SSH_CONNECTION" == "" ]]; then
+  WHOAMI=$(whoami)
+  if tmux has-session -t $WHOAMI 2>/dev/null; then
+    tmux -2 attach-session -t $WHOAMI
+  else
+    tmux -2 new-session -s $WHOAMI
+  fi
+fi
+
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
+
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 export ZSH="$HOME/.oh-my-zsh"
 
@@ -68,7 +76,7 @@ export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"
 export EDITOR="code"
 export GIT_EDITOR="nvim"
 
-# Output colors
+# Output formatting
 bold=$(tput bold)
 normal=$(tput sgr0)
 red=$(tput setaf 1)
@@ -135,25 +143,39 @@ proxy() {
   kill %?local-ssl-proxy || local-ssl-proxy --source ${1:-3010} --target ${2:-3000} --cert ~/localhost.pem --key ~/localhost-key.pem &
 }
 
-alias v="vim"
-alias vim="nvim"
-alias ts="npx ts-node"
-alias r="recent"
+# List all terminal colors
+colors() {
+  for i in {0..255}; do
+    print -Pn "%K{$i}  %k%F{$i}${(l:3::0:)i}%f " ${${(M)$((i%6)):#3}:+$'\n'}
+  done
+}
 
-# Configs
+alias v='vim'
+alias vim='nvim'
+alias ts='npx ts-node'
+alias r='recent'
+
+# configs
 alias zshrc="$EDITOR ~/.zshrc"
 alias zprofile="$EDITOR ~/.zprofile"
 alias yabairc="$EDITOR ~/.yabairc"
 alias skhdrc="$EDITOR ~/.skhdrc"
 alias karabinerrc="$EDITOR ~/.config/karabiner/karabiner.json"
+alias tmuxrc="$EDITOR ~/.tmux.conf"
+alias p10krc="$EDITOR ~/.p10k.zsh"
 
-# Docker
+# docker
 alias dsa='docker stop "$(docker ps -q)"'
 alias drm='docker rm -f "$(docker ps -a -q)"'
 alias dvrm='docker volume rm "$(docker volume ls -q)"'
 alias dpra='docker image prune -a'
 
-# Git
+# tmux
+alias tma='tmux attach'
+alias tmd='tmux detach'
+alias tml='tmux list-panes -a -F "#{pane_tty} #{session_name}"'
+
+# git
 alias gch='git checkout'
 alias gn='git checkout -b'
 alias gbd='git branch -d'
@@ -176,6 +198,3 @@ alias gpsht='git push origin "$current_branch_name":test'
 alias glg='git log --graph --pretty=oneline --all --abbrev-commit'
 alias gca='git commit --amend -C head'
 alias gcc='git commit -C head'
-
-# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
