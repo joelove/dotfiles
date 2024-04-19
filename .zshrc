@@ -1,11 +1,11 @@
-if [[ "$TERM" != "screen" ]] && [[ "$SSH_CONNECTION" == "" ]]; then
-  WHOAMI=$(whoami)
-  if tmux has-session -t $WHOAMI 2>/dev/null; then
-    tmux -2 attach-session -t $WHOAMI
-  else
-    tmux -2 new-session -s $WHOAMI
-  fi
-fi
+# if [[ "$TERM" != "screen" ]] && [[ "$SSH_CONNECTION" == "" ]]; then
+#   WHOAMI=$(whoami)
+#   if tmux has-session -t $WHOAMI 2>/dev/null; then
+#     tmux -2 attach-session -t $WHOAMI
+#   else
+#     tmux -2 new-session -s $WHOAMI
+#   fi
+# fi
 
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
@@ -125,7 +125,8 @@ gpshr() {
 # Murder something by port
 die() {
   port=${1:-3000}
-  pkill -9 $port
+  pid=$(lsof -n -i4TCP:$port | grep LISTEN | awk '{ print $2 }')
+  kill -9 $pid
 }
 
 # Shorthand for installing types for an NPM package
@@ -154,6 +155,8 @@ alias v='vim'
 alias vim='nvim'
 alias ts='npx ts-node'
 alias r='recent'
+alias cat='bat'
+alias catp='bat -p'
 
 # configs
 alias zshrc="$EDITOR ~/.zshrc"
