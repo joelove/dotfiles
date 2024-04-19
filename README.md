@@ -11,6 +11,8 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/too
 brew install jq
 brew install fzf
 brew install zoxide
+brew install cat
+brew instal ripgrep
 brew tap homebrew/cask-fonts
 brew install --cask font-fira-code
 brew install --cask raycast
