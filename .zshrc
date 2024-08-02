@@ -125,7 +125,7 @@ gpshr() {
 # Murder something by port
 die() {
   port=${1:-3000}
-  pid=$(lsof -n -i4TCP:$port | grep LISTEN | awk '{ print $2 }')
+  pid=$(lsof -n -i4TCP:$port | grep -m 1 LISTEN | awk '{ print $1 }')
   kill -9 $pid
 }
 
