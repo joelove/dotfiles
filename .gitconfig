@@ -2,3 +2,5 @@
 [user]
 	name = Joe Love
 	email = git@joelove.dev
+[rebase]
+	updateRefs = true
