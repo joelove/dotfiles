@@ -66,6 +66,9 @@ export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
 # Add local binaries to PATH
 export PATH="/usr/local/bin:$PATH"
 
+# Add user binaries to PATH
+export PATH="$HOME/.local/bin:$PATH"
+
 # Add Node home directory modules to PATH
 export PATH="$HOME/node_modules/.bin:$PATH"
 
@@ -125,7 +128,7 @@ gpshr() {
 # Murder something by port
 die() {
   port=${1:-3000}
-  pid=$(lsof -n -i4TCP:$port | grep -m 1 LISTEN | awk '{ print $1 }')
+  pid=$(lsof -n -i4TCP:$port | grep -m 1 LISTEN | awk '{ print $2 }')
   kill -9 $pid
 }
 
@@ -136,6 +139,7 @@ ty() {
 
 # List recent Git branches
 recent() {
+  echo "${bold}Recent branches${normal}:"
   git for-each-ref --sort=-committerdate --count="${1:-10}" --format='%(refname:short)' refs/heads/
 }
 
@@ -178,26 +182,33 @@ alias tma='tmux attach'
 alias tmd='tmux detach'
 alias tml='tmux list-panes -a -F "#{pane_tty} #{session_name}"'
 
+# aws
+alias ass='assume maze_developer'
+
 # git
-alias gch='git checkout'
-alias gn='git checkout -b'
 alias gbd='git branch -d'
-alias gs='git status'
-alias gst='git stash'
-alias gp='git pull'
-alias gf='git fetch'
-alias gpu='git push --set-upstream origin $current_branch_name'
-alias grhh='git reset --hard origin/$current_branch_name'
-alias gdc='git diff --cached'
-alias gdn='git diff --name-only'
-alias gr='git reset'
-alias gpsh='git push'
-alias gl='git log'
-alias gstk='git stash --keep-index'
-alias grb='git rebase'
-alias gpm='git pull origin main:main'
-alias grbm='gpm && grb main'
-alias gpsht='git push origin "$current_branch_name":test'
-alias glg='git log --graph --pretty=oneline --all --abbrev-commit'
 alias gca='git commit --amend -C head'
 alias gcc='git commit -C head'
+alias gch='git checkout'
+alias gchpl='gfa && gch origin/main pnpm-lock.yaml && pnpm i && gaa pnpm-lock.yaml'
+alias gdc='git diff --cached'
+alias gdn='gd --name-only'
+alias gdn='git diff --name-only'
+alias gf='git fetch'
+alias gfa='git fetch --all'
+alias gl='git log'
+alias glg='git log --graph --pretty=oneline --all --abbrev-commit'
+alias gn='git checkout -b'
+alias gp='git pull'
+alias gpm='git pull origin main:main'
+alias gpnpm='gchpl && gc -m "chore: checkout pnpm-lock from main and pnpm i"'
+alias gpsh='git push'
+alias gpsht='git push origin "$current_branch_name":test'
+alias gpu='git push --set-upstream origin $current_branch_name'
+alias gr='git reset'
+alias grb='git rebase'
+alias grbm='gpm && grb main'
+alias grhh='git reset --hard origin/$current_branch_name'
+alias gs='git status'
+alias gst='git stash'
+alias gstk='git stash --keep-index'
