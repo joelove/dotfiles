@@ -62,16 +62,48 @@ get_primary_space_index_on_focused_display() {
   yabai -m query --displays --display | jq -er '.spaces[0]'
 }
 
+get_primary_space_index_on_previous_display() {
+  yabai -m query --displays --display prev | jq -er '.spaces[0]'
+}
+
+get_primary_space_index_on_next_display() {
+  yabai -m query --displays --display next | jq -er '.spaces[0]'
+}
+
 get_background_space_index_on_focused_display() {
   yabai -m query --displays --display | jq -er '.spaces[1]'
 }
 
+get_background_space_index_on_previous_display() {
+  yabai -m query --displays --display prev | jq -er '.spaces[1]'
+}
+
+get_background_space_index_on_next_display() {
+  yabai -m query --displays --display next | jq -er '.spaces[1]'
+}
+
 activate_primary_space_on_focused_display() {
-  yabai -m space --focus $(get_primary_space_index_on_focused_display)
+  yabai -m space --focus "$(get_primary_space_index_on_focused_display)"
+}
+
+activate_primary_space_on_previous_display() {
+  yabai -m space --focus "$(get_primary_space_index_on_previous_display)"
+}
+
+activate_primary_space_on_next_display() {
+  yabai -m space --focus "$(get_primary_space_index_on_next_display)"
 }
 
 activate_background_space_on_focused_display() {
-  yabai -m space --focus $(get_background_space_index_on_focused_display)
+  yabai -m space --focus "$(get_background_space_index_on_focused_display)"
+}
+
+activate_background_space_on_previous_display() {
+  yabai -m space --focus "$(get_background_space_index_on_previous_display)"
+}
+
+activate_background_space_on_next_display() {
+  yabai -m space --focus "$(get_background_space_index_on_next_display)"
 }
 
 swap_active_space_on_focused_display() {
