@@ -155,12 +155,39 @@ colors() {
   done
 }
 
+# Manually deploy a single service
+deploy() {
+  current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+  if [ $# -lt 1 ]; then
+    gh run list --workflow=manual-deploy-service.yml --branch="$current_branch" --limit=5
+
+    echo "Usage: ${bold}$funcstack[1] [service] [branch=current] [environment=testing]${normal}"
+    exit 2
+  fi
+
+  if ! command -v gh 2>&1 >/dev/null; then
+    brew install gh
+    gh auth login
+  fi
+
+  service=$1
+  branch=${2:-$current_branch}
+  environment=${3:-testing}
+
+  echo "Deploying $service to $environment ($branch)"
+
+  gh workflow run manual-deploy-service.yml -r "$branch" -F environment-name="$environment" -F ref="$branch" -F package-name="$service"
+}
+
+# general
 alias v='vim'
 alias vim='nvim'
 alias ts='npx ts-node'
 alias r='recent'
 alias cat='bat'
 alias catp='bat -p'
+alias d='deploy'
 
 # configs
 alias zshrc="$EDITOR ~/.zshrc"
@@ -207,6 +234,8 @@ alias gpsht='git push origin "$current_branch_name":test'
 alias gpu='git push --set-upstream origin $current_branch_name'
 alias gr='git reset'
 alias grb='git rebase'
+alias grbc='git rebase --continue'
+alias grbcn='git rebase --continue --no-edit'
 alias grbm='gpm && grb main'
 alias grhh='git reset --hard origin/$current_branch_name'
 alias gs='git status'
