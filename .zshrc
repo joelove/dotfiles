@@ -158,6 +158,8 @@ colors() {
 
 # Manually deploy a single service
 deploy() {
+  echo # /br
+
   if [ $# -lt 1 ]; then
     gh run list --workflow=manual-deploy-service.yml --branch="$(git rev-parse --abbrev-ref HEAD)" --limit=5
 
@@ -230,14 +232,14 @@ alias gp='git pull'
 alias gpm='git pull origin main:main'
 alias gpnpm='gchpl && gc -m "chore: checkout pnpm-lock from main and pnpm i"'
 alias gpsh='git push'
-alias gpsht='scb && git push origin "$current_branch_name":test'
-alias gpu='scb && git push --set-upstream origin $current_branch_name'
+alias gpsht='scb && git push origin "$current_branch":test'
+alias gpu='scb && git push --set-upstream origin $current_branch'
 alias gr='git reset'
 alias grb='git rebase'
 alias grbc='git rebase --continue'
 alias grbcn='git rebase --continue --no-edit'
 alias grbm='gpm && grb main'
-alias grhh='scb && git reset --hard origin/$current_branch_name'
+alias grhh='scb && git reset --hard origin/$current_branch'
 alias gs='git status'
 alias gst='git stash'
 alias gstk='git stash --keep-index'
