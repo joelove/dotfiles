@@ -90,7 +90,7 @@ cyan=$(tput setaf 6)
 
 # Trigger branch name update before any commands are run
 precmd() {
-  set_branch_name
+  # set_current_branch
 }
 
 # Don't add delete history commands to ZSH history
@@ -107,21 +107,22 @@ dc () {
 }
 
 # Find current branch name and export to current environment
-set_branch_name() {
+set_current_branch() {
   if git ls-files >& /tmp/null; then
-    current_branch_name=${$(git symbolic-ref -q HEAD)##refs/heads/}
-    current_branch_name=${current_branch_name:-HEAD}
-    export current_branch_name
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    export current_branch
   fi
 }
 
 # Push current branch to git remote main, defaulting to origin
 gpshr() {
   remote=${1:-origin}
-  if [[ "$current_branch_name" == "main" ]] then
+  set_current_branch
+
+  if [[ "$current_branch" == "main" ]] then
     git push $remote main
   else
-    git push $remote $current_branch_name:main
+    git push $remote $current_branch:main
   fi
 }
 
@@ -157,12 +158,10 @@ colors() {
 
 # Manually deploy a single service
 deploy() {
-  current_branch=$(git rev-parse --abbrev-ref HEAD)
-
   if [ $# -lt 1 ]; then
-    gh run list --workflow=manual-deploy-service.yml --branch="$current_branch" --limit=5
+    gh run list --workflow=manual-deploy-service.yml --branch="$(git rev-parse --abbrev-ref HEAD)" --limit=5
 
-    echo "Usage: ${bold}$funcstack[1] [service] [branch=current] [environment=testing]${normal}"
+    echo "Usage: $funcstack[1] [service] [branch=current] [environment=testing]"
     exit 2
   fi
 
@@ -172,7 +171,7 @@ deploy() {
   fi
 
   service=$1
-  branch=${2:-$current_branch}
+  branch=${2:-$(git rev-parse --abbrev-ref HEAD)}
   environment=${3:-testing}
 
   echo "Deploying $service to $environment ($branch)"
@@ -188,6 +187,7 @@ alias r='recent'
 alias cat='bat'
 alias catp='bat -p'
 alias d='deploy'
+alias scb='set_current_branch'
 
 # configs
 alias zshrc="$EDITOR ~/.zshrc"
@@ -230,14 +230,14 @@ alias gp='git pull'
 alias gpm='git pull origin main:main'
 alias gpnpm='gchpl && gc -m "chore: checkout pnpm-lock from main and pnpm i"'
 alias gpsh='git push'
-alias gpsht='git push origin "$current_branch_name":test'
-alias gpu='git push --set-upstream origin $current_branch_name'
+alias gpsht='scb && git push origin "$current_branch_name":test'
+alias gpu='scb && git push --set-upstream origin $current_branch_name'
 alias gr='git reset'
 alias grb='git rebase'
 alias grbc='git rebase --continue'
 alias grbcn='git rebase --continue --no-edit'
 alias grbm='gpm && grb main'
-alias grhh='git reset --hard origin/$current_branch_name'
+alias grhh='scb && git reset --hard origin/$current_branch_name'
 alias gs='git status'
 alias gst='git stash'
 alias gstk='git stash --keep-index'
