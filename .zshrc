@@ -253,6 +253,8 @@ alias tmd='tmux detach'
 alias tml='tmux list-panes -a -F "#{pane_tty} #{session_name}"'
 
 # terraform
+alias tf='terraform'
+alias tfi='terraform init'
 alias tff='terraform fmt -write=true -recursive'
 alias tfv='terraform validate'
 alias tfp='terraform plan'
