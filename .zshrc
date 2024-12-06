@@ -79,14 +79,16 @@ export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"
 export EDITOR="code"
 export GIT_EDITOR="nvim"
 
-# Output formatting
-bold=$(tput bold)
-normal=$(tput sgr0)
-red=$(tput setaf 1)
-green=$(tput setaf 2)
-orange=$(tput setaf 3)
-purple=$(tput setaf 4)
-cyan=$(tput setaf 6)
+# OUTPUT FORMATTING
+# =================
+# bold=$(tput bold)
+# italic=$(tput sitm)
+# normal=$(tput sgr0)
+# red=$(tput setaf 1)
+# green=$(tput setaf 2)
+# orange=$(tput setaf 3)
+# purple=$(tput setaf 4)
+# cyan=$(tput setaf 6)
 
 # Trigger branch name update before any commands are run
 precmd() {
@@ -161,9 +163,9 @@ deploy() {
   echo # /br
 
   if [ $# -lt 1 ]; then
-    gh run list --workflow=manual-deploy-service.yml --branch="$(git rev-parse --abbrev-ref HEAD)" --limit=5
+    gh run list --workflow=manual-deploy-service.yml --branch="$(git rev-parse --abbrev-ref HEAD)" --limit=10
 
-    echo "Usage: $funcstack[1] [service] [branch=current] [environment=testing]"
+    echo "Usage: $funcstack[1] [service] [environment=testing] [branch=current]"
     exit 2
   fi
 
@@ -173,12 +175,48 @@ deploy() {
   fi
 
   service=$1
-  branch=${2:-$(git rev-parse --abbrev-ref HEAD)}
-  environment=${3:-testing}
+  environment=${2:-testing}
+  branch=${3:-$(git rev-parse --abbrev-ref HEAD)}
 
   echo "Deploying $service to $environment ($branch)"
 
   gh workflow run manual-deploy-service.yml -r "$branch" -F environment-name="$environment" -F ref="$branch" -F package-name="$service"
+
+  sleep 3 # slow Github is slow
+
+  gh run list -w manual-deploy-service.yml -L 1 --json "url" --jq ".[0].url" | xargs open
+}
+
+# Open a PR with an automatically formatted title
+# Usage: pr [base=main] [branch=current]
+pr() {
+  base=${1:-main}
+  branch=${2:-$(git rev-parse --abbrev-ref HEAD)}
+
+  if [[ $branch =~ ^([a-zA-Z]+-[0-9]+)-([^$]+) ]]; then
+    issue=$(echo "$match[1]" | tr '[:lower:]' '[:upper:]');
+    title=${match[2]//-/ };
+
+    gh pr new -d -t "[$issue] $title" -B "$base" -H "$branch" -T "pull_request_template.md"
+  else
+    echo # /br
+    echo "$(tput bold)Automatic title requires branch name to be in format [ISSUE]-[DESCRIPTION]$(tput sgr0)"
+    echo "$(tput sitm)Use cmd+shift+. to copy branch name from Linear issue$(tput sgr0)"
+
+    gh pr new -d -B "$base" -H "$branch" -T "pull_request_template.md"
+  fi
+}
+
+# Recursively delete files by name
+del() {
+  filename=$1
+
+  if [ -z "$filename" ]; then
+    echo "Usage: del [filename]"
+    exit 2
+  fi
+
+  find . -not -path "*/node_modules/*" -name '$filename' -type f -delete
 }
 
 # general
@@ -190,6 +228,9 @@ alias cat='bat'
 alias catp='bat -p'
 alias d='deploy'
 alias scb='set_current_branch'
+alias code='cursor'
+alias c='cursor'
+alias a='assume'
 
 # configs
 alias zshrc="$EDITOR ~/.zshrc"
@@ -211,8 +252,11 @@ alias tma='tmux attach'
 alias tmd='tmux detach'
 alias tml='tmux list-panes -a -F "#{pane_tty} #{session_name}"'
 
-# aws
-alias ass='assume maze_developer'
+# terraform
+alias tff='terraform fmt -write=true -recursive'
+alias tfv='terraform validate'
+alias tfp='terraform plan'
+alias tfa='terraform apply'
 
 # git
 alias gbd='git branch -d'
