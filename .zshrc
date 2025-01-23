@@ -76,7 +76,7 @@ export PATH="$HOME/node_modules/.bin:$PATH"
 export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"
 
 # Set default editors
-export EDITOR="code"
+export EDITOR="cursor"
 export GIT_EDITOR="nvim"
 
 # OUTPUT FORMATTING
@@ -222,7 +222,6 @@ del() {
 # general
 alias v='vim'
 alias vim='nvim'
-alias ts='npx ts-node'
 alias r='recent'
 alias cat='bat'
 alias catp='bat -p'
@@ -230,6 +229,7 @@ alias d='deploy'
 alias scb='set_current_branch'
 alias code='cursor'
 alias c='cursor'
+alias assume='export AWS_PROFILE='
 alias a='assume'
 
 # configs
@@ -259,6 +259,11 @@ alias tff='terraform fmt -write=true -recursive'
 alias tfv='terraform validate'
 alias tfp='terraform plan'
 alias tfa='terraform apply'
+
+# ts
+alias ts='npx ts-node'
+alias tstr='rm -rf *.tsbuildinfo || true && pnpm tsc --generateTrace trace'
+alias tsta='tstr || true && pnpm --package=@typescript/analyze-trace dlx analyze-trace trace'
 
 # git
 alias gbd='git branch -d'
