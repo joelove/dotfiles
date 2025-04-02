@@ -5,9 +5,9 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+[[ ! -f "${HOME}/.p10k.zsh" ]] || source "${HOME}/.p10k.zsh"
 
-export ZSH="$HOME/.oh-my-zsh"
+export ZSH="${HOME}/.oh-my-zsh"
 
 ZSH_THEME="powerlevel10k/powerlevel10k"
 
@@ -21,7 +21,7 @@ plugins=(
   history
 )
 
-source $ZSH/oh-my-zsh.sh
+source "${ZSH}/oh-my-zsh.sh"
 
 # Use zoxide for directory navigation
 if command -v zoxide 1>/dev/null 2>&1; then
@@ -40,34 +40,34 @@ fi
 
 # Use mise for Node version
 if command -v mise 1>/dev/null 2>&1; then
-  eval "$($(which mise) activate zsh)"
+  eval "$("$(which mise)" activate zsh)"
 fi
 
 # Add PNPM to PATH
-export PNPM_HOME="$HOME/Library/pnpm"
+export PNPM_HOME="${HOME}/Library/pnpm"
 
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
+case ":${PATH}:" in
+  *":${PNPM_HOME}:"*) ;;
+  *) export PATH="${PNPM_HOME}:${PATH}" ;;
 esac
 
 # Add Volta to PATH
-export PATH="$VOLTA_HOME/bin:$PATH"
+export PATH="${VOLTA_HOME}/bin:${PATH}"
 
 # Add global yarn packages to PATH
-export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
+export PATH="${HOME}/.yarn/bin:${HOME}/.config/yarn/global/node_modules/.bin:${PATH}"
 
 # Add local binaries to PATH
-export PATH="/usr/local/bin:$PATH"
+export PATH="/usr/local/bin:${PATH}"
 
 # Add user binaries to PATH
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="${HOME}/.local/bin:${PATH}"
 
 # Add Node home directory modules to PATH
-export PATH="$HOME/node_modules/.bin:$PATH"
+export PATH="${HOME}/node_modules/.bin:${PATH}"
 
 # Add Make to PATH
-export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"
+export PATH="/opt/homebrew/opt/make/libexec/gnubin:${PATH}"
 
 # Set default editors
 export EDITOR="cursor"
@@ -92,19 +92,19 @@ zshaddhistory() {
 # Delete a line from history by index, i.e. dc -2
 dc () {
   if [ $# -lt 1 ]; then
-    echo "${bold}Usage:${normal} $funcstack[1] [index=-10]"
-    exit 2
+    echo "${bold}Usage:${normal} ${funcstack[1]} [index=-10]"
+    return 2
   fi
 
-  local HISTORY_IGNORE="${(b)$(fc -ln $1 $1)}"
+  local HISTORY_IGNORE="${(b)$(fc -ln "$1" "$1")}"
   fc -W
-  fc -p $HISTFILE $HISTSIZE $SAVEHIST
-  print "Deleted '${green}$HISTORY_IGNORE${normal}' from history."
+  fc -p "${HISTFILE}" "${HISTSIZE}" "${SAVEHIST}"
+  print "Deleted '${green}${HISTORY_IGNORE}${normal}' from history."
 }
 
 # Find current branch name and export to current environment
 set_current_branch() {
-  if git ls-files >& /tmp/null; then
+  if git ls-files > /dev/null 2>&1; then
     current_branch=$(git rev-parse --abbrev-ref HEAD)
     export current_branch
   fi
@@ -112,26 +112,27 @@ set_current_branch() {
 
 # Push current branch to git remote main, defaulting to origin
 gpshr() {
-  remote=${1:-origin}
+  local remote="${1:-origin}"
   set_current_branch
 
-  if [[ "$current_branch" == "main" ]] then
-    git push $remote main
+  if [[ "${current_branch}" == "main" ]]; then
+    git push "${remote}" main
   else
-    git push $remote $current_branch:main
+    git push "${remote}" "${current_branch}:main"
   fi
 }
 
 # Murder something by port
 die() {
-  port=${1:-3000}
-  pid=$(lsof -n -i4TCP:$port | grep -m 1 LISTEN | awk '{ print $2 }')
-  kill -9 $pid
+  local port="${1:-3000}"
+  local pid
+  pid=$(lsof -n -i4TCP:"${port}" | grep -m 1 LISTEN | awk '{ print $2 }')
+  kill -9 "${pid}"
 }
 
 # Shorthand for installing types for an NPM package
 ty() {
-  npm add -D ${*/#/@types\/}
+  npm add -D "${@/#/@types/}"
 }
 
 # List recent Git branches
@@ -142,13 +143,13 @@ recent() {
 
 # Turn on or off local SSL proxy
 proxy() {
-  kill %?local-ssl-proxy || local-ssl-proxy --source ${1:-3010} --target ${2:-3000} --cert ~/localhost.pem --key ~/localhost-key.pem &
+  kill %?local-ssl-proxy || local-ssl-proxy --source "${1:-3010}" --target "${2:-3000}" --cert "${HOME}/localhost.pem" --key "${HOME}/localhost-key.pem" &
 }
 
 # List all terminal colors
 colors() {
   for i in {0..255}; do
-    print -Pn "%K{$i}  %k%F{$i}${(l:3::0:)i}%f " ${${(M)$((i%6)):#3}:+$'\n'}
+    print -Pn "%K{${i}}  %k%F{${i}}${(l:3::0:)i}%f " "${${(M)$((i%6)):#3}:+$'\n'}"
   done
 }
 
@@ -157,7 +158,7 @@ get_current_branch() {
 }
 
 ensure_gh_dependency() {
-  if ! command -v gh 2>&1 >/dev/null; then
+  if ! command -v gh > /dev/null 2>&1; then
     brew install gh
   fi
 
@@ -171,77 +172,80 @@ deploy_default_environment="testing"
 deploy_status() {
   ensure_gh_dependency
 
-  gh run list --workflow="$deploy_workflow" --limit=20
+  gh run list --workflow="${deploy_workflow}" --limit=20
 }
 
 # Manually deploy a single service (alias: d)
 deploy() {
   if [ $# -lt 1 ]; then
-    echo "${bold}Usage:${normal} $funcstack[1] [service] [environment=$deploy_default_environment] [branch=current]"
-    exit 2
+    echo "${bold}Usage:${normal} ${funcstack[1]} [service] [environment=${deploy_default_environment}] [branch=current]"
+    return 2
   fi
 
   ensure_gh_dependency
 
-  service=$1
-  environment=${2:-$deploy_default_environment}
-  branch=${3:-$(get_current_branch)}
+  local service="$1"
+  local environment="${2:-${deploy_default_environment}}"
+  local branch="${3:-$(get_current_branch)}"
 
   echo # /br
-  echo "${bold}Deploying ${green}$service${normal} to ${cyan}$environment${normal} (${orange}$branch${normal})"
+  echo "${bold}Deploying ${green}${service}${normal} to ${cyan}${environment}${normal} (${orange}${branch}${normal})"
 
-  gh workflow run "$deploy_workflow" -r "$branch" -F environment-name="$environment" -F ref="$branch" -F package-name="$service"
+  gh workflow run "${deploy_workflow}" -r "${branch}" -F environment-name="${environment}" -F ref="${branch}" -F package-name="${service}"
   sleep 3 # slow Github is slow
-  gh run list -w "$deploy_workflow" -L 1 --json "url" --jq ".[0].url" | xargs open
+  gh run list -w "${deploy_workflow}" -L 1 --json "url" --jq ".[0].url" | xargs open
 }
 
 # Open a PR with an automatically formatted title
 # Usage: pr [base=main] [branch=current]
 pr() {
-  base=${1:-main}
-  branch=${2:-$(get_current_branch)}
+  local base="${1:-main}"
+  local branch="${2:-$(get_current_branch)}"
 
   ensure_gh_dependency
 
-  if [[ $branch =~ ^([a-zA-Z]+-[0-9]+)-([^$]+) ]]; then
-    issue=$(echo "$match[1]" | tr '[:lower:]' '[:upper:]');
-    title=${match[2]//-/ };
+  if [[ ${branch} =~ ^([a-zA-Z]+-[0-9]+)-([^$]+) ]]; then
+    local issue
+    local title
+    issue=$(echo "${match[1]}" | tr '[:lower:]' '[:upper:]')
+    title=${match[2]//-/ }
 
-    gh pr new -d -t "[$issue] $title" -B "$base" -H "$branch" -T "pull_request_template.md"
+    gh pr new -d -t "[${issue}] ${title}" -B "${base}" -H "${branch}" -T "pull_request_template.md"
   else
     echo # /br
     echo "${bold}Automatic title requires branch name to be in format ${orange}[ISSUE]-[DESCRIPTION]${normal}"
     echo "${italic}Use cmd+shift+. to copy branch name from Linear issue${normal}"
 
-    gh pr new -d -B "$base" -H "$branch" -T "pull_request_template.md"
+    gh pr new -d -B "${base}" -H "${branch}" -T "pull_request_template.md"
   fi
 }
 
 # Recursively delete files by name
 del() {
-  filename=$1
+  local filename="$1"
 
-  if [ -z "$filename" ]; then
+  if [ -z "${filename}" ]; then
     echo "${bold}Usage:${normal} del [filename]"
-    exit 2
+    return 2
   fi
 
-  find . -not -path "*/node_modules/*" -name '$filename' -type f -delete
+  find . -not -path "*/node_modules/*" -name "${filename}" -type f -delete
 }
 
 # Assume an AWS profile
 assume_profile() {
   if [ $# -lt 1 ]; then
-    echo "${bold}Usage:${normal} $funcstack[1] [profile_name]"
-    exit 2
+    echo "${bold}Usage:${normal} ${funcstack[1]} [profile_name]"
+    return 2
   fi
 
   export AWS_PROFILE="$1"
-  echo "Assumed profile: ${green}$AWS_PROFILE${normal}"
+  echo "Assumed profile: ${green}${AWS_PROFILE}${normal}"
 }
 
+# List all AWS profiles
 list_profiles() {
-  grep -E '^\[profile' ~/.aws/config | sed -E 's/\[profile (.*)\]/\1/'
+  grep -E '^\[profile' "${HOME}/.aws/config" | sed -E 's/\[profile (.*)\]/\1/'
 }
 
 # general
@@ -261,13 +265,13 @@ alias profiles='list_profiles'
 alias p='profiles'
 
 # configs
-alias zshrc="$EDITOR ~/.zshrc"
-alias zprofile="$EDITOR ~/.zprofile"
-alias yabairc="$EDITOR ~/.yabairc"
-alias skhdrc="$EDITOR ~/.skhdrc"
-alias karabinerrc="$EDITOR ~/.config/karabiner/karabiner.json"
-alias tmuxrc="$EDITOR ~/.tmux.conf"
-alias p10krc="$EDITOR ~/.p10k.zsh"
+alias zshrc="${EDITOR} ${HOME}/.zshrc"
+alias zprofile="${EDITOR} ${HOME}/.zprofile"
+alias yabairc="${EDITOR} ${HOME}/.yabairc"
+alias skhdrc="${EDITOR} ${HOME}/.skhdrc"
+alias karabinerrc="${EDITOR} ${HOME}/.config/karabiner/karabiner.json"
+alias tmuxrc="${EDITOR} ${HOME}/.tmux.conf"
+alias p10krc="${EDITOR} ${HOME}/.p10k.zsh"
 
 # docker
 alias dsa='docker stop "$(docker ps -q)"'
@@ -311,14 +315,14 @@ alias gp='git pull'
 alias gpm='git pull origin main:main'
 alias gpnpm='gchpl && gc -m "chore: checkout pnpm-lock from main and pnpm i"'
 alias gpsh='git push'
-alias gpsht='scb && git push origin "$current_branch":test'
-alias gpu='scb && git push --set-upstream origin $current_branch'
+alias gpsht='scb && git push origin "${current_branch}:test"'
+alias gpu='scb && git push --set-upstream origin "${current_branch}"'
 alias gr='git reset'
 alias grb='git rebase'
 alias grbc='git rebase --continue'
 alias grbcn='git rebase --continue --no-edit'
 alias grbm='gpm && grb main'
-alias grhh='scb && git reset --hard origin/$current_branch'
+alias grhh='scb && git reset --hard "origin/${current_branch}"'
 alias gs='git status'
 alias gst='git stash'
 alias gstk='git stash --keep-index'
