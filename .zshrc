@@ -1,11 +1,5 @@
-# if [[ "$TERM" != "screen" ]] && [[ "$SSH_CONNECTION" == "" ]]; then
-#   WHOAMI=$(whoami)
-#   if tmux has-session -t $WHOAMI 2>/dev/null; then
-#     tmux -2 attach-session -t $WHOAMI
-#   else
-#     tmux -2 new-session -s $WHOAMI
-#   fi
-# fi
+#!/bin/zsh
+# shellcheck shell=zsh
 
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
@@ -81,19 +75,14 @@ export GIT_EDITOR="nvim"
 
 # OUTPUT FORMATTING
 # =================
-# bold=$(tput bold)
-# italic=$(tput sitm)
-# normal=$(tput sgr0)
-# red=$(tput setaf 1)
-# green=$(tput setaf 2)
-# orange=$(tput setaf 3)
-# purple=$(tput setaf 4)
-# cyan=$(tput setaf 6)
-
-# Trigger branch name update before any commands are run
-precmd() {
-  # set_current_branch
-}
+bold=$(tput bold)
+italic=$(tput sitm)
+normal=$(tput sgr0)
+red=$(tput setaf 1)
+green=$(tput setaf 2)
+orange=$(tput setaf 3)
+purple=$(tput setaf 4)
+cyan=$(tput setaf 6)
 
 # Don't add delete history commands to ZSH history
 zshaddhistory() {
@@ -102,10 +91,15 @@ zshaddhistory() {
 
 # Delete a line from history by index, i.e. dc -2
 dc () {
+  if [ $# -lt 1 ]; then
+    echo "${bold}Usage:${normal} $funcstack[1] [index=-10]"
+    exit 2
+  fi
+
   local HISTORY_IGNORE="${(b)$(fc -ln $1 $1)}"
   fc -W
   fc -p $HISTFILE $HISTSIZE $SAVEHIST
-  print "Deleted '$green$HISTORY_IGNORE$normal' from history."
+  print "Deleted '${green}$HISTORY_IGNORE${normal}' from history."
 }
 
 # Find current branch name and export to current environment
@@ -158,40 +152,56 @@ colors() {
   done
 }
 
-# Manually deploy a single service
+get_current_branch() {
+  git rev-parse --abbrev-ref HEAD
+}
+
+ensure_gh_dependency() {
+  if ! command -v gh 2>&1 >/dev/null; then
+    brew install gh
+  fi
+
+  gh auth status
+}
+
+deploy_workflow="manual-deploy-service.yml"
+deploy_default_environment="testing"
+
+# List all Github deployment actions (alias: ds)
+deploy_status() {
+  ensure_gh_dependency
+
+  gh run list --workflow="$deploy_workflow" --limit=20
+}
+
+# Manually deploy a single service (alias: d)
 deploy() {
-  echo # /br
-
   if [ $# -lt 1 ]; then
-    gh run list --workflow=manual-deploy-service.yml --branch="$(git rev-parse --abbrev-ref HEAD)" --limit=10
-
-    echo "Usage: $funcstack[1] [service] [environment=testing] [branch=current]"
+    echo "${bold}Usage:${normal} $funcstack[1] [service] [environment=$deploy_default_environment] [branch=current]"
     exit 2
   fi
 
-  if ! command -v gh 2>&1 >/dev/null; then
-    brew install gh
-    gh auth login
-  fi
+  ensure_gh_dependency
 
   service=$1
-  environment=${2:-testing}
-  branch=${3:-$(git rev-parse --abbrev-ref HEAD)}
+  environment=${2:-$deploy_default_environment}
+  branch=${3:-$(get_current_branch)}
 
-  echo "Deploying $service to $environment ($branch)"
+  echo # /br
+  echo "${bold}Deploying ${green}$service${normal} to ${cyan}$environment${normal} (${orange}$branch${normal})"
 
-  gh workflow run manual-deploy-service.yml -r "$branch" -F environment-name="$environment" -F ref="$branch" -F package-name="$service"
-
+  gh workflow run "$deploy_workflow" -r "$branch" -F environment-name="$environment" -F ref="$branch" -F package-name="$service"
   sleep 3 # slow Github is slow
-
-  gh run list -w manual-deploy-service.yml -L 1 --json "url" --jq ".[0].url" | xargs open
+  gh run list -w "$deploy_workflow" -L 1 --json "url" --jq ".[0].url" | xargs open
 }
 
 # Open a PR with an automatically formatted title
 # Usage: pr [base=main] [branch=current]
 pr() {
   base=${1:-main}
-  branch=${2:-$(git rev-parse --abbrev-ref HEAD)}
+  branch=${2:-$(get_current_branch)}
+
+  ensure_gh_dependency
 
   if [[ $branch =~ ^([a-zA-Z]+-[0-9]+)-([^$]+) ]]; then
     issue=$(echo "$match[1]" | tr '[:lower:]' '[:upper:]');
@@ -200,8 +210,8 @@ pr() {
     gh pr new -d -t "[$issue] $title" -B "$base" -H "$branch" -T "pull_request_template.md"
   else
     echo # /br
-    echo "$(tput bold)Automatic title requires branch name to be in format [ISSUE]-[DESCRIPTION]$(tput sgr0)"
-    echo "$(tput sitm)Use cmd+shift+. to copy branch name from Linear issue$(tput sgr0)"
+    echo "${bold}Automatic title requires branch name to be in format ${orange}[ISSUE]-[DESCRIPTION]${normal}"
+    echo "${italic}Use cmd+shift+. to copy branch name from Linear issue${normal}"
 
     gh pr new -d -B "$base" -H "$branch" -T "pull_request_template.md"
   fi
@@ -212,11 +222,26 @@ del() {
   filename=$1
 
   if [ -z "$filename" ]; then
-    echo "Usage: del [filename]"
+    echo "${bold}Usage:${normal} del [filename]"
     exit 2
   fi
 
   find . -not -path "*/node_modules/*" -name '$filename' -type f -delete
+}
+
+# Assume an AWS profile
+assume_profile() {
+  if [ $# -lt 1 ]; then
+    echo "${bold}Usage:${normal} $funcstack[1] [profile_name]"
+    exit 2
+  fi
+
+  export AWS_PROFILE="$1"
+  echo "Assumed profile: ${green}$AWS_PROFILE${normal}"
+}
+
+list_profiles() {
+  grep -E '^\[profile' ~/.aws/config | sed -E 's/\[profile (.*)\]/\1/'
 }
 
 # general
@@ -226,11 +251,14 @@ alias r='recent'
 alias cat='bat'
 alias catp='bat -p'
 alias d='deploy'
+alias ds='deploy_status'
 alias scb='set_current_branch'
 alias code='cursor'
 alias c='cursor'
-alias assume='export AWS_PROFILE='
+alias assume='assume_profile'
 alias a='assume'
+alias profiles='list_profiles'
+alias p='profiles'
 
 # configs
 alias zshrc="$EDITOR ~/.zshrc"
@@ -262,8 +290,8 @@ alias tfa='terraform apply'
 
 # ts
 alias ts='npx ts-node'
-alias tstr='rm -rf *.tsbuildinfo || true && pnpm tsc --generateTrace trace'
-alias tsta='tstr || true && pnpm --package=@typescript/analyze-trace dlx analyze-trace trace'
+alias tstr='rm -rf *.tsbuildinfo || true && pnpm tsc --generateTrace ./trace'
+alias tsta='tstr || true && pnpm --package=@typescript/analyze-trace dlx analyze-trace ./trace'
 
 # git
 alias gbd='git branch -d'
