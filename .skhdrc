@@ -31,16 +31,27 @@ ctrl + cmd - z : size_to_right_two_thirds
 ctrl + shift + alt - z : size_to_right_two_thirds
 
 ## Move window to previous display
-ctrl + alt - x : activate_primary_space_on_previous_display && focus_next_display && size_to_middle && move_to_previous_display && focus_previous_display && size_to_display
+ctrl + alt - x : activate_primary_space_on_previous_display; \
+                 focus_next_display; \
+                 size_to_middle; \
+                 move_to_previous_display; \
+                 focus_previous_display; \
+                 size_to_display
 
 ## Move window to next display
-ctrl + alt - c : activate_primary_space_on_next_display && focus_previous_display && size_to_middle && move_to_next_display && focus_next_display && size_to_display
+ctrl + alt - c : activate_primary_space_on_next_display; \
+                 focus_previous_display; \
+                 size_to_middle; \
+                 move_to_next_display; \
+                 focus_next_display; \
+                 size_to_display
 
 ## Switch space on display with focused window
 cmd + alt - tab : swap_active_space_on_focused_display
 
 ## Switch space on display with mouse cursor
-cmd + alt + shift - tab : focus_display_with_mouse && swap_active_space_on_focused_display
+cmd + alt + shift - tab : focus_display_with_mouse; \
+                          swap_active_space_on_focused_display
 
 ## Dual mac default shortcutss
 cmd - 0x35 : skhd -k "cmd - space"
