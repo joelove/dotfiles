@@ -16,7 +16,7 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/too
 brew install jq
 brew install fzf
 brew install zoxide
-brew install cat
+brew install bat
 brew instal ripgrep
 brew install 1password-cli
 brew tap homebrew/cask-fonts
