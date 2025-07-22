@@ -15,7 +15,7 @@ brew install cat
 brew instal ripgrep
 brew install 1password-cli
 brew tap homebrew/cask-fonts
-brew cask install font-fira-code-nerd-font
+brew install --cask font-fira-code-nerd-font
 brew install --cask raycast
 brew install --cask iterm2
 brew install --cask visual-studio-code
