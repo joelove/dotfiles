@@ -68,6 +68,11 @@ killall Dock
 # Speed up keyboard key repeat
 defaults write -g InitialKeyRepeat -int 20
 defaults write -g KeyRepeat -int 1
+
+# Create and default screenshots directory
+mkdir -p $HOME/Screenshots
+defaults write com.apple.screencapture location "${HOME}/Screenshots"
+killall SystemUIServer
 ```
 
 ### Notes
