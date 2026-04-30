@@ -53,7 +53,7 @@ cmd + alt - tab : swap_active_space_on_focused_display
 cmd + alt + shift - tab : focus_display_with_mouse; \
                           swap_active_space_on_focused_display
 
-## Dual mac default shortcutss
+## Dual mac default shortcuts
 cmd - 0x35 : skhd -k "cmd - space"
 
 ## Direct app launch

@@ -4,3 +4,5 @@
 	email = joelove@users.noreply.github.com
 [rebase]
 	updateRefs = true
+[init]
+	defaultBranch = main
