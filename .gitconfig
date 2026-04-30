@@ -4,3 +4,5 @@
 	email = git@joelove.dev
 [rebase]
 	updateRefs = true
+[init]
+	defaultBranch = main

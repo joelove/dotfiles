@@ -19,9 +19,15 @@ plugins=(
   node
   aws
   history
+  direnv
 )
 
 source "${ZSH}/oh-my-zsh.sh"
+
+
+# Load nvm
+export NVM_DIR="$HOME/.nvm"
+[ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"
 
 # Use zoxide for directory navigation
 if command -v zoxide 1>/dev/null 2>&1; then
@@ -29,8 +35,9 @@ if command -v zoxide 1>/dev/null 2>&1; then
 fi
 
 # Use fzf for fuzzy matching
-if command -v zoxide 1>/dev/null 2>&1; then
+if command -v fzf 1>/dev/null 2>&1; then
   eval "$(fzf --zsh)"
+  bindkey "${terminfo[kcuu1]}" fzf-history-widget
 fi
 
 # Use pyenv for Python version
@@ -38,10 +45,27 @@ if command -v pyenv 1>/dev/null 2>&1; then
   eval "$(pyenv init -)"
 fi
 
-# Use mise for Node version
-if command -v mise 1>/dev/null 2>&1; then
-  eval "$("$(which mise)" activate zsh)"
+# Use poetry for Python dependency management
+if command -v poetry 1>/dev/null 2>&1; then
+  eval "$(poetry completions zsh)" 2>/dev/null
 fi
+
+# # Use direnv for environment management
+# if command -v direnv 1>/dev/null 2>&1; then
+#   eval "$(direnv hook zsh)"
+# fi
+
+# # Use mise for runtime version management
+# if command -v mise 1>/dev/null 2>&1; then
+#   eval "$(mise activate zsh)"
+# fi
+
+# bun completions
+[ -s "/Users/joelove/.bun/_bun" ] && source "/Users/joelove/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
 
 # Add PNPM to PATH
 export PNPM_HOME="${HOME}/Library/pnpm"
@@ -51,8 +75,8 @@ case ":${PATH}:" in
   *) export PATH="${PNPM_HOME}:${PATH}" ;;
 esac
 
-# Add Volta to PATH
-export PATH="${VOLTA_HOME}/bin:${PATH}"
+# # Add Volta to PATH (commented out - using mise instead)
+# export PATH="${HOME}/.volta/bin:${PATH}"
 
 # Add global yarn packages to PATH
 export PATH="${HOME}/.yarn/bin:${HOME}/.config/yarn/global/node_modules/.bin:${PATH}"
@@ -69,12 +93,13 @@ export PATH="${HOME}/node_modules/.bin:${PATH}"
 # Add Make to PATH
 export PATH="/opt/homebrew/opt/make/libexec/gnubin:${PATH}"
 
+# Add PostgreSQL to PATH
+export PATH="/opt/homebrew/opt/postgresql@17/bin:${PATH}"
+
 # Set default editors
 export EDITOR="cursor"
-export GIT_EDITOR="nvim"
+export GIT_EDITOR="vim"
 
-# OUTPUT FORMATTING
-# =================
 bold=$(tput bold)
 italic=$(tput sitm)
 normal=$(tput sgr0)
@@ -210,13 +235,13 @@ pr() {
     issue=$(echo "${match[1]}" | tr '[:lower:]' '[:upper:]')
     title=${match[2]//-/ }
 
-    gh pr new -d -t "[${issue}] ${title}" -B "${base}" -H "${branch}" -T "pull_request_template.md"
+    gh pr new -d -t "[${issue}] ${title}" -B "${base}" -H "${branch}"
   else
     echo # /br
     echo "${bold}Automatic title requires branch name to be in format ${orange}[ISSUE]-[DESCRIPTION]${normal}"
     echo "${italic}Use cmd+shift+. to copy branch name from Linear issue${normal}"
 
-    gh pr new -d -B "${base}" -H "${branch}" -T "pull_request_template.md"
+    gh pr new -d -B "${base}" -H "${branch}"
   fi
 }
 
@@ -236,6 +261,7 @@ del() {
 assume_profile() {
   if [ $# -lt 1 ]; then
     echo "${bold}Usage:${normal} ${funcstack[1]} [profile_name]"
+    unset AWS_PROFILE
     return 2
   fi
 
@@ -255,7 +281,6 @@ alias r='recent'
 alias cat='bat'
 alias catp='bat -p'
 alias d='deploy'
-alias ds='deploy_status'
 alias scb='set_current_branch'
 alias code='cursor'
 alias c='cursor'
@@ -285,12 +310,12 @@ alias tmd='tmux detach'
 alias tml='tmux list-panes -a -F "#{pane_tty} #{session_name}"'
 
 # terraform
-alias tf='terraform'
-alias tfi='terraform init'
-alias tff='terraform fmt -write=true -recursive'
-alias tfv='terraform validate'
-alias tfp='terraform plan'
-alias tfa='terraform apply'
+# alias tf='terraform'
+# alias tfi='terraform init'
+# alias tff='terraform fmt -write=true -recursive'
+# alias tfv='terraform validate'
+# alias tfp='terraform plan'
+# alias tfa='terraform apply'
 
 # ts
 alias ts='npx ts-node'
