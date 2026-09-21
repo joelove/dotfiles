@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+#
+# candela-workspace - tmux-backed Ghostty workspace for the Candela repos.
+#
+# Two tmux sessions mirror the two Ghostty windows:
+#   candela-pi   two panes, each running pi in ~/Projects/candela
+#   candela-prs  four panes: nvim + gh-dash on top, two shells below
+#
+# Usage:
+#   candela-workspace build              create both sessions if missing
+#   candela-workspace attach [session]   ensure sessions, then attach
+#   candela-workspace attach-only [s]    attach without touching the layout
+#   candela-workspace open               open both Ghostty windows
+#   candela-workspace post-restore       resurrect hook (start pi again)
+#
+set -euo pipefail
+
+# Give the tmux server (and therefore every pane) a complete environment even
+# when we are launched by launchd / `open` with a minimal PATH.
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$HOME/.nvm/versions/node/v24.12.0/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+TMUX="/opt/homebrew/bin/tmux"
+CANDELA="$HOME/Projects/candela"
+PI_BIN="/Users/joelove/.nvm/versions/node/v24.12.0/bin/pi"
+SELF="/Users/joelove/.local/bin/candela-workspace"
+RESURRECT_DIR="$HOME/.local/share/tmux/resurrect"
+RESURRECT_RESTORE="$HOME/.tmux/plugins/tmux-resurrect/scripts/restore.sh"
+LOCKDIR="/tmp/candela-workspace.lock"
+
+have() { "$TMUX" has-session -t "$1" 2>/dev/null; }
+
+# True when a client is attached to the session, i.e. a terminal window is
+# viewing it. This is the source of truth for whether the workspace is open.
+have_client() { "$TMUX" list-clients -t "$1" -F '#{client_tty}' 2>/dev/null | grep -q .; }
+
+# --- session builders -------------------------------------------------------
+
+build_pi() {
+  have candela-pi && return 0
+  local left right
+  left=$("$TMUX" new-session -d -s candela-pi -n agent -c "$CANDELA" -P -F '#{pane_id}')
+  right=$("$TMUX" split-window -h -t "$left" -c "$CANDELA" -P -F '#{pane_id}')
+  "$TMUX" set-option -p -t "$left"  @pi_started 1
+  "$TMUX" set-option -p -t "$right" @pi_started 1
+  "$TMUX" send-keys -t "$left"  "$PI_BIN" Enter
+  "$TMUX" send-keys -t "$right" "$PI_BIN" Enter
+}
+
+build_prs() {
+  have candela-prs && return 0
+  local top bottom bottom_right top_right
+  top=$("$TMUX" new-session -d -s candela-prs -n editor -c "$CANDELA" -P -F '#{pane_id}')
+  # bottom strip (~25%)
+  bottom=$("$TMUX" split-window -v -t "$top" -l 25% -c "$CANDELA/candela-infra" -P -F '#{pane_id}')
+  bottom_right=$("$TMUX" split-window -h -t "$bottom" -l 50% -c "$CANDELA/candela-orchestrator" -P -F '#{pane_id}')
+  # top row right (~40%)
+  top_right=$("$TMUX" split-window -h -t "$top" -l 40% -c "$CANDELA" -P -F '#{pane_id}')
+  "$TMUX" send-keys -t "$top"       "nvim ." Enter
+  "$TMUX" send-keys -t "$top_right" "gh dash" Enter
+}
+
+build() { build_pi; build_prs; }
+
+# --- ensure -----------------------------------------------------------------
+
+latest_save() {
+  ls -t "$RESURRECT_DIR"/tmux_resurrect_*.txt 2>/dev/null | head -1
+}
+
+# Start pi in any candela-pi pane that is sitting at a plain shell. A pane
+# option marks a pane as already handled so the ensure step and the resurrect
+# hook can both call this without starting pi twice.
+start_pi_in_shells() {
+  have candela-pi || return 0
+  local pane cmd mark
+  while IFS= read -r pane; do
+    mark=$("$TMUX" show-options -p -t "$pane" -qv @pi_started 2>/dev/null || true)
+    [ "$mark" = "1" ] && continue
+    cmd=$("$TMUX" display-message -p -t "$pane" '#{pane_current_command}' 2>/dev/null || echo '')
+    case "$cmd" in
+      zsh|bash|sh|-zsh|-bash)
+        "$TMUX" set-option -p -t "$pane" @pi_started 1
+        "$TMUX" send-keys -t "$pane" "$PI_BIN" Enter
+        ;;
+    esac
+  done < <("$TMUX" list-panes -t candela-pi -F '#{pane_id}' 2>/dev/null)
+}
+
+# Restore the last resurrect save, synchronously, into the running server.
+restore_from_save() {
+  local socket
+  socket=$("$TMUX" display-message -p '#{socket_path}' 2>/dev/null || true)
+  [ -n "$socket" ] || return 1
+  [ -n "$(latest_save)" ] || return 1
+  TMUX="$socket,0,0" bash "$RESURRECT_RESTORE" >/dev/null 2>&1 || true
+}
+
+ensure_unlocked() {
+  "$TMUX" start-server 2>/dev/null || true
+  if ! have candela-pi || ! have candela-prs; then
+    if [ -n "$(latest_save)" ]; then
+      # Keep the server alive while restoring from scratch.
+      local tmp="__candela_workspace_tmp__"
+      have "$tmp" || "$TMUX" new-session -d -s "$tmp" -c "$CANDELA" 2>/dev/null || true
+      restore_from_save
+      have "$tmp" && "$TMUX" kill-session -t "$tmp" 2>/dev/null || true
+      # resurrect restores pi as a generic `node`, so it comes back as a shell.
+      sleep 1
+      start_pi_in_shells
+    fi
+  fi
+  build
+}
+
+ensure() {
+  while ! mkdir "$LOCKDIR" 2>/dev/null; do sleep 0.2; done
+  trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
+  ensure_unlocked
+  rmdir "$LOCKDIR" 2>/dev/null || true
+  trap - EXIT
+}
+
+# --- actions ----------------------------------------------------------------
+
+attach() {
+  local session="${1:-candela-prs}"
+  ensure
+  "$TMUX" attach-session -t "$session"
+}
+
+attach_only() {
+  "$TMUX" attach-session -t "${1:-candela-prs}"
+}
+
+# Create one Ghostty window attached to a session, inside the existing Ghostty
+# app instance. Ghostty runs a multiple-argument `command` through /bin/sh -c,
+# so the attach-only invocation works as written.
+new_ghostty_window() {
+  local session="$1"
+  osascript - "$SELF" "$session" <<'APPLESCRIPT'
+on run argv
+  set cmd to (item 1 of argv) & " attach-only " & (item 2 of argv)
+  tell application "Ghostty"
+    set cfg to new surface configuration
+    set command of cfg to cmd
+    new window with configuration cfg
+  end tell
+end run
+APPLESCRIPT
+}
+
+# Focus the Ghostty window backing each tmux session. `open -a` alone only
+# raises windows already on the active space, so find each window by its
+# session title (set via tmux `set-titles`) and let yabai switch the display to
+# the window's space, including a native fullscreen space.
+focus_workspace_windows() {
+  local title id
+  for title in agent editor; do
+    id=$(yabai -m query --windows 2>/dev/null \
+      | jq -r --arg t "$title" '.[] | select(.app=="Ghostty" and .title==$t) | .id' \
+      | head -n1)
+    if [ -n "$id" ]; then
+      yabai -m window --focus "$id" 2>/dev/null || true
+    fi
+  done
+  /usr/bin/open -a /Applications/Ghostty.app
+}
+
+open_windows() {
+  ensure
+
+  # Already open: swap to each window's space and focus the app; spawn nothing.
+  if have_client candela-pi && have_client candela-prs; then
+    focus_workspace_windows
+    return 0
+  fi
+
+  # Start a single windowless app instance if Ghostty is not already running.
+  # (`--initial-window=false` is only applied on this fresh launch, so a normal
+  # double-click launch still opens a window.)
+  if ! pgrep -x ghostty >/dev/null 2>&1; then
+    /usr/bin/open -a /Applications/Ghostty.app --args --initial-window=false
+    local i
+    for i in $(seq 1 50); do
+      osascript -e 'tell application "Ghostty" to count windows' >/dev/null 2>&1 && break
+      sleep 0.1
+    done
+  fi
+
+  # Create only the windows whose session has no attached client.
+  have_client candela-pi  || new_ghostty_window candela-pi
+  have_client candela-prs || new_ghostty_window candela-prs
+}
+
+# Called by tmux-resurrect after a manual restore. resurrect sees pi as a
+# generic `node` process and cannot relaunch it, so restart it in the pi
+# session.
+post_restore() {
+  sleep 1.5
+  start_pi_in_shells
+}
+
+case "${1:-open}" in
+  build)       build ;;
+  ensure)      ensure ;;
+  attach)      attach "${2:-candela-prs}" ;;
+  attach-only) attach_only "${2:-candela-prs}" ;;
+  open)        open_windows ;;
+  post-restore) post_restore ;;
+  *) echo "usage: candela-workspace [build|ensure|attach <session>|attach-only <session>|open|post-restore]" >&2; exit 1 ;;
+esac

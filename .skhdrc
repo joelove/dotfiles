@@ -46,8 +46,17 @@ ctrl + alt - c : activate_primary_space_on_next_display; \
                  focus_next_display; \
                  size_to_display
 
-## Switch space on display with focused window
-cmd + alt - tab : swap_active_space_on_focused_display
+## Spatial focus: nearest window in that direction, else the display in that
+## direction. yabai exits 1 when there is no window in that space, so the
+## display focus acts as the cross-monitor fallback. Shift is deliberate so
+## Ghostty's cmd+alt+arrow pane navigation is left untouched.
+cmd + alt + shift - left  : yabai -m window --focus west  2>/dev/null || yabai -m display --focus west  2>/dev/null
+cmd + alt + shift - right : yabai -m window --focus east  2>/dev/null || yabai -m display --focus east  2>/dev/null
+cmd + alt + shift - up    : yabai -m window --focus north 2>/dev/null || yabai -m display --focus north 2>/dev/null
+cmd + alt + shift - down  : yabai -m window --focus south 2>/dev/null || yabai -m display --focus south 2>/dev/null
+
+## Open the Candela Ghostty workspace (was: switch space on focused display)
+cmd + alt - tab : candela-workspace open
 
 ## Switch space on display with mouse cursor
 cmd + alt + shift - tab : focus_display_with_mouse; \

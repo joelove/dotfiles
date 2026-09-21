@@ -63,6 +63,9 @@ fi
 # bun completions
 [ -s "/Users/joelove/.bun/_bun" ] && source "/Users/joelove/.bun/_bun"
 
+# Candela UI read token
+export CANDELA_UI_READ_TOKEN="$(gh auth token)"
+
 # bun
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
@@ -96,8 +99,11 @@ export PATH="/opt/homebrew/opt/make/libexec/gnubin:${PATH}"
 # Add PostgreSQL to PATH
 export PATH="/opt/homebrew/opt/postgresql@17/bin:${PATH}"
 
+# Add Cargo to PATH
+export PATH="$HOME/.cargo/bin:$PATH"
+
 # Set default editors
-export EDITOR="cursor"
+export EDITOR="vim"
 export GIT_EDITOR="vim"
 
 bold=$(tput bold)
@@ -275,15 +281,15 @@ list_profiles() {
 }
 
 # general
-alias v='vim'
+alias v='nvim'
 alias vim='nvim'
+alias code='nvim'
+alias c='nvim'
 alias r='recent'
 alias cat='bat'
 alias catp='bat -p'
 alias d='deploy'
 alias scb='set_current_branch'
-alias code='cursor'
-alias c='cursor'
 alias assume='assume_profile'
 alias a='assume'
 alias profiles='list_profiles'
@@ -337,7 +343,8 @@ alias gl='git log'
 alias glg='git log --graph --pretty=oneline --all --abbrev-commit'
 alias gn='git checkout -b'
 alias gp='git pull'
-alias gpm='git pull origin main:main'
+alias gfm='git pull origin main:main'
+alias gpm='git checkout main && git pull'
 alias gpnpm='gchpl && gc -m "chore: checkout pnpm-lock from main and pnpm i"'
 alias gpsh='git push'
 alias gpsht='scb && git push origin "${current_branch}:test"'

@@ -36,6 +36,10 @@ brew install koekeishiya/formulae/yabai
 
 - [skhd](https://github.com/koekeishiya/skhd)
 - [yabai](https://github.com/koekeishiya/yabai)
+- [Ghostty](https://ghostty.org) (config symlinked from `.config/ghostty`)
+- [tmux](https://github.com/tmux/tmux) with tpm plugins (see `.tmux.conf`)
+- [Neovim](https://neovim.io) NvChad-based config (symlinked from `.config/nvim`)
+- `candela-workspace` tmux/Ghostty workspace launcher (symlinked from `.local/bin`); needs `tmux`, `jq`, `yabai` and the `candela-*` repos under `~/Projects/candela`
 
 ### Symlinks
 
@@ -50,6 +54,11 @@ ln -s ~/Projects/dotfiles/.gitconfig ~/.gitconfig
 ln -s ~/Projects/dotfiles/.gitignore ~/.gitignore
 ln -s ~/Projects/dotfiles/.tmux.conf ~/.tmux.conf
 ln -s ~/Projects/dotfiles/.p10k.zsh ~/.p10k.zsh
+mkdir -p ~/.config
+ln -s ~/Projects/dotfiles/.config/ghostty ~/.config/ghostty
+ln -s ~/Projects/dotfiles/.config/nvim ~/.config/nvim
+mkdir -p ~/.local/bin
+ln -s ~/Projects/dotfiles/.local/bin/candela-workspace ~/.local/bin/candela-workspace
 ```
 
 ```sh
