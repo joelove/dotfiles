@@ -1,0 +1,109 @@
+# Ghostty configuration
+# Migrated from iTerm2 "Default" profile (com.googlecode.iterm2)
+
+# ---------------------------------------------------------------------------
+# Font
+# ---------------------------------------------------------------------------
+# iTerm2 "Normal Font" was: MesloLGS-NF-Regular 15
+font-family = MesloLGS NF
+font-size = 15
+
+# iTerm2 "Vertical Spacing" = 1.28 (28% extra height).
+# Remove/comment this line if you prefer the font's natural spacing.
+adjust-cell-height = 28%
+
+# ---------------------------------------------------------------------------
+# Color scheme
+# ---------------------------------------------------------------------------
+# Background / foreground
+background = #000000
+foreground = #f8f8f2
+
+# Cursor
+# Solid block when focused. Ghostty automatically renders a hollow block
+# (box outline) when the surface/window is unfocused. See renderer/cursor.zig.
+cursor-style = block
+cursor-color = #ffa827
+cursor-text = #000000
+
+# Selection
+selection-background = #403d3d
+selection-foreground = #ffffff
+
+# ANSI palette (0-15)
+palette = 0=#222222
+palette = 1=#f92a72
+palette = 2=#a6e22e
+palette = 3=#ffa827
+palette = 4=#ae81ff
+palette = 5=#f92a72
+palette = 6=#66d9ef
+palette = 7=#cfcfc2
+palette = 8=#75715e
+palette = 9=#f92a72
+palette = 10=#a6e22e
+palette = 11=#e6db74
+palette = 12=#ae81ff
+palette = 13=#f92a72
+palette = 14=#66d9ef
+palette = 15=#f8f8f2
+
+# ---------------------------------------------------------------------------
+# Splits
+# ---------------------------------------------------------------------------
+# Dim unfocused split panes, but more subtly than the Ghostty default of 0.7.
+# Lower values fade the pane more; 1.0 disables dimming entirely.
+unfocused-split-opacity = 0.85
+
+# Subtle grey divider line between split panes (against the #000000 bg).
+split-divider-color = #2a2a2a
+
+# ---------------------------------------------------------------------------
+# Shell integration
+# ---------------------------------------------------------------------------
+# Keep the block cursor at the shell prompt. By default shell integration
+# switches the cursor to a bar, which defeats the focused/unfocused block
+# behavior above.
+shell-integration-features = no-cursor,no-sudo,title,no-ssh-env,no-ssh-terminfo,path
+
+# ---------------------------------------------------------------------------
+# tmux integration
+# ---------------------------------------------------------------------------
+# Send the tmux prefix (C-b) plus a pane command, so Ghostty drives tmux panes
+# instead of creating Ghostty splits. Uses the `text:` keybind action, which
+# takes Zig string-literal escapes (e.g. `\x02` sends Ctrl-B).
+#
+# split right
+keybind = super+d=text:\x02%
+# split down
+keybind = super+shift+d=text:\x02\x22
+# C-b C-w -> kill-pane
+keybind = super+w=text:\x02\x17
+# zoom / unzoom pane
+keybind = super+shift+enter=text:\x02z
+# move pane focus
+keybind = super+alt+arrow_left=text:\x02\x1b[D
+keybind = super+alt+arrow_right=text:\x02\x1b[C
+keybind = super+alt+arrow_up=text:\x02\x1b[A
+keybind = super+alt+arrow_down=text:\x02\x1b[B
+
+# ---------------------------------------------------------------------------
+# Window cycling
+# ---------------------------------------------------------------------------
+# Cycle between Ghostty windows (not tabs). This overrides the default
+# ctrl+tab=next_tab / ctrl+shift+tab=previous_tab; tabs are still reachable via
+# super+t, super+[ / super+], and the tab overview.
+keybind = ctrl+tab=goto_window:next
+keybind = ctrl+shift+tab=goto_window:previous
+
+# ---------------------------------------------------------------------------
+# GUI-editor bridges
+# ---------------------------------------------------------------------------
+# Send Alt+<key>; tmux forwards it to the pane and nvim maps <A-...>.
+# See ~/.config/nvim/lua/mappings.lua.
+keybind = super+p=text:\x1bp
+keybind = super+shift+p=text:\x1bP
+keybind = super+s=text:\x1bs
+keybind = super+f=text:\x1bf
+keybind = super+shift+f=text:\x1bF
+keybind = super+/=text:\x1b/
