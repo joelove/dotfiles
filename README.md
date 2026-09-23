@@ -61,6 +61,7 @@ ln -s ~/Projects/dotfiles/.config/gh-dash ~/.config/gh-dash
 ln -s ~/Projects/dotfiles/.config/dev-workspace ~/.config/dev-workspace
 mkdir -p ~/.local/bin
 ln -s ~/Projects/dotfiles/.local/bin/dev-workspace ~/.local/bin/dev-workspace
+ln -s ~/Projects/dotfiles/.local/bin/running-actions ~/.local/bin/running-actions
 # per-project wrappers (one-line `exec dev-workspace <profile> "$@"`) are added alongside
 mkdir -p ~/.agents/skills ~/.pi/agent/skills
 ln -s ~/Projects/dotfiles/.agents/skills/github-prs ~/.agents/skills/github-prs
