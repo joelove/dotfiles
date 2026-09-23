@@ -1,24 +1,16 @@
 # yaml-language-server: $schema=https://gh-dash.dev/schema.json
 
-# All open PRs across the Candela repos you track.
+# Default profile: all open PRs across github.com/joelove.
 # gh-dash appends `sort:updated`, so no sort qualifier here.
 prSections:
-  - title: "Candela: open PRs"
+  - title: "My open PRs"
     filters: >-
       is:open
-      repo:Candela-Ed/candela-match
-      repo:Candela-Ed/candela-eval
-      repo:Candela-Ed/candela-orchestrator
-      repo:Candela-Ed/candela-infra
-      repo:Candela-Ed/candela-cms
+      user:joelove
 
-# Map GitHub repos to local checkouts so checkout/diff work from the TUI.
+# Map local checkouts so checkout/diff work from the TUI.
 repoPaths:
-  Candela-Ed/candela-match: /Users/joelove/Projects/candela/candela-match
-  Candela-Ed/candela-eval: /Users/joelove/Projects/candela/candela-eval
-  Candela-Ed/candela-orchestrator: /Users/joelove/Projects/candela/candela-orchestrator
-  Candela-Ed/candela-infra: /Users/joelove/Projects/candela/candela-infra
-  Candela-Ed/candela-cms: /Users/joelove/Projects/candela/candela-cms
+  joelove/dotfiles: /Users/joelove/Projects/dotfiles
 
 defaults:
   view: prs
@@ -27,8 +19,8 @@ defaults:
   preview:
     open: true
 
-# gh-dash's stock "open in GitHub" key is `o` (there is no Enter binding).
-# Add Enter as an extra binding; `o` still works.
+# gh-dash's stock "open in GitHub" key is `o`; here it opens the PR in the
+# dev-workspace editor pane (octo.nvim), falling back to the browser.
 keybindings:
   prs:
     - key: enter
@@ -36,4 +28,4 @@ keybindings:
       command: "gh pr view {{.PrNumber}} --repo {{.RepoName}} --web"
     - key: o
       name: review in nvim
-      command: "candela-workspace review https://github.com/{{.RepoName}}/pull/{{.PrNumber}}"
+      command: "dev-workspace review https://github.com/{{.RepoName}}/pull/{{.PrNumber}}"

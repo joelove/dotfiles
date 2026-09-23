@@ -110,7 +110,7 @@ swap_active_space_on_focused_display() {
   activate_primary_space_on_focused_display || activate_background_space_on_focused_display
 }
 
-# All open PRs across the Candela repos (gh-dash TUI).
+# All open PRs (gh-dash TUI).
 prs() {
   gh dash "$@"
 }

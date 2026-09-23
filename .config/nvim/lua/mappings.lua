@@ -35,9 +35,9 @@ map({ "n", "i", "v" }, "<A-w>", function()
 end, { desc = "close buffer (cmd+w)" })
 
 -- octo.nvim (GitHub PR review). octo lives in this nvim pane; gh-dash stays the
--- triage dashboard. The pane opens ~/Projects/candela (not a git repo), so use
--- explicit repo/URL commands for anything octo cannot infer from cwd.
+-- triage dashboard. The editor pane may open a directory that is not a git repo,
+-- so use explicit repo/URL commands for anything octo cannot infer from cwd.
 map("n", "<leader>op", "<cmd>Octo pr list<CR>", { desc = "octo PR list (current repo)" })
-map("n", "<leader>os", "<cmd>Octo search is:pr org:Candela-Ed<CR>", { desc = "octo search Candela PRs" })
+map("n", "<leader>os", "<cmd>Octo search is:pr<CR>", { desc = "octo search PRs" })
 map("n", "<leader>or", "<cmd>Octo review<CR>", { desc = "octo review current branch PR" })
 map("n", "<leader>oc", "<cmd>Octo review comments<CR>", { desc = "octo pending review comments" })

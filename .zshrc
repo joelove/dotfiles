@@ -63,9 +63,6 @@ fi
 # bun completions
 [ -s "/Users/joelove/.bun/_bun" ] && source "/Users/joelove/.bun/_bun"
 
-# Candela UI read token
-export CANDELA_UI_READ_TOKEN="$(gh auth token)"
-
 # bun
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"

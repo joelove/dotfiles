@@ -55,7 +55,7 @@ cmd + alt + shift - right : yabai -m window --focus east  2>/dev/null || yabai -
 cmd + alt + shift - up    : yabai -m window --focus north 2>/dev/null || yabai -m display --focus north 2>/dev/null
 cmd + alt + shift - down  : yabai -m window --focus south 2>/dev/null || yabai -m display --focus south 2>/dev/null
 
-## Open the Candela Ghostty workspace (was: switch space on focused display)
+## Open the Ghostty workspace (was: switch space on focused display)
 cmd + alt - tab : candela-workspace open
 
 ## Switch space on display with mouse cursor

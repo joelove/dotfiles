@@ -3,45 +3,56 @@
 Exhaustive per-tool detail. `SKILL.md` has the invariants and the quick map;
 this file is the reference for changing or debugging anything.
 
-## Sessions and layout (`candela-workspace`)
+## Sessions and profiles (`dev-workspace`)
 
-- Repo path: `~/Projects/dotfiles/.local/bin/candela-workspace`, symlinked to
-  `~/.local/bin/candela-workspace`. Sets its own `PATH` and uses absolute
-  `SELF`/`PI_BIN` paths so it works from `open`/launchd.
-- Two tmux sessions, one window each:
-  - `candela-pi`, window `agent`: two panes, both `pi` in `~/Projects/candela`.
-  - `candela-prs`, window `editor`: four panes. Top-left `nvim .` (in
-    `~/Projects/candela`), top-right `gh dash`, bottom-left/right shells in
-    `candela-infra` / `candela-orchestrator`.
-- Subcommands: `build`, `ensure`, `attach [session]`, `attach-only [session]`,
-  `open`, `review <pr>`, `normalize-editor`, `post-restore`.
-- `open`: `ensure`, then opens one Ghostty instance with the two windows via
-  AppleScript `new window with configuration` (a fresh launch uses
-  `--initial-window=false`). If both sessions already have clients it just
-  focuses: `focus_workspace_windows` finds each window by its title
-  (`agent`/`editor`, from tmux `set-titles`) and uses `yabai -m window --focus`
-  to swap each display to the window's space.
-- `ensure`: restores from the newest tmux-resurrect save when a session is
-  missing, then `build`, then `normalize_editor`. A lock dir prevents concurrent
-  runs.
-- `normalize_editor`: geometry-based re-pin, independent of pane names/options.
-  The smallest `pane_top` is the top row; its rightmost pane is gh-dash
-  (`-x 76`) and its leftmost is nvim (`@candela_review_pane 1`). The largest
-  `pane_top` is the bottom row; its leftmost pane is resized to `-y 14`. Called
-  from `ensure`, from `post_restore`, and from the tmux `window-resized` hook
-  via the debounced `normalize-editor` subcommand (0.25s quiet period).
-- `build_prs`/`build_pi` define the layout on first creation: gh-dash `-l 76`,
-  bottom strip `-l 14`, `@candela_review_pane 1` on the nvim pane.
-- `review <ref>`: `pr_url` accepts a full URL, `owner/repo#n`, or
-  `owner/repo n`. `review_pane` finds the pane tagged `@candela_review_pane`.
-  It sends `Escape`, `:Octo <url>`, Enter, waits 2s, then `:Octo review`, Enter
-  (octo fetches asynchronously). Falls back to `open <url>` when the editor pane
-  is absent or not running nvim.
-- `post_restore`: survives `resurrect` restoring `pi` as a bare `node`; starts
-  pi in shell panes and re-normalizes.
-- Never name a shell variable `TMUX` in this script or its callers: it shadows
-  tmux's exported socket variable, so child `tmux` clients try to connect to the
-  value as a socket. The script uses `TMUX_BIN`.
+- Engine: `~/Projects/dotfiles/.local/bin/dev-workspace`, symlinked to
+  `~/.local/bin/dev-workspace`. It sets its own `PATH`, uses a `TMUX_BIN`
+  variable (never `TMUX`), guards tmux queries with no server, and computes
+  `DEV_SELF` from `BASH_SOURCE` so Ghostty windows can re-invoke it.
+- Invocation: `dev-workspace [<profile>] <cmd>`. A leading known subcommand
+  selects the default `projects` profile; otherwise the first argument is the
+  profile name. Profiles are sourced bash at `~/.config/dev-workspace/<name>.conf`.
+- Profile fields and defaults: `DEV_NAME` (basename of root, lowercased),
+  `DEV_ROOT` (`~/Projects`), `DEV_AGENT_DIR` (root), `DEV_AGENT_CMD` (`pi`; empty
+  skips the agent session), `DEV_AGENT_PANES` (2), `DEV_AGENT_SESSION`
+  (`${DEV_NAME}-agent`), `DEV_EDITOR_DIR` (root), `DEV_EDITOR_CMD` (`nvim .`),
+  `DEV_EDITOR_SESSION` (`${DEV_NAME}-editor`), `DEV_REVIEW_CMD` (`gh dash`;
+  empty omits the pane), `DEV_TERM_DIRS` (one pane at root; relative paths
+  resolve against root), `DEV_GH_COLS` (76), `DEV_BOTTOM_LINES` (14).
+- A workspace is two sessions in two Ghostty windows: the agent view
+  (`DEV_AGENT_SESSION`, `DEV_AGENT_PANES` panes running `DEV_AGENT_CMD`) and the
+  editor view (`DEV_EDITOR_SESSION`: editor pane, optional review pane, bottom
+  row of `DEV_TERM_DIRS`). Window names are `agent` / `editor`.
+- Commands: `open` (default), `build`, `ensure`, `attach [session]`,
+  `attach-only [session]`, `review <pr>`, `normalize-editor [--all]`,
+  `post-restore [--all]`, `list`, `print-config`.
+- `open`: `ensure`, then focus if all sessions have clients, else create only
+  the missing Ghostty windows in one instance (fresh launch uses
+  `--initial-window=false`; window command is `dev-workspace <profile>
+  attach-only <session>`). `focus_workspace_windows` matches yabai windows by
+  session-name title (`set-titles-string '#S'`) and swaps each display's space.
+- `ensure`: restore the newest tmux-resurrect save when a session is missing,
+  `build`, `normalize-editor`. Per-profile lock dir
+  `/tmp/dev-workspace-<name>.lock`.
+- `normalize_editor`: geometry-based (no pane tags needed). Top row: leftmost
+  pane is the editor (`@dev_review_pane <DEV_NAME>`), rightmost is the review
+  pane resized to `DEV_GH_COLS` when present. Bottom row: leftmost pane resized
+  to `DEV_BOTTOM_LINES`. `--all` iterates every profile plus the default and is
+  debounced 0.25s for the resize hook.
+- `start_agent_in_shells` / `start_views_in_shells`: after a restore, start
+  `DEV_AGENT_CMD` in agent panes and the editor/review commands in the editor
+  panes, but only where they are sitting at a plain shell (marked with
+  `@dev_agent_started` for the agent). resurrect cannot restore a command with
+  arguments, which is why the review pane is started this way.
+- `review <pr>`: `pr_url` accepts a full URL, `owner/repo#n`, or `owner/repo n`;
+  `review_pane` selects the pane tagged `@dev_review_pane <profile>`; sends
+  `Escape`, `:Octo <url>`, Enter, waits 2s, `:Octo review`, Enter. Browser
+  fallback when the editor pane is absent or not nvim.
+- A project wrapper is one line: `exec dev-workspace <profile> "$@"`. Profiles
+  can pin session names (e.g. to preserve an existing resurrect save), point
+  `DEV_REVIEW_CMD` at a project-specific `gh dash --config` kept under
+  `.config/dev-workspace/`, and list the project's terminal subdirs in
+  `DEV_TERM_DIRS`.
 
 ## Ghostty
 
@@ -72,22 +83,26 @@ this file is the reference for changing or debugging anything.
   inactive (no green highlight).
 - Plugins via tpm: tmux-resurrect, tmux-continuum, vim-tmux-navigator,
   tmux-nova.
-- resurrect: `capture-pane-contents on`; `continuum-restore off` (candela-workspace
-  drives restore); `@resurrect-processes '"~gh->gh dash" "~nvim->nvim ."'`;
-  post-restore hook `/Users/joelove/.local/bin/candela-workspace post-restore`.
+- resurrect: `capture-pane-contents on`; `continuum-restore off`
+  (dev-workspace drives restore); `@resurrect-processes '"~nvim->nvim ."'`
+  (only nvim, since resurrect cannot restore a command with arguments); the
+  post-restore hook runs
+  `/Users/joelove/.local/bin/dev-workspace post-restore --all`, which starts the
+  agent and the per-profile editor/review commands.
 - `default-shell /bin/zsh`.
 - terminal-features: `*:RGB` (truecolor), `xterm*:extkeys` (modified keys like
   Shift+Enter), `xterm*:hyperlinks` (OSC 8).
 - `mouse on` (click to focus, scroll, border drag).
-- `set-titles on` + `set-titles-string '#W'` (window name; candela-workspace
-  matches `agent`/`editor`).
+- `set-titles on` + `set-titles-string '#S'` (unique session name; used by
+  dev-workspace to find each Ghostty window).
 - `cursor-style blinking-block` (focused pane flashes; Ghostty hollows the
   unfocused window).
 - `extended-keys on`.
 - Prefix is default `C-b`. `prefix r` sources the config. `C-w` is
   context-aware: nvim focused -> `send-keys M-w` (close buffer), else
   `kill-pane`.
-- `set-hook -g window-resized` runs `candela-workspace normalize-editor`.
+- `set-hook -g window-resized` runs
+  `dev-workspace normalize-editor --all` (debounced).
 - Inspect: `tmux show-options -g`, `tmux show-hooks -g`,
   `tmux list-keys -T prefix`.
 
@@ -113,27 +128,30 @@ this file is the reference for changing or debugging anything.
 ## octo.nvim review flow
 
 - Install is lazy (`cmd = "Octo"`); opens from `:Octo pr list`,
-  `:Octo search is:pr org:Candela-Ed`, `:Octo <url>`, or `candela-workspace review`.
+  `:Octo search ...`, `:Octo <url>`, or `dev-workspace [<profile>] review`.
 - Review: `:Octo review` starts review mode (files panel + side-by-side diff).
   `<localleader>ca` comment, `<localleader>sa` suggestion, `:Octo review submit`
   (Ctrl-a approve, Ctrl-m comment, Ctrl-r request changes).
-- The editor pane's cwd is `~/Projects/candela`, which is not a git repo, so use
+- The editor pane's cwd is the project root and may not be a git repo, so use
   explicit repo/URL commands. `resurrect` drops the pane tag; `normalize_editor`
-  re-adds it.
+  re-adds it (`@dev_review_pane <profile>`).
 
 ## gh-dash
 
-- Repo path: `~/Projects/dotfiles/.config/gh-dash/config.yml`, symlinked to
+- Repo path: `~/Projects/dotfiles/.config/gh-dash/`, symlinked to
   `~/.config/gh-dash`.
-- `prSections`: "Candela: open PRs" across candela-match, candela-eval,
-  candela-orchestrator, candela-infra, candela-cms.
-- `repoPaths` map each repo to its checkout for checkout/diff.
-- `defaults`: `view: prs`, `prsLimit: 50`, `refetchIntervalMinutes: 5`,
-  preview open.
-- `keybindings.prs`: `enter` -> `gh pr view --web`; `o` -> `candela-workspace
-  review https://github.com/{{.RepoName}}/pull/{{.PrNumber}}` (overrides the
-  built-in open-in-GitHub; the helper falls back to the browser).
-- Config is read at launch; relaunch `gh dash` to reload.
+- `config.yml` is the default profile: `prSections` lists all open PRs for
+  `user:joelove`; `repoPaths` maps local checkouts; `o` runs
+  `dev-workspace review ...` (default workspace).
+- A project profile can keep its own gh-dash config in
+  `.config/dev-workspace/<name>.yml` and set
+  `DEV_REVIEW_CMD="gh dash --config ~/.config/dev-workspace/<name>.yml"`; its
+  `o` binding calls the project wrapper.
+- Both configs bind `enter` -> `gh pr view --web` and `o` -> review in nvim
+  (overriding gh-dash's built-in open-in-GitHub; the helper falls back to the
+  browser), with the same `defaults` and preview settings.
+- gh-dash reads its config at launch; each workspace runs its own
+  `gh dash --config ...` so the review pane shows the right sections.
 
 ## pi
 
@@ -155,17 +173,18 @@ this file is the reference for changing or debugging anything.
 
 - `.zshrc` (symlinked): oh-my-zsh + powerlevel10k, nvm/zoxide/fzf/pyenv, PATH
   additions, `EDITOR=GIT_EDITOR=vim`, aliases `v`/`code`/`c` -> nvim, `cat` ->
-  bat, git aliases, `pr` helper, `CANDELA_UI_READ_TOKEN="$(gh auth token)"`.
+  bat, git aliases, `pr` helper.
 - `.zprofile`, `.zshenv` (sources `.automations.sh`), `.p10k.zsh`.
 - `.gitconfig`: identity plus `gh auth git-credential` helpers for github.com
   and gist.github.com.
 
 ## skhd and yabai
 
-- `.skhdrc` (symlinked): `cmd+alt+tab` -> `candela-workspace open`;
-  `cmd+alt+shift+arrows` -> yabai spatial focus (window, else display);
-  window sizing hotkeys (`ctrl+alt+cmd`/`ctrl+cmd+shift` + space/x/c/z/tilde);
-  move window across displays; `hyper+1..4` app launches; `cmd+esc` dual-mac
+- `.skhdrc` (symlinked): `cmd+alt+tab` runs the workspace wrapper's `open`
+  (`<project>-workspace open` / `dev-workspace <profile> open`);
+  `cmd+alt+shift+arrows` -> yabai spatial focus (window, else display); window
+  sizing hotkeys (`ctrl+alt+cmd`/`ctrl+cmd+shift` + space/x/c/z/tilde); move
+  window across displays; `hyper+1..4` app launches; `cmd+esc` dual-mac
   passthrough.
 - `.automations.sh` (sourced from `.zshenv`): yabai grid sizing helpers,
   display/space focus helpers, and the `prs()` alias for `gh dash`.
@@ -183,27 +202,29 @@ this file is the reference for changing or debugging anything.
 
 ## This week's configuration (dotfiles commits)
 
-- 2026-09-21 `2989f60` Add Ghostty, Neovim and candela-workspace configs;
-  symlink Ghostty, nvim, gh-dash, candela-workspace.
+- 2026-09-21 `2989f60` import the Ghostty, Neovim and workspace configs;
+  symlink Ghostty, nvim, gh-dash and the workspace launcher.
 - 2026-09-23 `f4345b0` octo.nvim + open-PR-for-review integration (review
   subcommand, gh-dash binding, github-prs skill, gh-dash config in dotfiles).
 - 2026-09-23 `0d65df3` gh-dash `o` bound to review-in-nvim.
-- 2026-09-23 `9c84d0d` `candela-workspace` TMUX_BIN fix.
+- 2026-09-23 `9c84d0d` workspace TMUX_BIN fix.
 - 2026-09-23 `33d34c4` tolerant `review_pane`.
-- 2026-09-23 `669a25c`, `55161d7`, `f6996d7`, `d91d7a1`: fixed editor sizes
-  (gh-dash 80/76 cols, bottom 16/20/14 lines) re-pinned by `normalize_editor`.
+- 2026-09-23 `669a25c`, `55161d7`, `f6996d7`, `d91d7a1`: fixed editor sizes,
+  later re-pinned by `normalize_editor`.
 - 2026-09-23 `f50ae50` normalize on ensure/restore; `4c65d9b` `window-resized`
   hook.
-- Earlier in the week (in `.tmux.conf`/skhd): tmux-nova subtle borders, mouse,
-  titles, blinking cursor, extended-keys/hyperlinks, `C-w` kill, `cmd+alt+tab`
-  workspace open, spatial focus.
+- Latest: generic `dev-workspace` engine + per-project profiles, one-line
+  project wrappers, per-profile gh-dash configs (default all `user:joelove`,
+  per-project configs under `.config/dev-workspace/`), `@dev_review_pane
+  <profile>`, `set-titles-string #S`, and `dev-workspace ... --all` hooks.
 
 ## Debugging playbook
 
-- Layout wrong after restart or resize: `candela-workspace normalize-editor`
-  (or `ensure`); check `tmux list-panes -t candela-prs -F '#{pane_id} #{pane_width} #{pane_height} #{@candela_review_pane}'`.
-- `candela-workspace` acts on the wrong server / "not running nvim": a `TMUX`
-  variable is shadowing the socket env; check the script uses `TMUX_BIN`.
+- Layout wrong after restart or resize: `dev-workspace [<profile>]
+  normalize-editor` (or `ensure`); check
+  `tmux list-panes -t <session> -F '#{pane_id} #{pane_width} #{pane_height} #{@dev_review_pane}'`.
+- `dev-workspace` acts on the wrong server / "not running nvim": a `TMUX`
+  variable is shadowing the socket env; check the engine uses `TMUX_BIN`.
 - Modified keys (Shift+Enter) not working: `extended-keys`/`extkeys` need a
   fresh client attach; restart tmux or re-attach.
 - GUI shortcut does nothing: verify the Ghostty bridge (`ghostty +list-keybinds`)
@@ -212,10 +233,10 @@ this file is the reference for changing or debugging anything.
   backslash in `text:` escapes.
 - octo "No healthcheck found": load octo first (`:Octo ...`), then
   `:checkhealth octo`.
-- octo/review helper can't find the repo: the editor pane cwd is the umbrella
-  dir; use an explicit URL/repo.
+- octo/review helper can't find the repo: the editor pane cwd is the project
+  root; use an explicit URL/repo.
 - Review helper does nothing in gh-dash: gh-dash read the config at launch;
-  relaunch it.
+  relaunch it, and check the workspace's `DEV_REVIEW_CMD` config file.
 - resurrect brought back old panes/options: expected; `normalize_editor`
   re-applies sizes and the review tag.
 - tmux config parse errors: `tmux source-file ~/.tmux.conf` and read stderr;
@@ -225,10 +246,13 @@ this file is the reference for changing or debugging anything.
 
 - Add a shortcut as a pair: Ghostty keybind (Alt sequence) + nvim `<A-...>` map,
   then reload both.
-- Change editor sizes in `build_prs` and `normalize_editor` together.
+- Change editor sizes as profile fields (`DEV_GH_COLS`, `DEV_BOTTOM_LINES`);
+  `normalize_editor` consumes them.
+- Add a project as a profile in `~/.config/dev-workspace/<name>.conf` plus a
+  one-line wrapper in `.local/bin/<name>-workspace`; do not fork the engine.
 - Keep tmux as the only pane owner; do not introduce Ghostty splits.
 - Keep the palette consistent with the existing monokai values.
 - Validate before committing: `ghostty +validate-config`,
-  `tmux source-file`, `bash -n candela-workspace`, `:Lazy`/`:checkhealth`.
+  `tmux source-file`, `bash -n dev-workspace`, `:Lazy`/`:checkhealth`.
 - Commit and push `~/Projects/dotfiles`; home config is a symlink, so an
   uncommitted edit is easy to lose.

@@ -39,7 +39,7 @@ brew install koekeishiya/formulae/yabai
 - [Ghostty](https://ghostty.org) (config symlinked from `.config/ghostty`)
 - [tmux](https://github.com/tmux/tmux) with tpm plugins (see `.tmux.conf`)
 - [Neovim](https://neovim.io) NvChad-based config (symlinked from `.config/nvim`)
-- `candela-workspace` tmux/Ghostty workspace launcher (symlinked from `.local/bin`); needs `tmux`, `jq`, `yabai` and the `candela-*` repos under `~/Projects/candela`
+- `dev-workspace` tmux/Ghostty workspace engine with per-project profiles (symlinked from `.local/bin` and `.config/dev-workspace`); needs `tmux`, `jq`, `yabai`
 
 ### Symlinks
 
@@ -58,8 +58,10 @@ mkdir -p ~/.config
 ln -s ~/Projects/dotfiles/.config/ghostty ~/.config/ghostty
 ln -s ~/Projects/dotfiles/.config/nvim ~/.config/nvim
 ln -s ~/Projects/dotfiles/.config/gh-dash ~/.config/gh-dash
+ln -s ~/Projects/dotfiles/.config/dev-workspace ~/.config/dev-workspace
 mkdir -p ~/.local/bin
-ln -s ~/Projects/dotfiles/.local/bin/candela-workspace ~/.local/bin/candela-workspace
+ln -s ~/Projects/dotfiles/.local/bin/dev-workspace ~/.local/bin/dev-workspace
+# per-project wrappers (one-line `exec dev-workspace <profile> "$@"`) are added alongside
 mkdir -p ~/.agents/skills ~/.pi/agent/skills
 ln -s ~/Projects/dotfiles/.agents/skills/github-prs ~/.agents/skills/github-prs
 ln -s ~/.agents/skills/github-prs ~/.pi/agent/skills/github-prs
