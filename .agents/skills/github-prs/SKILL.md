@@ -34,5 +34,7 @@ changes).
 
 - The helper finds the `candela-prs` session's nvim pane via the tmux option
   `@candela_review_pane`; it works from any pane or cwd.
-- gh-dash's PR list has an `O` keybinding that calls the same helper.
+- gh-dash's PR list has an `o` keybinding that calls the same helper (it
+  replaces the built-in open-in-GitHub, and still falls back to the browser
+  when the editor pane is unavailable).
 - Related skills: review-code, autopilot, git-sync-from-main, linear-project-tracking.
