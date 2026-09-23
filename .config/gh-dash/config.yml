@@ -19,6 +19,15 @@ defaults:
   preview:
     open: true
 
+# Denser table: drop the per-section count, row separators, and row padding.
+# (gh-dash's own title/separator header cannot be hidden.)
+theme:
+  ui:
+    sectionsShowCount: false
+    table:
+      compact: true
+      showSeparator: false
+
 # gh-dash's stock "open in GitHub" key is `o`; here it opens the PR in the
 # dev-workspace editor pane (octo.nvim), falling back to the browser.
 keybindings:
