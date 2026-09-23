@@ -151,7 +151,7 @@ pr_url() {
 # The editor nvim pane, tagged in build_prs. Empty when the workspace is down.
 review_pane() {
   "$TMUX" list-panes -a -F '#{pane_id} #{@candela_review_pane}' 2>/dev/null \
-    | awk '$2 == "1" { print $1; exit }'
+    | awk '$2 == "1" { print $1; exit }' || true
 }
 
 # Open a PR in the editor pane's nvim (octo.nvim) and enter review mode.
