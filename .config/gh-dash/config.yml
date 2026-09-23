@@ -1,24 +1,16 @@
 # yaml-language-server: $schema=https://gh-dash.dev/schema.json
 
-# All open PRs across the Company repos you track.
+# Default profile: all open PRs across github.com/joelove.
 # gh-dash appends `sort:updated`, so no sort qualifier here.
 prSections:
-  - title: "Company: open PRs"
+  - title: "My open PRs"
     filters: >-
       is:open
-      repo:Company-Org/company-match
-      repo:Company-Org/company-eval
-      repo:Company-Org/company-orchestrator
-      repo:Company-Org/company-infra
-      repo:Company-Org/company-cms
+      user:joelove
 
-# Map GitHub repos to local checkouts so checkout/diff work from the TUI.
+# Map local checkouts so checkout/diff work from the TUI.
 repoPaths:
-  Company-Org/company-match: $HOME/Projects/company/company-match
-  Company-Org/company-eval: $HOME/Projects/company/company-eval
-  Company-Org/company-orchestrator: $HOME/Projects/company/company-orchestrator
-  Company-Org/company-infra: $HOME/Projects/company/company-infra
-  Company-Org/company-cms: $HOME/Projects/company/company-cms
+  joelove/dotfiles: $HOME/Projects/dotfiles
 
 defaults:
   view: prs
@@ -27,8 +19,8 @@ defaults:
   preview:
     open: true
 
-# gh-dash's stock "open in GitHub" key is `o` (there is no Enter binding).
-# Add Enter as an extra binding; `o` still works.
+# gh-dash's stock "open in GitHub" key is `o`; here it opens the PR in the
+# dev-workspace editor pane (octo.nvim), falling back to the browser.
 keybindings:
   prs:
     - key: enter
@@ -36,4 +28,4 @@ keybindings:
       command: "gh pr view {{.PrNumber}} --repo {{.RepoName}} --web"
     - key: o
       name: review in nvim
-      command: "company-workspace review https://github.com/{{.RepoName}}/pull/{{.PrNumber}}"
+      command: "dev-workspace review https://github.com/{{.RepoName}}/pull/{{.PrNumber}}"

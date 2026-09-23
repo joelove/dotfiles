@@ -1,0 +1,508 @@
+#!/usr/bin/env bash
+#
+# dev-workspace - generic tmux/Ghostty workspace engine.
+#
+# A workspace is a sourced bash profile describing one agent view and one
+# editor view. Profiles live in ~/.config/dev-workspace/<name>.conf; the
+# built-in default profile ("projects") is the full two-session layout rooted
+# at ~/Projects. Wrappers are thin: `exec dev-workspace <name> "$@"`.
+#
+# Usage:
+#   dev-workspace [<profile>] <command> [args]
+#
+# Commands:
+#   open (default)        ensure sessions and open/focus the Ghostty windows
+#   build                 create missing sessions
+#   ensure                restore missing sessions, then re-pin the layout
+#   attach [session]      ensure, then attach (default: editor session)
+#   attach-only [session] attach without touching sessions or layout
+#   review <pr>           open a PR in the editor pane's nvim (octo.nvim)
+#   normalize-editor [--all]   re-pin the pane sizes and review-pane tag
+#   post-restore [--all]       resurrect hook: restart the agent and normalize
+#   list                  list profiles
+#   print-config          print the resolved profile fields
+#
+set -euo pipefail
+
+# Give the tmux server (and therefore every pane) a complete environment even
+# when we are launched by launchd / `open` with a minimal PATH.
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$HOME/.nvm/versions/node/v24.12.0/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+TMUX_BIN="/opt/homebrew/bin/tmux"
+DEV_CONFIG_DIR="$HOME/.config/dev-workspace"
+DEV_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+RESURRECT_DIR="$HOME/.local/share/tmux/resurrect"
+RESURRECT_RESTORE="$HOME/.tmux/plugins/tmux-resurrect/scripts/restore.sh"
+DEFAULT_PROFILE="projects"
+
+have() { "$TMUX_BIN" has-session -t "$1" 2>/dev/null; }
+
+# True when a client is attached to the session, i.e. a terminal window is
+# viewing it. This is the source of truth for whether the workspace is open.
+have_client() { "$TMUX_BIN" list-clients -t "$1" -F '#{client_tty}' 2>/dev/null | grep -q .; }
+
+# --- profiles ---------------------------------------------------------------
+
+reset_profile() {
+  unset DEV_NAME DEV_ROOT DEV_AGENT_DIR DEV_AGENT_CMD DEV_AGENT_PANES DEV_AGENT_SESSION \
+    DEV_EDITOR_DIR DEV_EDITOR_CMD DEV_EDITOR_SESSION DEV_REVIEW_CMD DEV_GH_COLS \
+    DEV_BOTTOM_LINES DEV_TERM_DIRS DEV_TERM_PATHS
+}
+
+apply_defaults() {
+  DEV_ROOT="${DEV_ROOT:-$HOME/Projects}"
+  case "$DEV_ROOT" in "~"*) DEV_ROOT="$HOME${DEV_ROOT#\~}" ;; esac
+  DEV_NAME="${DEV_NAME:-$(basename "$DEV_ROOT" | tr '[:upper:]' '[:lower:]')}"
+  DEV_AGENT_DIR="${DEV_AGENT_DIR:-$DEV_ROOT}"
+  DEV_AGENT_CMD="${DEV_AGENT_CMD-pi}"
+  DEV_AGENT_PANES="${DEV_AGENT_PANES:-2}"
+  DEV_AGENT_SESSION="${DEV_AGENT_SESSION:-$DEV_NAME-agent}"
+  DEV_EDITOR_DIR="${DEV_EDITOR_DIR:-$DEV_ROOT}"
+  DEV_EDITOR_CMD="${DEV_EDITOR_CMD:-nvim .}"
+  DEV_EDITOR_SESSION="${DEV_EDITOR_SESSION:-$DEV_NAME-editor}"
+  DEV_REVIEW_CMD="${DEV_REVIEW_CMD-gh dash}"
+  DEV_GH_COLS="${DEV_GH_COLS:-76}"
+  DEV_BOTTOM_LINES="${DEV_BOTTOM_LINES:-14}"
+  declare -p DEV_TERM_DIRS >/dev/null 2>&1 || DEV_TERM_DIRS=("$DEV_ROOT")
+  DEV_TERM_PATHS=()
+  local d
+  for d in "${DEV_TERM_DIRS[@]}"; do
+    case "$d" in
+      /*) DEV_TERM_PATHS+=("$d") ;;
+      *) DEV_TERM_PATHS+=("$DEV_ROOT/$d") ;;
+    esac
+  done
+}
+
+load_profile() {
+  local name="$1" file
+  reset_profile
+  file="$DEV_CONFIG_DIR/$name.conf"
+  if [ -f "$file" ]; then
+    # shellcheck disable=SC1090
+    . "$file"
+  fi
+  apply_defaults
+}
+
+all_profiles() {
+  local f
+  for f in "$DEV_CONFIG_DIR"/*.conf; do
+    [ -f "$f" ] || continue
+    basename "$f" .conf
+  done
+}
+
+# --- session builders -------------------------------------------------------
+
+build_agent() {
+  [ -n "$DEV_AGENT_CMD" ] || return 0
+  have "$DEV_AGENT_SESSION" && return 0
+  local pane i
+  pane=$("$TMUX_BIN" new-session -d -s "$DEV_AGENT_SESSION" -n agent -c "$DEV_AGENT_DIR" -P -F '#{pane_id}')
+  "$TMUX_BIN" set-option -p -t "$pane" @dev_agent_started 1
+  i=1
+  while [ "$i" -lt "$DEV_AGENT_PANES" ]; do
+    pane=$("$TMUX_BIN" split-window -h -t "$pane" -c "$DEV_AGENT_DIR" -P -F '#{pane_id}')
+    "$TMUX_BIN" set-option -p -t "$pane" @dev_agent_started 1
+    i=$((i + 1))
+  done
+  while IFS= read -r pane; do
+    "$TMUX_BIN" send-keys -t "$pane" "$DEV_AGENT_CMD" Enter
+  done < <("$TMUX_BIN" list-panes -t "$DEV_AGENT_SESSION" -F '#{pane_id}')
+}
+
+build_editor() {
+  have "$DEV_EDITOR_SESSION" && return 0
+  local top bottom top_right n j
+  top=$("$TMUX_BIN" new-session -d -s "$DEV_EDITOR_SESSION" -n editor -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
+
+  # bottom strip: one pane per terminal dir
+  n=${#DEV_TERM_PATHS[@]}
+  if [ "$n" -gt 0 ]; then
+    bottom=$("$TMUX_BIN" split-window -v -t "$top" -l "$DEV_BOTTOM_LINES" -c "${DEV_TERM_PATHS[0]}" -P -F '#{pane_id}')
+    j=1
+    while [ "$j" -lt "$n" ]; do
+      bottom=$("$TMUX_BIN" split-window -h -t "$bottom" -l 50% -c "${DEV_TERM_PATHS[$j]}" -P -F '#{pane_id}')
+      j=$((j + 1))
+    done
+  fi
+
+  # review pane on the right of the top row
+  top_right=""
+  if [ -n "$DEV_REVIEW_CMD" ]; then
+    top_right=$("$TMUX_BIN" split-window -h -t "$top" -l "$DEV_GH_COLS" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
+  fi
+
+  "$TMUX_BIN" set-option -p -t "$top" @dev_review_pane "$DEV_NAME"
+  "$TMUX_BIN" send-keys -t "$top" "$DEV_EDITOR_CMD" Enter
+  if [ -n "$top_right" ]; then
+    "$TMUX_BIN" send-keys -t "$top_right" "$DEV_REVIEW_CMD" Enter
+  fi
+}
+
+build() { build_agent; build_editor; }
+
+# --- ensure -----------------------------------------------------------------
+
+latest_save() {
+  ls -t "$RESURRECT_DIR"/tmux_resurrect_*.txt 2>/dev/null | head -n1
+}
+
+# Restore the last resurrect save, synchronously, into the running server.
+restore_from_save() {
+  local socket
+  socket=$("$TMUX_BIN" display-message -p '#{socket_path}' 2>/dev/null || true)
+  [ -n "$socket" ] || return 1
+  [ -n "$(latest_save)" ] || return 1
+  TMUX="$socket,0,0" bash "$RESURRECT_RESTORE" >/dev/null 2>&1 || true
+}
+
+# Start the agent in any agent pane sitting at a plain shell. A pane option
+# marks a pane as already handled so ensure and the resurrect hook can both
+# call this without starting the agent twice.
+start_agent_in_shells() {
+  [ -n "$DEV_AGENT_CMD" ] || return 0
+  have "$DEV_AGENT_SESSION" || return 0
+  local pane cmd mark
+  while IFS= read -r pane; do
+    mark=$("$TMUX_BIN" show-options -p -t "$pane" -qv @dev_agent_started 2>/dev/null || true)
+    [ "$mark" = "1" ] && continue
+    cmd=$("$TMUX_BIN" display-message -p -t "$pane" '#{pane_current_command}' 2>/dev/null || echo '')
+    case "$cmd" in
+      zsh|bash|sh|-zsh|-bash)
+        "$TMUX_BIN" set-option -p -t "$pane" @dev_agent_started 1
+        "$TMUX_BIN" send-keys -t "$pane" "$DEV_AGENT_CMD" Enter
+        ;;
+    esac
+  done < <("$TMUX_BIN" list-panes -t "$DEV_AGENT_SESSION" -F '#{pane_id}' 2>/dev/null)
+}
+
+# Send a command to a pane only if it is sitting at a plain shell.
+send_if_shell() {
+  local pane="$1" command="$2" cur
+  [ -n "$command" ] || return 0
+  cur=$("$TMUX_BIN" display-message -p -t "$pane" '#{pane_current_command}' 2>/dev/null || echo '')
+  case "$cur" in
+    zsh|bash|sh|-zsh|-bash) "$TMUX_BIN" send-keys -t "$pane" "$command" Enter ;;
+  esac
+}
+
+# Restart the editor and review commands in a restored editor session. resurrect
+# cannot restore commands with arguments (the review pane uses a per-profile
+# `gh dash --config`), so it leaves those panes as shells and this fills them in.
+start_views_in_shells() {
+  have "$DEV_EDITOR_SESSION" || return 0
+  local panes top_min top_sorted editor review
+  panes=$("$TMUX_BIN" list-panes -t "$DEV_EDITOR_SESSION" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
+  [ -n "$panes" ] || return 0
+  top_min=$(printf '%s\n' "$panes" | awk '{ print $2 }' | sort -n | head -n1)
+  top_sorted=$(printf '%s\n' "$panes" | awk -v t="$top_min" '$2 == t { print $3, $1 }' | sort -n)
+  editor=$(printf '%s\n' "$top_sorted" | head -n1 | awk '{ print $2 }')
+  review=$(printf '%s\n' "$top_sorted" | tail -n1 | awk '{ print $2 }')
+  send_if_shell "$editor" "$DEV_EDITOR_CMD"
+  if [ "$review" != "$editor" ]; then
+    send_if_shell "$review" "$DEV_REVIEW_CMD"
+  fi
+}
+
+# Re-apply the editor window's fixed layout and pane tag. tmux-resurrect
+# restores the layout it saved and drops pane options, so a restart would
+# otherwise bring back old sizes and lose the review tag.
+normalize_editor() {
+  have "$DEV_EDITOR_SESSION" || return 0
+  local panes top_min bot_max top_sorted editor review bottom
+  panes=$("$TMUX_BIN" list-panes -t "$DEV_EDITOR_SESSION" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
+  [ -n "$panes" ] || return 0
+
+  top_min=$(printf '%s\n' "$panes" | awk '{ print $2 }' | sort -n | head -n1)
+  bot_max=$(printf '%s\n' "$panes" | awk '{ print $2 }' | sort -n | tail -n1)
+  top_sorted=$(printf '%s\n' "$panes" | awk -v t="$top_min" '$2 == t { print $3, $1 }' | sort -n)
+  editor=$(printf '%s\n' "$top_sorted" | head -n1 | awk '{ print $2 }')
+  review=$(printf '%s\n' "$top_sorted" | tail -n1 | awk '{ print $2 }')
+  if [ "$review" = "$editor" ]; then review=""; fi
+  bottom=$(printf '%s\n' "$panes" | awk -v t="$bot_max" '$2 == t { print $3, $1 }' | sort -n | head -n1 | awk '{ print $2 }')
+
+  if [ -n "$review" ]; then
+    "$TMUX_BIN" resize-pane -t "$review" -x "$DEV_GH_COLS" 2>/dev/null || true
+  fi
+  if [ -n "$bottom" ]; then
+    "$TMUX_BIN" resize-pane -t "$bottom" -y "$DEV_BOTTOM_LINES" 2>/dev/null || true
+  fi
+  if [ -n "$editor" ]; then
+    "$TMUX_BIN" set-option -p -t "$editor" @dev_review_pane "$DEV_NAME" 2>/dev/null || true
+  fi
+  return 0
+}
+
+normalize_editor_all() {
+  local name
+  for name in $(all_profiles) "$DEFAULT_PROFILE"; do
+    load_profile "$name"
+    normalize_editor
+  done
+}
+
+# Debounced for the window-resized hook: a drag emits many resize events, so
+# only the last one in a burst re-applies the layout.
+normalize_editor_all_debounced() {
+  local stamp="/tmp/dev-workspace.normalize" mine
+  mine="$(date +%s).$$.$RANDOM"
+  printf '%s' "$mine" > "$stamp" 2>/dev/null || return 0
+  sleep 0.25
+  [ "$(cat "$stamp" 2>/dev/null || true)" = "$mine" ] || return 0
+  normalize_editor_all
+}
+
+ensure_unlocked() {
+  "$TMUX_BIN" start-server 2>/dev/null || true
+  local missing=0
+  if [ -n "$DEV_AGENT_CMD" ] && ! have "$DEV_AGENT_SESSION"; then missing=1; fi
+  if ! have "$DEV_EDITOR_SESSION"; then missing=1; fi
+  if [ "$missing" = "1" ] && [ -n "$(latest_save)" ]; then
+    # Keep the server alive while restoring from scratch.
+    local tmp="__dev_workspace_${DEV_NAME}_tmp__"
+    if ! have "$tmp"; then
+      "$TMUX_BIN" new-session -d -s "$tmp" -c "$DEV_ROOT" 2>/dev/null || true
+    fi
+    restore_from_save
+    if have "$tmp"; then
+      "$TMUX_BIN" kill-session -t "$tmp" 2>/dev/null || true
+    fi
+    # resurrect restores the agent as a generic process, so it comes back as a
+    # shell; start it again.
+    sleep 1
+    start_agent_in_shells
+    start_views_in_shells
+  fi
+  build
+  normalize_editor
+}
+
+ensure() {
+  local lockdir="/tmp/dev-workspace-${DEV_NAME}.lock"
+  while ! mkdir "$lockdir" 2>/dev/null; do sleep 0.2; done
+  trap 'rmdir "$lockdir" 2>/dev/null || true' EXIT
+  ensure_unlocked
+  rmdir "$lockdir" 2>/dev/null || true
+  trap - EXIT
+}
+
+# --- actions ----------------------------------------------------------------
+
+attach() {
+  local session="${1:-$DEV_EDITOR_SESSION}"
+  ensure
+  "$TMUX_BIN" attach-session -t "$session"
+}
+
+attach_only() {
+  "$TMUX_BIN" attach-session -t "${1:-$DEV_EDITOR_SESSION}"
+}
+
+# --- PR review integration --------------------------------------------------
+
+# Canonicalize a PR reference to a GitHub URL. Accepts a full URL,
+# owner/repo#123, or owner/repo 123.
+pr_url() {
+  local ref="${1:-}" num="${2:-}"
+  case "$ref" in
+    https://*) printf '%s' "$ref" ;;
+    *"#"*)     printf 'https://github.com/%s/pull/%s' "${ref%%#*}" "${ref##*#}" ;;
+    */*)
+      if [ -n "$num" ]; then
+        printf 'https://github.com/%s/pull/%s' "$ref" "$num"
+      else
+        return 1
+      fi
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+# The editor pane for this profile, tagged by normalize_editor/build_editor.
+review_pane() {
+  "$TMUX_BIN" list-panes -a -F '#{pane_id} #{@dev_review_pane}' 2>/dev/null \
+    | awk -v n="$DEV_NAME" '$2 == n { print $1; exit }' || true
+}
+
+# Open a PR in the editor pane's nvim (octo.nvim) and enter review mode.
+review() {
+  local url pane
+  url=$(pr_url "$@") || { echo "usage: dev-workspace $PROFILE review <pr-url|owner/repo#n|owner/repo n>" >&2; return 1; }
+  pane=$(review_pane)
+  if [ -n "$pane" ] && [ "$("$TMUX_BIN" display-message -p -t "$pane" '#{pane_current_command}' 2>/dev/null)" = "nvim" ]; then
+    "$TMUX_BIN" send-keys -t "$pane" Escape
+    "$TMUX_BIN" send-keys -t "$pane" -l ":Octo $url"
+    "$TMUX_BIN" send-keys -t "$pane" Enter
+    # octo fetches the PR asynchronously; give it a moment before review mode.
+    sleep 2
+    "$TMUX_BIN" send-keys -t "$pane" -l ":Octo review"
+    "$TMUX_BIN" send-keys -t "$pane" Enter
+  else
+    echo "dev-workspace: editor pane is not running nvim; opening $url in the browser" >&2
+    /usr/bin/open "$url"
+  fi
+}
+
+# Create one Ghostty window attached to a session, inside the existing Ghostty
+# app instance. Ghostty runs a multiple-argument `command` through /bin/sh -c.
+new_ghostty_window() {
+  local session="$1" cmd
+  if [ "$PROFILE" = "$DEFAULT_PROFILE" ]; then
+    cmd="$DEV_SELF attach-only $session"
+  else
+    cmd="$DEV_SELF $PROFILE attach-only $session"
+  fi
+  osascript - "$cmd" <<'APPLESCRIPT'
+on run argv
+  set cmd to item 1 of argv
+  tell application "Ghostty"
+    set cfg to new surface configuration
+    set command of cfg to cmd
+    new window with configuration cfg
+  end tell
+end run
+APPLESCRIPT
+}
+
+# Focus the Ghostty window backing each session. `open -a` alone only raises
+# windows already on the active space, so find each window by its session-name
+# title (tmux set-titles-string '#S') and let yabai switch the display to the
+# window's space, including a native fullscreen space.
+focus_workspace_windows() {
+  local title id sessions=()
+  if [ -n "$DEV_AGENT_CMD" ]; then sessions+=("$DEV_AGENT_SESSION"); fi
+  sessions+=("$DEV_EDITOR_SESSION")
+  for title in "${sessions[@]}"; do
+    id=$(yabai -m query --windows 2>/dev/null \
+      | jq -r --arg t "$title" '.[] | select(.app=="Ghostty" and .title==$t) | .id' \
+      | head -n1)
+    if [ -n "$id" ]; then
+      yabai -m window --focus "$id" 2>/dev/null || true
+    fi
+  done
+  /usr/bin/open -a /Applications/Ghostty.app
+}
+
+open_windows() {
+  ensure
+
+  local agent_open=1 editor_open=1
+  if [ -n "$DEV_AGENT_CMD" ] && ! have_client "$DEV_AGENT_SESSION"; then agent_open=0; fi
+  if ! have_client "$DEV_EDITOR_SESSION"; then editor_open=0; fi
+
+  # Already open: swap to each window's space and focus the app; spawn nothing.
+  if [ "$agent_open" = "1" ] && [ "$editor_open" = "1" ]; then
+    focus_workspace_windows
+    return 0
+  fi
+
+  # Start a single windowless app instance if Ghostty is not already running.
+  # (`--initial-window=false` is only applied on this fresh launch, so a normal
+  # double-click launch still opens a window.)
+  if ! pgrep -x ghostty >/dev/null 2>&1; then
+    /usr/bin/open -a /Applications/Ghostty.app --args --initial-window=false
+    local i
+    for i in $(seq 1 50); do
+      osascript -e 'tell application "Ghostty" to count windows' >/dev/null 2>&1 && break
+      sleep 0.1
+    done
+  fi
+
+  # Create only the windows whose session has no attached client.
+  if [ -n "$DEV_AGENT_CMD" ] && [ "$agent_open" = "0" ]; then
+    new_ghostty_window "$DEV_AGENT_SESSION"
+  fi
+  if [ "$editor_open" = "0" ]; then
+    new_ghostty_window "$DEV_EDITOR_SESSION"
+  fi
+}
+
+# Called by tmux-resurrect after a manual restore.
+post_restore() {
+  sleep 1.5
+  start_agent_in_shells
+  start_views_in_shells
+  normalize_editor
+}
+
+post_restore_all() {
+  sleep 1.5
+  local name
+  for name in $(all_profiles) "$DEFAULT_PROFILE"; do
+    load_profile "$name"
+    start_agent_in_shells
+    start_views_in_shells
+    normalize_editor
+  done
+}
+
+# --- dispatch ---------------------------------------------------------------
+
+if [ "$#" -eq 0 ]; then
+  PROFILE="$DEFAULT_PROFILE"
+  CMD="open"
+  REST=()
+else
+  case "$1" in
+    open|build|ensure|attach|attach-only|review|normalize-editor|post-restore|list|print-config)
+      PROFILE="$DEFAULT_PROFILE"
+      CMD="$1"
+      REST=("${@:2}")
+      ;;
+    *)
+      PROFILE="$1"
+      CMD="${2:-open}"
+      REST=("${@:3}")
+      ;;
+  esac
+fi
+
+load_profile "$PROFILE"
+
+case "$CMD" in
+  open)        open_windows ;;
+  build)       build ;;
+  ensure)      ensure ;;
+  attach)      attach "${REST[0]:-}" ;;
+  attach-only) attach_only "${REST[0]:-}" ;;
+  review)      review "${REST[0]:-}" "${REST[1]:-}" ;;
+  normalize-editor)
+    if [ "${REST[0]:-}" = "--all" ]; then
+      normalize_editor_all_debounced
+    else
+      normalize_editor
+    fi
+    ;;
+  post-restore)
+    if [ "${REST[0]:-}" = "--all" ]; then
+      post_restore_all
+    else
+      post_restore
+    fi
+    ;;
+  list)
+    printf '%s (default)\n' "$DEFAULT_PROFILE"
+    all_profiles
+    ;;
+  print-config)
+    printf 'DEV_NAME=%s\n' "$DEV_NAME"
+    printf 'DEV_ROOT=%s\n' "$DEV_ROOT"
+    printf 'DEV_AGENT_DIR=%s\n' "$DEV_AGENT_DIR"
+    printf 'DEV_AGENT_CMD=%s\n' "$DEV_AGENT_CMD"
+    printf 'DEV_AGENT_PANES=%s\n' "$DEV_AGENT_PANES"
+    printf 'DEV_AGENT_SESSION=%s\n' "$DEV_AGENT_SESSION"
+    printf 'DEV_EDITOR_DIR=%s\n' "$DEV_EDITOR_DIR"
+    printf 'DEV_EDITOR_CMD=%s\n' "$DEV_EDITOR_CMD"
+    printf 'DEV_EDITOR_SESSION=%s\n' "$DEV_EDITOR_SESSION"
+    printf 'DEV_REVIEW_CMD=%s\n' "$DEV_REVIEW_CMD"
+    printf 'DEV_TERM_PATHS=%s\n' "${DEV_TERM_PATHS[*]}"
+    printf 'DEV_GH_COLS=%s\n' "$DEV_GH_COLS"
+    printf 'DEV_BOTTOM_LINES=%s\n' "$DEV_BOTTOM_LINES"
+    ;;
+  *)
+    echo "usage: dev-workspace [<profile>] <command>" >&2
+    exit 1
+    ;;
+esac
