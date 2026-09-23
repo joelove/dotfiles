@@ -18,7 +18,8 @@ this file is the reference for changing or debugging anything.
   (`${DEV_NAME}-agent`), `DEV_EDITOR_DIR` (root), `DEV_EDITOR_CMD` (`nvim .`),
   `DEV_EDITOR_SESSION` (`${DEV_NAME}-editor`), `DEV_REVIEW_CMD` (`gh dash`;
   empty omits the pane), `DEV_REVIEW_SUB_CMD` (empty omits the pane; e.g. a live
-  actions readout) with `DEV_REVIEW_SUB_LINES` (5), `DEV_TERM_DIRS` (one pane at
+  actions readout) with `DEV_REVIEW_SUB_LINES` (5; the pane's baseline height,
+  which a self-sizing sub-command can override), `DEV_TERM_DIRS` (one pane at
   root; relative paths resolve against root), `DEV_TERM_CMDS` (commands parallel
   to `DEV_TERM_DIRS`; empty entries leave a plain shell, default all empty),
   `DEV_GH_COLS` (76), `DEV_BOTTOM_LINES` (14).
@@ -165,8 +166,11 @@ this file is the reference for changing or debugging anything.
   `status:pending` PR qualifier matches PRs whose head commit has no checks, not
   PRs with running checks. To watch running Actions, the candela profile runs
   `.local/bin/running-actions` directly below the gh-dash pane via
-  `DEV_REVIEW_SUB_CMD`; the script refreshes `gh run list --status in_progress`
-  across the candela repos into one compact line per running action.
+  `DEV_REVIEW_SUB_CMD`. It queries the REST `/actions/runs?status=in_progress`
+  endpoint per repo with `gh api --cache` (default 60s) on a 30s loop, redraws
+  only when the content changes, and resizes its own pane to one line per
+  running action (clamped to 8, and effectively hidden at a single empty line
+  when zero), so it and gh-dash share the right column dynamically.
 
 ## pi
 

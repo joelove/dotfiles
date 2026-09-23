@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 #
-# running-actions - one compact line per in-progress GitHub Actions run across a
-# set of repos, for a dev-workspace pane. Refreshes until interrupted.
+# running-actions - a live, self-sizing readout of in-progress GitHub Actions
+# runs across a set of repos, for a dev-workspace pane.
 #
-# The output is an n-liner: exactly one line per running action (n lines), or a
-# dim placeholder when nothing is running.
+# Behaviour:
+# - Prints one compact line per running action (an n-liner).
+# - Resizes its own tmux pane to n lines (clamped to RUNNING_ACTIONS_MAX_LINES),
+#   so the pane it shares vertical space with keeps the rest. At n=0 it collapses
+#   to a single empty line, i.e. effectively hidden.
+# - Polls every RUNNING_ACTIONS_INTERVAL seconds but only clears/redraws when the
+#   content or line count actually changed (no flicker, no wasted work).
+# - Uses `gh api --cache` so repeated polls reuse a cached API response instead
+#   of re-hitting the API every cycle.
 #
 # Repos default to the Candela set. Override by passing repos as arguments or
-# setting RUNNING_ACTIONS_REPOS (space-separated). Refresh interval defaults to
-# 5 seconds and can be set with RUNNING_ACTIONS_INTERVAL.
+# setting RUNNING_ACTIONS_REPOS (space-separated).
 #
 set -uo pipefail
 
@@ -26,7 +32,11 @@ if [ "${#repos[@]}" -eq 0 ]; then
     )
   fi
 fi
-interval="${RUNNING_ACTIONS_INTERVAL:-5}"
+interval="${RUNNING_ACTIONS_INTERVAL:-30}"
+cache="${RUNNING_ACTIONS_CACHE:-60s}"
+maxlines="${RUNNING_ACTIONS_MAX_LINES:-8}"
+
+pane="${TMUX_PANE:-}"
 
 if [ -t 1 ]; then
   bold=$'\033[1m' dim=$'\033[2m' yellow=$'\033[33m' reset=$'\033[0m'
@@ -46,27 +56,49 @@ elapsed() {
   fi
 }
 
-frame() {
-  local r out wf br started total=0
+# Populate FRAME_BODY (rendered lines) and FRAME_N (line count).
+FRAME_BODY=""
+FRAME_N=0
+build_frame() {
+  local r out wf br started line body="" n=0
   for r in "${repos[@]}"; do
-    out=$(gh run list --repo "$r" --status in_progress --limit 10 \
-      --json name,headBranch,startedAt \
-      --jq '.[] | [.name, .headBranch, .startedAt] | @tsv' 2>/dev/null || true)
-    [ -n "$out" ] || continue
+    out=$(gh api --cache "$cache" \
+      "/repos/$r/actions/runs?status=in_progress&per_page=$maxlines" \
+      --jq '.workflow_runs[] | [.name, .head_branch, .run_started_at] | @tsv' 2>/dev/null) || continue
     while IFS=$'\t' read -r wf br started; do
       [ -n "$wf" ] || continue
-      printf '  %s●%s %s%-18.18s%s %-14.14s %s%-20.20s%s %s%s%s\n' \
+      printf -v line '  %s●%s %s%-18.18s%s %-14.14s %s%-20.20s%s %s%s%s' \
         "$yellow" "$reset" "$bold" "${r##*/}" "$reset" "$wf" \
         "$dim" "$br" "$reset" "$yellow" "$(elapsed "$started")" "$reset"
-      total=$((total + 1))
+      if [ -z "$body" ]; then body="$line"; else body="$body"$'\n'"$line"; fi
+      n=$((n + 1))
     done <<<"$out"
   done
-  [ "$total" -eq 0 ] && printf '  %sno running actions%s\n' "$dim" "$reset"
-  return 0
+  FRAME_BODY="$body"
+  FRAME_N="$n"
 }
 
+# Resize our own pane, but only when the target height actually changed.
+last_height=""
+resize_self() {
+  [ -n "$pane" ] || return 0
+  [ "$1" = "$last_height" ] && return 0
+  command tmux resize-pane -t "$pane" -y "$1" 2>/dev/null || true
+  last_height="$1"
+}
+
+last_sig=""
 while true; do
-  printf '\033[H\033[2J'
-  frame
+  build_frame
+  height="$FRAME_N"
+  [ "$height" -lt 1 ] && height=1
+  [ "$height" -gt "$maxlines" ] && height="$maxlines"
+  resize_self "$height"
+  sig="$FRAME_N|$FRAME_BODY"
+  if [ "$sig" != "$last_sig" ]; then
+    printf '\033[H\033[2J'
+    [ -n "$FRAME_BODY" ] && printf '%s' "$FRAME_BODY"
+    last_sig="$sig"
+  fi
   sleep "$interval"
 done
