@@ -54,8 +54,8 @@ build_prs() {
   # bottom strip (~25%)
   bottom=$("$TMUX_BIN" split-window -v -t "$top" -l 25% -c "$CANDELA/candela-infra" -P -F '#{pane_id}')
   bottom_right=$("$TMUX_BIN" split-window -h -t "$bottom" -l 50% -c "$CANDELA/candela-orchestrator" -P -F '#{pane_id}')
-  # top row right (~40%)
-  top_right=$("$TMUX_BIN" split-window -h -t "$top" -l 40% -c "$CANDELA" -P -F '#{pane_id}')
+  # top row right (80 cols)
+  top_right=$("$TMUX_BIN" split-window -h -t "$top" -l 80 -c "$CANDELA" -P -F '#{pane_id}')
   "$TMUX_BIN" set-option -p -t "$top" @candela_review_pane 1
   "$TMUX_BIN" send-keys -t "$top"       "nvim ." Enter
   "$TMUX_BIN" send-keys -t "$top_right" "gh dash" Enter
