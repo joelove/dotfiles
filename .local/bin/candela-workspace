@@ -113,6 +113,17 @@ normalize_editor() {
   return 0
 }
 
+# Debounced normalize_editor for the window-resized hook: a window drag emits
+# many resize events, so only the last one in a burst re-applies the layout.
+normalize_editor_debounced() {
+  local stamp="/tmp/candela-workspace.normalize" mine
+  mine="$(date +%s).$$.$RANDOM"
+  printf '%s' "$mine" > "$stamp" 2>/dev/null || return 0
+  sleep 0.25
+  [ "$(cat "$stamp" 2>/dev/null || true)" = "$mine" ] || return 0
+  normalize_editor
+}
+
 # Restore the last resurrect save, synchronously, into the running server.
 restore_from_save() {
   local socket
@@ -275,6 +286,7 @@ case "${1:-open}" in
   attach-only) attach_only "${2:-candela-prs}" ;;
   open)        open_windows ;;
   review)      review "${2:-}" "${3:-}" ;;
+  normalize-editor) normalize_editor_debounced ;;
   post-restore) post_restore ;;
   *) echo "usage: candela-workspace [build|ensure|attach <session>|attach-only <session>|open|review <pr>|post-restore]" >&2; exit 1 ;;
 esac
