@@ -185,6 +185,16 @@ get_current_branch() {
   git rev-parse --abbrev-ref HEAD
 }
 
+# Run gpm in every git repo sitting next to the current directory. (alias: gpa)
+gpma() {
+  local dir
+  for dir in "${PWD:h}"/*(N/); do
+    [[ -e "${dir}/.git" ]] || continue
+    echo "${bold}${dir:t}${normal}"
+    (cd "${dir}" && eval gpm)
+  done
+}
+
 ensure_gh_dependency() {
   if ! command -v gh > /dev/null 2>&1; then
     brew install gh
