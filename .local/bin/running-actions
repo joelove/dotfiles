@@ -78,13 +78,13 @@ build_frame() {
   FRAME_N="$n"
 }
 
-# Resize our own pane, but only when the target height actually changed.
-last_height=""
+# Resize our own pane to the wanted height, but only when it actually differs.
 resize_self() {
   [ -n "$pane" ] || return 0
-  [ "$1" = "$last_height" ] && return 0
-  command tmux resize-pane -t "$pane" -y "$1" 2>/dev/null || true
-  last_height="$1"
+  local want="$1" cur
+  cur=$(command tmux display-message -p -t "$pane" '#{pane_height}' 2>/dev/null) || return 0
+  [ "$cur" = "$want" ] && return 0
+  command tmux resize-pane -t "$pane" -y "$want" 2>/dev/null || true
 }
 
 last_sig=""
