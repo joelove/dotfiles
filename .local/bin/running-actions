@@ -4,14 +4,14 @@
 # runs across a set of repos, for a dev-workspace pane.
 #
 # Behaviour:
-# - Prints one compact line per running action (an n-liner).
+# - Prints one compact line per running action (an n-liner) with a live run
+#   duration (mm:ss, or h:mm:ss) that ticks every RUNNING_ACTIONS_TICK seconds.
 # - Resizes its own tmux pane to n lines (clamped to RUNNING_ACTIONS_MAX_LINES),
 #   so the pane it shares vertical space with keeps the rest. At n=0 it collapses
 #   to a single empty line, i.e. effectively hidden.
-# - Polls every RUNNING_ACTIONS_INTERVAL seconds but only clears/redraws when the
-#   content or line count actually changed (no flicker, no wasted work).
-# - Uses `gh api --cache` so repeated polls reuse a cached API response instead
-#   of re-hitting the API every cycle.
+# - Polls the API only every RUNNING_ACTIONS_INTERVAL seconds (30 by default) and
+#   uses `gh api --cache` so repeated polls reuse a cached response.
+# - Redraws only when the rendered content actually changed (no idle flicker).
 #
 # Repos default to the Candela set. Override by passing repos as arguments or
 # setting RUNNING_ACTIONS_REPOS (space-separated).
@@ -32,6 +32,7 @@ if [ "${#repos[@]}" -eq 0 ]; then
     )
   fi
 fi
+tick="${RUNNING_ACTIONS_TICK:-5}"
 interval="${RUNNING_ACTIONS_INTERVAL:-30}"
 cache="${RUNNING_ACTIONS_CACHE:-60s}"
 maxlines="${RUNNING_ACTIONS_MAX_LINES:-8}"
@@ -44,36 +45,55 @@ else
   bold="" dim="" yellow="" reset=""
 fi
 
-elapsed() {
-  local start now mins
-  start=$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$1" +%s 2>/dev/null) || return 0
-  now=$(date +%s)
-  mins=$(((now - start) / 60))
-  if [ "$mins" -ge 60 ]; then
-    printf '%dh%02d' "$((mins / 60))" "$((mins % 60))"
+iso_to_epoch() {
+  date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$1" +%s 2>/dev/null || printf '0'
+}
+
+# Human duration with seconds, so a 5s tick visibly counts up.
+fmt_duration() {
+  local s="$1"
+  [ "$s" -lt 0 ] && s=0
+  if [ "$s" -ge 3600 ]; then
+    printf '%d:%02d:%02d' "$((s / 3600))" "$(((s % 3600) / 60))" "$((s % 60))"
   else
-    printf '%dm' "$mins"
+    printf '%02d:%02d' "$((s / 60))" "$((s % 60))"
   fi
 }
 
-# Populate FRAME_BODY (rendered lines) and FRAME_N (line count).
-FRAME_BODY=""
-FRAME_N=0
-build_frame() {
-  local r out wf br started line body="" n=0
+# Fetched runs, one record per line: repo<TAB>name<TAB>branch<TAB>start_epoch
+RUNS=""
+fetch_runs() {
+  local r out name br started epoch rec
+  RUNS=""
   for r in "${repos[@]}"; do
     out=$(gh api --cache "$cache" \
       "/repos/$r/actions/runs?status=in_progress&per_page=$maxlines" \
       --jq '.workflow_runs[] | [.name, .head_branch, .run_started_at] | @tsv' 2>/dev/null) || continue
-    while IFS=$'\t' read -r wf br started; do
-      [ -n "$wf" ] || continue
-      printf -v line '  %s●%s %s%-18.18s%s %-14.14s %s%-20.20s%s %s%s%s' \
-        "$yellow" "$reset" "$bold" "${r##*/}" "$reset" "$wf" \
-        "$dim" "$br" "$reset" "$yellow" "$(elapsed "$started")" "$reset"
-      if [ -z "$body" ]; then body="$line"; else body="$body"$'\n'"$line"; fi
-      n=$((n + 1))
+    while IFS=$'\t' read -r name br started; do
+      [ -n "$name" ] || continue
+      epoch=$(iso_to_epoch "$started")
+      rec=$(printf '%s\t%s\t%s\t%s' "${r##*/}" "$name" "$br" "$epoch")
+      if [ -z "$RUNS" ]; then RUNS="$rec"; else RUNS="$RUNS"$'\n'"$rec"; fi
     done <<<"$out"
   done
+}
+
+# Render RUNS into FRAME_BODY / FRAME_N.
+FRAME_BODY=""
+FRAME_N=0
+build_frame() {
+  local now line body="" n=0 repo name br epoch
+  now=$(date +%s)
+  if [ -n "$RUNS" ]; then
+    while IFS=$'\t' read -r repo name br epoch; do
+      [ -n "$name" ] || continue
+      printf -v line '  %s●%s %s%-18.18s%s %-14.14s %s%-20.20s%s %s%7s%s' \
+        "$yellow" "$reset" "$bold" "$repo" "$reset" "$name" \
+        "$dim" "$br" "$reset" "$yellow" "$(fmt_duration "$((now - epoch))")" "$reset"
+      if [ -z "$body" ]; then body="$line"; else body="$body"$'\n'"$line"; fi
+      n=$((n + 1))
+    done <<<"$RUNS"
+  fi
   FRAME_BODY="$body"
   FRAME_N="$n"
 }
@@ -88,7 +108,13 @@ resize_self() {
 }
 
 last_sig=""
+last_poll=0
 while true; do
+  now=$(date +%s)
+  if [ $((now - last_poll)) -ge "$interval" ]; then
+    fetch_runs
+    last_poll=$now
+  fi
   build_frame
   height="$FRAME_N"
   [ "$height" -lt 1 ] && height=1
@@ -100,5 +126,5 @@ while true; do
     [ -n "$FRAME_BODY" ] && printf '%s' "$FRAME_BODY"
     last_sig="$sig"
   fi
-  sleep "$interval"
+  sleep "$tick"
 done
