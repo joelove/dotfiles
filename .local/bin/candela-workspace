@@ -88,6 +88,31 @@ start_pi_in_shells() {
   done < <("$TMUX_BIN" list-panes -t candela-pi -F '#{pane_id}' 2>/dev/null)
 }
 
+# Re-apply the editor window's fixed layout and pane tag. tmux-resurrect
+# restores panes but not user pane options, and it restores the layout it
+# saved, so a restart would otherwise bring back old sizes. Runs on every
+# ensure and after a manual resurrect restore.
+normalize_editor() {
+  have candela-prs || return 0
+  local panes top_min bot_max nvim gh bottom
+  panes=$("$TMUX_BIN" list-panes -t candela-prs -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
+  [ -n "$panes" ] || return 0
+
+  top_min=$(printf '%s\n' "$panes" | awk '{ print $2 }' | sort -n | head -n1)
+  bot_max=$(printf '%s\n' "$panes" | awk '{ print $2 }' | sort -n | tail -n1)
+
+  # gh-dash is the rightmost top pane, nvim the leftmost; resize the leftmost
+  # bottom pane to set the row height.
+  gh=$(printf '%s\n' "$panes" | awk -v t="$top_min" '$2 == t { print $3, $1 }' | sort -n | tail -n1 | awk '{ print $2 }')
+  nvim=$(printf '%s\n' "$panes" | awk -v t="$top_min" '$2 == t { print $3, $1 }' | sort -n | head -n1 | awk '{ print $2 }')
+  bottom=$(printf '%s\n' "$panes" | awk -v t="$bot_max" '$2 == t { print $3, $1 }' | sort -n | head -n1 | awk '{ print $2 }')
+
+  [ -n "$gh" ] && "$TMUX_BIN" resize-pane -t "$gh" -x 80 2>/dev/null || true
+  [ -n "$bottom" ] && "$TMUX_BIN" resize-pane -t "$bottom" -y 16 2>/dev/null || true
+  [ -n "$nvim" ] && "$TMUX_BIN" set-option -p -t "$nvim" @candela_review_pane 1 2>/dev/null || true
+  return 0
+}
+
 # Restore the last resurrect save, synchronously, into the running server.
 restore_from_save() {
   local socket
@@ -112,6 +137,7 @@ ensure_unlocked() {
     fi
   fi
   build
+  normalize_editor
 }
 
 ensure() {
@@ -239,6 +265,7 @@ open_windows() {
 post_restore() {
   sleep 1.5
   start_pi_in_shells
+  normalize_editor
 }
 
 case "${1:-open}" in
