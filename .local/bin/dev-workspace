@@ -17,6 +17,7 @@
 #   attach [session]      ensure, then attach (default: editor session)
 #   attach-only [session] attach without touching sessions or layout
 #   review <pr>           open a PR in the editor pane's nvim (octo.nvim)
+#   review-pane           (re)launch the review pane command only if it is closed
 #   normalize-editor [--all]   re-pin the pane sizes and review-pane tag
 #   post-restore [--all]       resurrect hook: restart the agent and normalize
 #   list                  list profiles
@@ -204,6 +205,29 @@ start_views_in_shells() {
   if [ "$review" != "$editor" ]; then
     send_if_shell "$review" "$DEV_REVIEW_CMD"
   fi
+}
+
+# Bring the review pane back without disturbing anything else. Idempotent:
+# - review command already running: no-op
+# - pane fell back to a shell after the TUI quit: relaunch the command
+# - pane was killed: split it back off the editor pane, then re-pin the layout
+ensure_review_pane() {
+  [ -n "$DEV_REVIEW_CMD" ] || return 0
+  have "$DEV_EDITOR_SESSION" || return 0
+  local panes top_min top_sorted editor review recreated=0
+  panes=$("$TMUX_BIN" list-panes -t "$DEV_EDITOR_SESSION" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
+  [ -n "$panes" ] || return 0
+  top_min=$(printf '%s\n' "$panes" | awk '{ print $2 }' | sort -n | head -n1)
+  top_sorted=$(printf '%s\n' "$panes" | awk -v t="$top_min" '$2 == t { print $3, $1 }' | sort -n)
+  editor=$(printf '%s\n' "$top_sorted" | head -n1 | awk '{ print $2 }')
+  review=$(printf '%s\n' "$top_sorted" | tail -n1 | awk '{ print $2 }')
+  if [ "$review" = "$editor" ]; then
+    review=$("$TMUX_BIN" split-window -h -t "$editor" -l "$DEV_GH_COLS" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
+    recreated=1
+  fi
+  send_if_shell "$review" "$DEV_REVIEW_CMD"
+  [ "$recreated" = "1" ] && normalize_editor
+  return 0
 }
 
 # Re-apply the editor window's fixed layout and pane tag. tmux-resurrect
@@ -446,7 +470,7 @@ if [ "$#" -eq 0 ]; then
   REST=()
 else
   case "$1" in
-    open|build|ensure|attach|attach-only|review|normalize-editor|post-restore|list|print-config)
+    open|build|ensure|attach|attach-only|review|review-pane|normalize-editor|post-restore|list|print-config)
       PROFILE="$DEFAULT_PROFILE"
       CMD="$1"
       REST=("${@:2}")
@@ -468,6 +492,7 @@ case "$CMD" in
   attach)      attach "${REST[0]:-}" ;;
   attach-only) attach_only "${REST[0]:-}" ;;
   review)      review "${REST[0]:-}" "${REST[1]:-}" ;;
+  review-pane) ensure_review_pane ;;
   normalize-editor)
     if [ "${REST[0]:-}" = "--all" ]; then
       normalize_editor_all_debounced
