@@ -26,7 +26,7 @@ per-tool detail.
 - `~/Projects/dotfiles` is the single source of truth: home paths are symlinks; edit in the repo, then commit and push.
 - Ghostty is a thin front end. tmux owns panes/splits; never add Ghostty/AppleScript splits.
 - `cmd` never reaches the terminal. GUI shortcuts are bridged: Ghostty keybind sends `Alt+<key>` (`text:\x1b...`), tmux forwards it, Neovim maps `<A-...>`.
-- Workspaces are data: a profile (`~/.config/dev-workspace/<name>.conf`) sets directories, commands and sizes; the engine has no project-specific code. Adding a project is a profile plus a one-line wrapper.
+- Workspaces are data: a profile (`~/.config/dev-workspace/<name>.conf`) sets directories, commands and sizes; the engine has no project-specific code. Adding a project is a profile plus a one-line wrapper. Bottom-strip panes are the same: `DEV_TERM_DIRS` plus parallel `DEV_TERM_CMDS`.
 - The editor layout is pinned deterministically: `build_editor` creates it and `normalize_editor` re-applies the review pane width (`DEV_GH_COLS`) and bottom row height (`DEV_BOTTOM_LINES`). Change sizes only in the profile.
 - `dev-workspace` owns the lifecycle: `open`, `build`, `ensure`, `attach`, `review`, `normalize-editor`, `post-restore`; project wrappers are one-line `exec dev-workspace <profile> "$@"`.
 - tmux-resurrect restores panes but not pane options or pinned sizes, so `normalize_editor` re-applies sizes and re-tags the editor pane (`@dev_review_pane <profile>`); the global hooks call `dev-workspace ... --all`.
@@ -40,6 +40,7 @@ per-tool detail.
 | Path | Configures |
 | --- | --- |
 | `.local/bin/dev-workspace` | generic workspace engine (sessions, layout, Ghostty windows, review helper) |
+| `.local/bin/running-actions` | live in-progress Actions view for a dev-workspace bottom pane |
 | `.local/bin/*-workspace` | per-project one-line wrappers over a profile |
 | `.config/dev-workspace/*.conf` | per-project profiles |
 | `.config/dev-workspace/*.yml` | per-project gh-dash configs |

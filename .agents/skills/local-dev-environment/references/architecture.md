@@ -18,13 +18,16 @@ this file is the reference for changing or debugging anything.
   (`${DEV_NAME}-agent`), `DEV_EDITOR_DIR` (root), `DEV_EDITOR_CMD` (`nvim .`),
   `DEV_EDITOR_SESSION` (`${DEV_NAME}-editor`), `DEV_REVIEW_CMD` (`gh dash`;
   empty omits the pane), `DEV_TERM_DIRS` (one pane at root; relative paths
-  resolve against root), `DEV_GH_COLS` (76), `DEV_BOTTOM_LINES` (14).
+  resolve against root), `DEV_TERM_CMDS` (commands parallel to `DEV_TERM_DIRS`;
+  empty entries leave a plain shell, default all empty), `DEV_GH_COLS` (76),
+  `DEV_BOTTOM_LINES` (14).
 - A workspace is two sessions in two Ghostty windows: the agent view
   (`DEV_AGENT_SESSION`, `DEV_AGENT_PANES` panes running `DEV_AGENT_CMD`) and the
   editor view (`DEV_EDITOR_SESSION`: editor pane, optional review pane, bottom
   row of `DEV_TERM_DIRS`). Window names are `agent` / `editor`.
 - Commands: `open` (default), `build`, `ensure`, `attach [session]`,
-  `attach-only [session]`, `review <pr>`, `normalize-editor [--all]`,
+  `attach-only [session]`, `review <pr>`, `review-pane` (idempotently relaunch
+  the review command in its pane), `normalize-editor [--all]`,
   `post-restore [--all]`, `list`, `print-config`.
 - `open`: `ensure`, then focus if all sessions have clients, else create only
   the missing Ghostty windows in one instance (fresh launch uses
@@ -43,7 +46,8 @@ this file is the reference for changing or debugging anything.
   `DEV_AGENT_CMD` in agent panes and the editor/review commands in the editor
   panes, but only where they are sitting at a plain shell (marked with
   `@dev_agent_started` for the agent). resurrect cannot restore a command with
-  arguments, which is why the review pane is started this way.
+  arguments, which is why the review pane is started this way. It also
+  restarts any non-empty `DEV_TERM_CMDS` in the bottom row, left to right.
 - `review <pr>`: `pr_url` accepts a full URL, `owner/repo#n`, or `owner/repo n`;
   `review_pane` selects the pane tagged `@dev_review_pane <profile>`; sends
   `Escape`, `:Octo <url>`, Enter, waits 2s, `:Octo review`, Enter. Browser
@@ -152,6 +156,11 @@ this file is the reference for changing or debugging anything.
   browser), with the same `defaults` and preview settings.
 - gh-dash reads its config at launch; each workspace runs its own
   `gh dash --config ...` so the review pane shows the right sections.
+- gh-dash has no Actions/workflow-runs view or section (v4.26), and the
+  `status:pending` PR qualifier matches PRs whose head commit has no checks, not
+  PRs with running checks. To watch running Actions, the candela profile runs
+  `.local/bin/running-actions` in a bottom pane via `DEV_TERM_CMDS`; the script
+  loops `gh run list --status in_progress` across the candela repos.
 
 ## pi
 
@@ -248,6 +257,8 @@ this file is the reference for changing or debugging anything.
   then reload both.
 - Change editor sizes as profile fields (`DEV_GH_COLS`, `DEV_BOTTOM_LINES`);
   `normalize_editor` consumes them.
+- Add a bottom-pane command as the matching `DEV_TERM_CMDS` entry (parallel to
+  `DEV_TERM_DIRS`), not engine code; empty strings keep plain shells.
 - Add a project as a profile in `~/.config/dev-workspace/<name>.conf` plus a
   one-line wrapper in `.local/bin/<name>-workspace`; do not fork the engine.
 - Keep tmux as the only pane owner; do not introduce Ghostty splits.
