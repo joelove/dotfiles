@@ -57,8 +57,12 @@ ln -s ~/Projects/dotfiles/.p10k.zsh ~/.p10k.zsh
 mkdir -p ~/.config
 ln -s ~/Projects/dotfiles/.config/ghostty ~/.config/ghostty
 ln -s ~/Projects/dotfiles/.config/nvim ~/.config/nvim
+ln -s ~/Projects/dotfiles/.config/gh-dash ~/.config/gh-dash
 mkdir -p ~/.local/bin
 ln -s ~/Projects/dotfiles/.local/bin/candela-workspace ~/.local/bin/candela-workspace
+mkdir -p ~/.agents/skills ~/.pi/agent/skills
+ln -s ~/Projects/dotfiles/.agents/skills/github-prs ~/.agents/skills/github-prs
+ln -s ~/.agents/skills/github-prs ~/.pi/agent/skills/github-prs
 ```
 
 ```sh

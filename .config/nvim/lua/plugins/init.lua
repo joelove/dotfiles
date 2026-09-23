@@ -62,4 +62,27 @@ return {
   -- 		},
   -- 	},
   -- },
+
+  -- GitHub PR review in this nvim pane. gh-dash stays the triage/approve
+  -- dashboard; octo does inline review comments, suggestions, request-changes
+  -- and thread resolution.
+  {
+    "pwntester/octo.nvim",
+    cmd = "Octo",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "nvim-telescope/telescope.nvim",
+      "nvim-tree/nvim-web-devicons",
+    },
+    opts = {
+      picker = "telescope",
+      enable_builtin = true,
+      -- The gh token has repo scope but not read:project; silence the warning.
+      suppress_missing_scope = { projects_v2 = true },
+    },
+    config = function(_, opts)
+      require("octo").setup(opts)
+      vim.treesitter.language.register("markdown", "octo")
+    end,
+  },
 }

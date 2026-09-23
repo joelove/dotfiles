@@ -11,6 +11,7 @@
 #   candela-workspace attach [session]   ensure sessions, then attach
 #   candela-workspace attach-only [s]    attach without touching the layout
 #   candela-workspace open               open both Ghostty windows
+#   candela-workspace review <pr>        open a PR in the editor nvim (octo)
 #   candela-workspace post-restore       resurrect hook (start pi again)
 #
 set -euo pipefail
@@ -55,6 +56,7 @@ build_prs() {
   bottom_right=$("$TMUX" split-window -h -t "$bottom" -l 50% -c "$CANDELA/candela-orchestrator" -P -F '#{pane_id}')
   # top row right (~40%)
   top_right=$("$TMUX" split-window -h -t "$top" -l 40% -c "$CANDELA" -P -F '#{pane_id}')
+  "$TMUX" set-option -p -t "$top" @candela_review_pane 1
   "$TMUX" send-keys -t "$top"       "nvim ." Enter
   "$TMUX" send-keys -t "$top_right" "gh dash" Enter
 }
@@ -132,6 +134,45 @@ attach_only() {
   "$TMUX" attach-session -t "${1:-candela-prs}"
 }
 
+# --- PR review integration --------------------------------------------------
+
+# Canonicalize a PR reference to a GitHub URL. Accepts a full URL,
+# owner/repo#123, or owner/repo 123.
+pr_url() {
+  local ref="${1:-}" num="${2:-}"
+  case "$ref" in
+    https://*) printf '%s' "$ref" ;;
+    *"#"*)     printf 'https://github.com/%s/pull/%s' "${ref%%#*}" "${ref##*#}" ;;
+    */*)       [ -n "$num" ] && printf 'https://github.com/%s/pull/%s' "$ref" "$num" || return 1 ;;
+    *)         return 1 ;;
+  esac
+}
+
+# The editor nvim pane, tagged in build_prs. Empty when the workspace is down.
+review_pane() {
+  "$TMUX" list-panes -a -F '#{pane_id} #{@candela_review_pane}' 2>/dev/null \
+    | awk '$2 == "1" { print $1; exit }'
+}
+
+# Open a PR in the editor pane's nvim (octo.nvim) and enter review mode.
+review() {
+  local url pane
+  url=$(pr_url "$@") || { echo "usage: candela-workspace review <pr-url|owner/repo#n|owner/repo n>" >&2; return 1; }
+  pane=$(review_pane)
+  if [ -n "$pane" ] && [ "$("$TMUX" display-message -p -t "$pane" '#{pane_current_command}' 2>/dev/null)" = "nvim" ]; then
+    "$TMUX" send-keys -t "$pane" Escape
+    "$TMUX" send-keys -t "$pane" -l ":Octo $url"
+    "$TMUX" send-keys -t "$pane" Enter
+    # octo fetches the PR asynchronously; give it a moment before review mode.
+    sleep 2
+    "$TMUX" send-keys -t "$pane" -l ":Octo review"
+    "$TMUX" send-keys -t "$pane" Enter
+  else
+    echo "candela-workspace: editor pane is not running nvim; opening $url in the browser" >&2
+    /usr/bin/open "$url"
+  fi
+}
+
 # Create one Ghostty window attached to a session, inside the existing Ghostty
 # app instance. Ghostty runs a multiple-argument `command` through /bin/sh -c,
 # so the attach-only invocation works as written.
@@ -206,6 +247,7 @@ case "${1:-open}" in
   attach)      attach "${2:-candela-prs}" ;;
   attach-only) attach_only "${2:-candela-prs}" ;;
   open)        open_windows ;;
+  review)      review "${2:-}" "${3:-}" ;;
   post-restore) post_restore ;;
-  *) echo "usage: candela-workspace [build|ensure|attach <session>|attach-only <session>|open|post-restore]" >&2; exit 1 ;;
+  *) echo "usage: candela-workspace [build|ensure|attach <session>|attach-only <session>|open|review <pr>|post-restore]" >&2; exit 1 ;;
 esac
