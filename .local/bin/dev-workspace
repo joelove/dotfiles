@@ -46,8 +46,8 @@ have_client() { "$TMUX_BIN" list-clients -t "$1" -F '#{client_tty}' 2>/dev/null 
 
 reset_profile() {
   unset DEV_NAME DEV_ROOT DEV_AGENT_DIR DEV_AGENT_CMD DEV_AGENT_PANES DEV_AGENT_SESSION \
-    DEV_EDITOR_DIR DEV_EDITOR_CMD DEV_EDITOR_SESSION DEV_REVIEW_CMD DEV_GH_COLS \
-    DEV_BOTTOM_LINES DEV_TERM_DIRS DEV_TERM_PATHS DEV_TERM_CMDS
+    DEV_EDITOR_DIR DEV_EDITOR_CMD DEV_EDITOR_SESSION DEV_REVIEW_CMD DEV_REVIEW_SUB_CMD \
+    DEV_REVIEW_SUB_LINES DEV_GH_COLS DEV_BOTTOM_LINES DEV_TERM_DIRS DEV_TERM_PATHS DEV_TERM_CMDS
 }
 
 apply_defaults() {
@@ -62,6 +62,8 @@ apply_defaults() {
   DEV_EDITOR_CMD="${DEV_EDITOR_CMD:-nvim .}"
   DEV_EDITOR_SESSION="${DEV_EDITOR_SESSION:-$DEV_NAME-editor}"
   DEV_REVIEW_CMD="${DEV_REVIEW_CMD-gh dash}"
+  DEV_REVIEW_SUB_CMD="${DEV_REVIEW_SUB_CMD-}"
+  DEV_REVIEW_SUB_LINES="${DEV_REVIEW_SUB_LINES:-5}"
   DEV_GH_COLS="${DEV_GH_COLS:-76}"
   DEV_BOTTOM_LINES="${DEV_BOTTOM_LINES:-14}"
   declare -p DEV_TERM_DIRS >/dev/null 2>&1 || DEV_TERM_DIRS=("$DEV_ROOT")
@@ -122,7 +124,7 @@ build_agent() {
 
 build_editor() {
   have "$DEV_EDITOR_SESSION" && return 0
-  local top bottom top_right n j pane
+  local top bottom top_right review_sub n j pane
   local -a bottom_panes=()
   top=$("$TMUX_BIN" new-session -d -s "$DEV_EDITOR_SESSION" -n editor -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
 
@@ -145,10 +147,20 @@ build_editor() {
     top_right=$("$TMUX_BIN" split-window -h -t "$top" -l "$DEV_GH_COLS" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
   fi
 
+  # optional pane directly below the review pane (e.g. a live actions readout)
+  review_sub=""
+  if [ -n "$top_right" ] && [ -n "$DEV_REVIEW_SUB_CMD" ]; then
+    review_sub=$("$TMUX_BIN" split-window -v -t "$top_right" -l "$DEV_REVIEW_SUB_LINES" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
+  fi
+
   "$TMUX_BIN" set-option -p -t "$top" @dev_review_pane "$DEV_NAME"
   "$TMUX_BIN" send-keys -t "$top" "$DEV_EDITOR_CMD" Enter
   if [ -n "$top_right" ]; then
     "$TMUX_BIN" send-keys -t "$top_right" "$DEV_REVIEW_CMD" Enter
+  fi
+  if [ -n "$review_sub" ]; then
+    "$TMUX_BIN" send-keys -t "$review_sub" "$DEV_REVIEW_SUB_CMD" Enter
+    "$TMUX_BIN" set-option -p -t "$review_sub" @dev_review_sub_started 1
   fi
   j=0
   if [ "${#bottom_panes[@]}" -gt 0 ]; then
@@ -225,6 +237,19 @@ start_views_in_shells() {
   if [ "$review" != "$editor" ]; then
     send_if_shell "$review" "$DEV_REVIEW_CMD"
   fi
+  # Restart the pane below the review pane, identified by geometry.
+  if [ -n "$DEV_REVIEW_SUB_CMD" ] && [ -n "$review" ] && [ "$review" != "$editor" ]; then
+    local review_left sub mark
+    review_left=$(printf '%s\n' "$top_sorted" | tail -n1 | awk '{ print $1 }')
+    sub=$(printf '%s\n' "$panes" | awk -v l="$review_left" -v t="$top_min" '$3 == l && $2 > t { print $2, $1 }' | sort -n | head -n1 | awk '{ print $2 }')
+    if [ -n "$sub" ]; then
+      mark=$("$TMUX_BIN" show-options -p -t "$sub" -qv @dev_review_sub_started 2>/dev/null || true)
+      if [ "$mark" != "1" ]; then
+        send_if_shell "$sub" "$DEV_REVIEW_SUB_CMD"
+        "$TMUX_BIN" set-option -p -t "$sub" @dev_review_sub_started 1
+      fi
+    fi
+  fi
   # Restart bottom-strip commands (left to right) that resurrect left as shells.
   # Commands are positional, so only act when the restored bottom row matches
   # the profile; a resurrected older layout with a different pane count would
@@ -266,6 +291,12 @@ ensure_review_pane() {
   if [ "$review" = "$editor" ]; then
     review=$("$TMUX_BIN" split-window -h -t "$editor" -l "$DEV_GH_COLS" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
     recreated=1
+  elif [ "$("$TMUX_BIN" show-options -p -t "$review" -qv @dev_review_sub_started 2>/dev/null || true)" = "1" ]; then
+    # The rightmost top pane is the review-sub pane, so the review pane was
+    # killed and the sub pane expanded into its place. Recreate the review pane
+    # above the sub pane, keeping the two stacked in the right column.
+    review=$("$TMUX_BIN" split-window -v -b -t "$review" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
+    recreated=1
   fi
   send_if_shell "$review" "$DEV_REVIEW_CMD"
   [ "$recreated" = "1" ] && normalize_editor
@@ -277,7 +308,7 @@ ensure_review_pane() {
 # otherwise bring back old sizes and lose the review tag.
 normalize_editor() {
   have "$DEV_EDITOR_SESSION" || return 0
-  local panes top_min bot_max top_sorted editor review bottom
+  local panes top_min bot_max top_sorted editor review bottom review_left review_sub
   panes=$("$TMUX_BIN" list-panes -t "$DEV_EDITOR_SESSION" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
   [ -n "$panes" ] || return 0
 
@@ -291,6 +322,11 @@ normalize_editor() {
 
   if [ -n "$review" ]; then
     "$TMUX_BIN" resize-pane -t "$review" -x "$DEV_GH_COLS" 2>/dev/null || true
+    review_left=$(printf '%s\n' "$top_sorted" | tail -n1 | awk '{ print $1 }')
+    review_sub=$(printf '%s\n' "$panes" | awk -v l="$review_left" -v t="$top_min" '$3 == l && $2 > t { print $2, $1 }' | sort -n | head -n1 | awk '{ print $2 }')
+    if [ -n "$review_sub" ]; then
+      "$TMUX_BIN" resize-pane -t "$review_sub" -y "$DEV_REVIEW_SUB_LINES" 2>/dev/null || true
+    fi
   fi
   if [ -n "$bottom" ]; then
     "$TMUX_BIN" resize-pane -t "$bottom" -y "$DEV_BOTTOM_LINES" 2>/dev/null || true
@@ -564,6 +600,8 @@ case "$CMD" in
     printf 'DEV_EDITOR_CMD=%s\n' "$DEV_EDITOR_CMD"
     printf 'DEV_EDITOR_SESSION=%s\n' "$DEV_EDITOR_SESSION"
     printf 'DEV_REVIEW_CMD=%s\n' "$DEV_REVIEW_CMD"
+    printf 'DEV_REVIEW_SUB_CMD=%s\n' "$DEV_REVIEW_SUB_CMD"
+    printf 'DEV_REVIEW_SUB_LINES=%s\n' "$DEV_REVIEW_SUB_LINES"
     printf 'DEV_TERM_PATHS=%s\n' "${DEV_TERM_PATHS[*]}"
     printf 'DEV_TERM_CMDS=%s\n' "${DEV_TERM_CMDS[*]}"
     printf 'DEV_GH_COLS=%s\n' "$DEV_GH_COLS"

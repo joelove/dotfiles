@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 #
-# running-actions - live view of in-progress GitHub Actions runs across a set
-# of repos, for a dev-workspace bottom-strip pane. Refreshes forever until
-# interrupted, so it can be used as a pane command directly (no `watch` needed).
+# running-actions - one compact line per in-progress GitHub Actions run across a
+# set of repos, for a dev-workspace pane. Refreshes until interrupted.
+#
+# The output is an n-liner: exactly one line per running action (n lines), or a
+# dim placeholder when nothing is running.
 #
 # Repos default to the Candela set. Override by passing repos as arguments or
 # setting RUNNING_ACTIONS_REPOS (space-separated). Refresh interval defaults to
@@ -26,32 +28,45 @@ if [ "${#repos[@]}" -eq 0 ]; then
 fi
 interval="${RUNNING_ACTIONS_INTERVAL:-5}"
 
-printf_hrule() {
-  printf '%-30s %-8s %-22s %-24s %s\n' "------------------------------" "--------" \
-    "----------------------" "------------------------" "----------"
+if [ -t 1 ]; then
+  bold=$'\033[1m' dim=$'\033[2m' yellow=$'\033[33m' reset=$'\033[0m'
+else
+  bold="" dim="" yellow="" reset=""
+fi
+
+elapsed() {
+  local start now mins
+  start=$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$1" +%s 2>/dev/null) || return 0
+  now=$(date +%s)
+  mins=$(((now - start) / 60))
+  if [ "$mins" -ge 60 ]; then
+    printf '%dh%02d' "$((mins / 60))" "$((mins % 60))"
+  else
+    printf '%dm' "$mins"
+  fi
+}
+
+frame() {
+  local r out wf br started total=0
+  for r in "${repos[@]}"; do
+    out=$(gh run list --repo "$r" --status in_progress --limit 10 \
+      --json name,headBranch,startedAt \
+      --jq '.[] | [.name, .headBranch, .startedAt] | @tsv' 2>/dev/null || true)
+    [ -n "$out" ] || continue
+    while IFS=$'\t' read -r wf br started; do
+      [ -n "$wf" ] || continue
+      printf '  %s●%s %s%-18.18s%s %-14.14s %s%-20.20s%s %s%s%s\n' \
+        "$yellow" "$reset" "$bold" "${r##*/}" "$reset" "$wf" \
+        "$dim" "$br" "$reset" "$yellow" "$(elapsed "$started")" "$reset"
+      total=$((total + 1))
+    done <<<"$out"
+  done
+  [ "$total" -eq 0 ] && printf '  %sno running actions%s\n' "$dim" "$reset"
+  return 0
 }
 
 while true; do
   printf '\033[H\033[2J'
-  printf '\033[1mrunning actions\033[0m  %s   (refresh %ss, ctrl-c to stop)\n\n' \
-    "$(date '+%H:%M:%S')" "$interval"
-  printf '%-30s %-8s %-22s %-24s %s\n' "REPO" "RUN" "WORKFLOW" "BRANCH" "STATUS"
-  printf_hrule
-
-  total=0
-  for r in "${repos[@]}"; do
-    out=$(gh run list --repo "$r" --status in_progress --limit 10 \
-      --json databaseId,name,headBranch,status \
-      --jq '.[] | [.databaseId, .name, .headBranch, .status] | @tsv' 2>/dev/null || true)
-    if [ -n "$out" ]; then
-      while IFS=$'\t' read -r id wf br st; do
-        printf '%-30s %-8s %-22.22s %-24.24s %s\n' "${r##*/}" "$id" "$wf" "$br" "$st"
-        total=$((total + 1))
-      done <<<"$out"
-    fi
-  done
-
-  [ "$total" -eq 0 ] && printf '  no in-progress runs\n'
-  printf '\n  %s run(s) across %s repo(s)\n' "$total" "${#repos[@]}"
+  frame
   sleep "$interval"
 done

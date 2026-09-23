@@ -17,14 +17,16 @@ this file is the reference for changing or debugging anything.
   skips the agent session), `DEV_AGENT_PANES` (2), `DEV_AGENT_SESSION`
   (`${DEV_NAME}-agent`), `DEV_EDITOR_DIR` (root), `DEV_EDITOR_CMD` (`nvim .`),
   `DEV_EDITOR_SESSION` (`${DEV_NAME}-editor`), `DEV_REVIEW_CMD` (`gh dash`;
-  empty omits the pane), `DEV_TERM_DIRS` (one pane at root; relative paths
-  resolve against root), `DEV_TERM_CMDS` (commands parallel to `DEV_TERM_DIRS`;
-  empty entries leave a plain shell, default all empty), `DEV_GH_COLS` (76),
-  `DEV_BOTTOM_LINES` (14).
+  empty omits the pane), `DEV_REVIEW_SUB_CMD` (empty omits the pane; e.g. a live
+  actions readout) with `DEV_REVIEW_SUB_LINES` (5), `DEV_TERM_DIRS` (one pane at
+  root; relative paths resolve against root), `DEV_TERM_CMDS` (commands parallel
+  to `DEV_TERM_DIRS`; empty entries leave a plain shell, default all empty),
+  `DEV_GH_COLS` (76), `DEV_BOTTOM_LINES` (14).
 - A workspace is two sessions in two Ghostty windows: the agent view
   (`DEV_AGENT_SESSION`, `DEV_AGENT_PANES` panes running `DEV_AGENT_CMD`) and the
-  editor view (`DEV_EDITOR_SESSION`: editor pane, optional review pane, bottom
-  row of `DEV_TERM_DIRS`). Window names are `agent` / `editor`.
+  editor view (`DEV_EDITOR_SESSION`: editor pane, optional review pane with an
+  optional `DEV_REVIEW_SUB_CMD` pane stacked directly below it, bottom row of
+  `DEV_TERM_DIRS`). Window names are `agent` / `editor`.
 - Commands: `open` (default), `build`, `ensure`, `attach [session]`,
   `attach-only [session]`, `review <pr>`, `review-pane` (idempotently relaunch
   the review command in its pane), `normalize-editor [--all]`,
@@ -39,15 +41,18 @@ this file is the reference for changing or debugging anything.
   `/tmp/dev-workspace-<name>.lock`.
 - `normalize_editor`: geometry-based (no pane tags needed). Top row: leftmost
   pane is the editor (`@dev_review_pane <DEV_NAME>`), rightmost is the review
-  pane resized to `DEV_GH_COLS` when present. Bottom row: leftmost pane resized
-  to `DEV_BOTTOM_LINES`. `--all` iterates every profile plus the default and is
-  debounced 0.25s for the resize hook.
+  pane resized to `DEV_GH_COLS` when present; the pane directly below the review
+  pane (same left, next top) is resized to `DEV_REVIEW_SUB_LINES`. Bottom row:
+  leftmost pane resized to `DEV_BOTTOM_LINES`. `--all` iterates every profile
+  plus the default and is debounced 0.25s for the resize hook.
 - `start_agent_in_shells` / `start_views_in_shells`: after a restore, start
   `DEV_AGENT_CMD` in agent panes and the editor/review commands in the editor
   panes, but only where they are sitting at a plain shell (marked with
   `@dev_agent_started` for the agent). resurrect cannot restore a command with
   arguments, which is why the review pane is started this way. It also
-  restarts any non-empty `DEV_TERM_CMDS` in the bottom row, left to right.
+  restarts the `DEV_REVIEW_SUB_CMD` pane below the review pane and any non-empty
+  `DEV_TERM_CMDS` in the bottom row, left to right; pane options
+  (`@dev_review_sub_started`, `@dev_term_started`) stop a second restart.
 - `review <pr>`: `pr_url` accepts a full URL, `owner/repo#n`, or `owner/repo n`;
   `review_pane` selects the pane tagged `@dev_review_pane <profile>`; sends
   `Escape`, `:Octo <url>`, Enter, waits 2s, `:Octo review`, Enter. Browser
@@ -55,8 +60,8 @@ this file is the reference for changing or debugging anything.
 - A project wrapper is one line: `exec dev-workspace <profile> "$@"`. Profiles
   can pin session names (e.g. to preserve an existing resurrect save), point
   `DEV_REVIEW_CMD` at a project-specific `gh dash --config` kept under
-  `.config/dev-workspace/`, and list the project's terminal subdirs in
-  `DEV_TERM_DIRS`.
+  `.config/dev-workspace/`, optionally stack a `DEV_REVIEW_SUB_CMD` below the
+  review pane, and list the project's terminal subdirs in `DEV_TERM_DIRS`.
 
 ## Ghostty
 
@@ -159,8 +164,9 @@ this file is the reference for changing or debugging anything.
 - gh-dash has no Actions/workflow-runs view or section (v4.26), and the
   `status:pending` PR qualifier matches PRs whose head commit has no checks, not
   PRs with running checks. To watch running Actions, the candela profile runs
-  `.local/bin/running-actions` in a bottom pane via `DEV_TERM_CMDS`; the script
-  loops `gh run list --status in_progress` across the candela repos.
+  `.local/bin/running-actions` directly below the gh-dash pane via
+  `DEV_REVIEW_SUB_CMD`; the script refreshes `gh run list --status in_progress`
+  across the candela repos into one compact line per running action.
 
 ## pi
 
@@ -255,10 +261,11 @@ this file is the reference for changing or debugging anything.
 
 - Add a shortcut as a pair: Ghostty keybind (Alt sequence) + nvim `<A-...>` map,
   then reload both.
-- Change editor sizes as profile fields (`DEV_GH_COLS`, `DEV_BOTTOM_LINES`);
-  `normalize_editor` consumes them.
-- Add a bottom-pane command as the matching `DEV_TERM_CMDS` entry (parallel to
-  `DEV_TERM_DIRS`), not engine code; empty strings keep plain shells.
+- Change editor sizes as profile fields (`DEV_GH_COLS`, `DEV_BOTTOM_LINES`,
+  `DEV_REVIEW_SUB_LINES`); `normalize_editor` consumes them.
+- Add a pane below the review pane as `DEV_REVIEW_SUB_CMD`, or a bottom-strip
+  command as the matching `DEV_TERM_CMDS` entry (parallel to `DEV_TERM_DIRS`),
+  not engine code; empty values omit/keep plain shells.
 - Add a project as a profile in `~/.config/dev-workspace/<name>.conf` plus a
   one-line wrapper in `.local/bin/<name>-workspace`; do not fork the engine.
 - Keep tmux as the only pane owner; do not introduce Ghostty splits.
