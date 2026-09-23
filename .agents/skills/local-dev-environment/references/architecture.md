@@ -168,9 +168,9 @@ this file is the reference for changing or debugging anything.
   `.local/bin/running-actions` directly below the gh-dash pane via
   `DEV_REVIEW_SUB_CMD`. It queries the REST `/actions/runs?status=in_progress`
   endpoint per repo with `gh api --cache` (default 60s) on a 30s poll loop, shows
-  a live `mm:ss`/`h:mm:ss` duration that redraws every 5s, and resizes its own
-  pane to one line per running action (clamped to 8, and effectively hidden at a
-  single empty line when zero), so it and gh-dash share the right column
+  a live `mm:ss`/`h:mm:ss` duration that redraws every second, and resizes its
+  own pane to one line per running action (clamped to 8, and effectively hidden
+  at a single empty line when zero), so it and gh-dash share the right column
   dynamically.
 
 ## pi

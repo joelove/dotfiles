@@ -5,7 +5,8 @@
 #
 # Behaviour:
 # - Prints one compact line per running action (an n-liner) with a live run
-#   duration (mm:ss, or h:mm:ss) that ticks every RUNNING_ACTIONS_TICK seconds.
+#   duration (mm:ss, or h:mm:ss) that ticks every RUNNING_ACTIONS_TICK seconds
+#   (1 by default).
 # - Resizes its own tmux pane to n lines (clamped to RUNNING_ACTIONS_MAX_LINES),
 #   so the pane it shares vertical space with keeps the rest. At n=0 it collapses
 #   to a single empty line, i.e. effectively hidden.
@@ -32,7 +33,7 @@ if [ "${#repos[@]}" -eq 0 ]; then
     )
   fi
 fi
-tick="${RUNNING_ACTIONS_TICK:-5}"
+tick="${RUNNING_ACTIONS_TICK:-1}"
 interval="${RUNNING_ACTIONS_INTERVAL:-30}"
 cache="${RUNNING_ACTIONS_CACHE:-60s}"
 maxlines="${RUNNING_ACTIONS_MAX_LINES:-8}"
@@ -47,6 +48,11 @@ fi
 
 iso_to_epoch() {
   date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$1" +%s 2>/dev/null || printf '0'
+}
+
+# Current epoch seconds without spawning `date` (bash 5 EPOCHSECONDS).
+now_epoch() {
+  printf '%s' "${EPOCHSECONDS:-$(date +%s)}"
 }
 
 # Human duration with seconds, so a 5s tick visibly counts up.
@@ -83,7 +89,7 @@ FRAME_BODY=""
 FRAME_N=0
 build_frame() {
   local now line body="" n=0 repo name br epoch
-  now=$(date +%s)
+  now=$(now_epoch)
   if [ -n "$RUNS" ]; then
     while IFS=$'\t' read -r repo name br epoch; do
       [ -n "$name" ] || continue
@@ -110,7 +116,7 @@ resize_self() {
 last_sig=""
 last_poll=0
 while true; do
-  now=$(date +%s)
+  now=$(now_epoch)
   if [ $((now - last_poll)) -ge "$interval" ]; then
     fetch_runs
     last_poll=$now
