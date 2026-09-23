@@ -20,7 +20,7 @@ set -euo pipefail
 # when we are launched by launchd / `open` with a minimal PATH.
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$HOME/.nvm/versions/node/v24.12.0/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-TMUX="/opt/homebrew/bin/tmux"
+TMUX_BIN="/opt/homebrew/bin/tmux"
 CANDELA="$HOME/Projects/candela"
 PI_BIN="/Users/joelove/.nvm/versions/node/v24.12.0/bin/pi"
 SELF="/Users/joelove/.local/bin/candela-workspace"
@@ -28,37 +28,37 @@ RESURRECT_DIR="$HOME/.local/share/tmux/resurrect"
 RESURRECT_RESTORE="$HOME/.tmux/plugins/tmux-resurrect/scripts/restore.sh"
 LOCKDIR="/tmp/candela-workspace.lock"
 
-have() { "$TMUX" has-session -t "$1" 2>/dev/null; }
+have() { "$TMUX_BIN" has-session -t "$1" 2>/dev/null; }
 
 # True when a client is attached to the session, i.e. a terminal window is
 # viewing it. This is the source of truth for whether the workspace is open.
-have_client() { "$TMUX" list-clients -t "$1" -F '#{client_tty}' 2>/dev/null | grep -q .; }
+have_client() { "$TMUX_BIN" list-clients -t "$1" -F '#{client_tty}' 2>/dev/null | grep -q .; }
 
 # --- session builders -------------------------------------------------------
 
 build_pi() {
   have candela-pi && return 0
   local left right
-  left=$("$TMUX" new-session -d -s candela-pi -n agent -c "$CANDELA" -P -F '#{pane_id}')
-  right=$("$TMUX" split-window -h -t "$left" -c "$CANDELA" -P -F '#{pane_id}')
-  "$TMUX" set-option -p -t "$left"  @pi_started 1
-  "$TMUX" set-option -p -t "$right" @pi_started 1
-  "$TMUX" send-keys -t "$left"  "$PI_BIN" Enter
-  "$TMUX" send-keys -t "$right" "$PI_BIN" Enter
+  left=$("$TMUX_BIN" new-session -d -s candela-pi -n agent -c "$CANDELA" -P -F '#{pane_id}')
+  right=$("$TMUX_BIN" split-window -h -t "$left" -c "$CANDELA" -P -F '#{pane_id}')
+  "$TMUX_BIN" set-option -p -t "$left"  @pi_started 1
+  "$TMUX_BIN" set-option -p -t "$right" @pi_started 1
+  "$TMUX_BIN" send-keys -t "$left"  "$PI_BIN" Enter
+  "$TMUX_BIN" send-keys -t "$right" "$PI_BIN" Enter
 }
 
 build_prs() {
   have candela-prs && return 0
   local top bottom bottom_right top_right
-  top=$("$TMUX" new-session -d -s candela-prs -n editor -c "$CANDELA" -P -F '#{pane_id}')
+  top=$("$TMUX_BIN" new-session -d -s candela-prs -n editor -c "$CANDELA" -P -F '#{pane_id}')
   # bottom strip (~25%)
-  bottom=$("$TMUX" split-window -v -t "$top" -l 25% -c "$CANDELA/candela-infra" -P -F '#{pane_id}')
-  bottom_right=$("$TMUX" split-window -h -t "$bottom" -l 50% -c "$CANDELA/candela-orchestrator" -P -F '#{pane_id}')
+  bottom=$("$TMUX_BIN" split-window -v -t "$top" -l 25% -c "$CANDELA/candela-infra" -P -F '#{pane_id}')
+  bottom_right=$("$TMUX_BIN" split-window -h -t "$bottom" -l 50% -c "$CANDELA/candela-orchestrator" -P -F '#{pane_id}')
   # top row right (~40%)
-  top_right=$("$TMUX" split-window -h -t "$top" -l 40% -c "$CANDELA" -P -F '#{pane_id}')
-  "$TMUX" set-option -p -t "$top" @candela_review_pane 1
-  "$TMUX" send-keys -t "$top"       "nvim ." Enter
-  "$TMUX" send-keys -t "$top_right" "gh dash" Enter
+  top_right=$("$TMUX_BIN" split-window -h -t "$top" -l 40% -c "$CANDELA" -P -F '#{pane_id}')
+  "$TMUX_BIN" set-option -p -t "$top" @candela_review_pane 1
+  "$TMUX_BIN" send-keys -t "$top"       "nvim ." Enter
+  "$TMUX_BIN" send-keys -t "$top_right" "gh dash" Enter
 }
 
 build() { build_pi; build_prs; }
@@ -76,36 +76,36 @@ start_pi_in_shells() {
   have candela-pi || return 0
   local pane cmd mark
   while IFS= read -r pane; do
-    mark=$("$TMUX" show-options -p -t "$pane" -qv @pi_started 2>/dev/null || true)
+    mark=$("$TMUX_BIN" show-options -p -t "$pane" -qv @pi_started 2>/dev/null || true)
     [ "$mark" = "1" ] && continue
-    cmd=$("$TMUX" display-message -p -t "$pane" '#{pane_current_command}' 2>/dev/null || echo '')
+    cmd=$("$TMUX_BIN" display-message -p -t "$pane" '#{pane_current_command}' 2>/dev/null || echo '')
     case "$cmd" in
       zsh|bash|sh|-zsh|-bash)
-        "$TMUX" set-option -p -t "$pane" @pi_started 1
-        "$TMUX" send-keys -t "$pane" "$PI_BIN" Enter
+        "$TMUX_BIN" set-option -p -t "$pane" @pi_started 1
+        "$TMUX_BIN" send-keys -t "$pane" "$PI_BIN" Enter
         ;;
     esac
-  done < <("$TMUX" list-panes -t candela-pi -F '#{pane_id}' 2>/dev/null)
+  done < <("$TMUX_BIN" list-panes -t candela-pi -F '#{pane_id}' 2>/dev/null)
 }
 
 # Restore the last resurrect save, synchronously, into the running server.
 restore_from_save() {
   local socket
-  socket=$("$TMUX" display-message -p '#{socket_path}' 2>/dev/null || true)
+  socket=$("$TMUX_BIN" display-message -p '#{socket_path}' 2>/dev/null || true)
   [ -n "$socket" ] || return 1
   [ -n "$(latest_save)" ] || return 1
   TMUX="$socket,0,0" bash "$RESURRECT_RESTORE" >/dev/null 2>&1 || true
 }
 
 ensure_unlocked() {
-  "$TMUX" start-server 2>/dev/null || true
+  "$TMUX_BIN" start-server 2>/dev/null || true
   if ! have candela-pi || ! have candela-prs; then
     if [ -n "$(latest_save)" ]; then
       # Keep the server alive while restoring from scratch.
       local tmp="__candela_workspace_tmp__"
-      have "$tmp" || "$TMUX" new-session -d -s "$tmp" -c "$CANDELA" 2>/dev/null || true
+      have "$tmp" || "$TMUX_BIN" new-session -d -s "$tmp" -c "$CANDELA" 2>/dev/null || true
       restore_from_save
-      have "$tmp" && "$TMUX" kill-session -t "$tmp" 2>/dev/null || true
+      have "$tmp" && "$TMUX_BIN" kill-session -t "$tmp" 2>/dev/null || true
       # resurrect restores pi as a generic `node`, so it comes back as a shell.
       sleep 1
       start_pi_in_shells
@@ -127,11 +127,11 @@ ensure() {
 attach() {
   local session="${1:-candela-prs}"
   ensure
-  "$TMUX" attach-session -t "$session"
+  "$TMUX_BIN" attach-session -t "$session"
 }
 
 attach_only() {
-  "$TMUX" attach-session -t "${1:-candela-prs}"
+  "$TMUX_BIN" attach-session -t "${1:-candela-prs}"
 }
 
 # --- PR review integration --------------------------------------------------
@@ -150,7 +150,7 @@ pr_url() {
 
 # The editor nvim pane, tagged in build_prs. Empty when the workspace is down.
 review_pane() {
-  "$TMUX" list-panes -a -F '#{pane_id} #{@candela_review_pane}' 2>/dev/null \
+  "$TMUX_BIN" list-panes -a -F '#{pane_id} #{@candela_review_pane}' 2>/dev/null \
     | awk '$2 == "1" { print $1; exit }' || true
 }
 
@@ -159,14 +159,14 @@ review() {
   local url pane
   url=$(pr_url "$@") || { echo "usage: candela-workspace review <pr-url|owner/repo#n|owner/repo n>" >&2; return 1; }
   pane=$(review_pane)
-  if [ -n "$pane" ] && [ "$("$TMUX" display-message -p -t "$pane" '#{pane_current_command}' 2>/dev/null)" = "nvim" ]; then
-    "$TMUX" send-keys -t "$pane" Escape
-    "$TMUX" send-keys -t "$pane" -l ":Octo $url"
-    "$TMUX" send-keys -t "$pane" Enter
+  if [ -n "$pane" ] && [ "$("$TMUX_BIN" display-message -p -t "$pane" '#{pane_current_command}' 2>/dev/null)" = "nvim" ]; then
+    "$TMUX_BIN" send-keys -t "$pane" Escape
+    "$TMUX_BIN" send-keys -t "$pane" -l ":Octo $url"
+    "$TMUX_BIN" send-keys -t "$pane" Enter
     # octo fetches the PR asynchronously; give it a moment before review mode.
     sleep 2
-    "$TMUX" send-keys -t "$pane" -l ":Octo review"
-    "$TMUX" send-keys -t "$pane" Enter
+    "$TMUX_BIN" send-keys -t "$pane" -l ":Octo review"
+    "$TMUX_BIN" send-keys -t "$pane" Enter
   else
     echo "candela-workspace: editor pane is not running nvim; opening $url in the browser" >&2
     /usr/bin/open "$url"
