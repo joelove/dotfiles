@@ -14,13 +14,8 @@ map("n", "<leader>e", "<cmd>NvimTreeToggle<CR>", { desc = "filetree toggle" })
 map("n", "<leader>ef", "<cmd>NvimTreeFindFile<CR>", { desc = "filetree find current file" })
 map("n", "<leader>er", "<cmd>NvimTreeRefresh<CR>", { desc = "filetree refresh" })
 map("n", "<A-E>", function()
-  local api = require "nvim-tree.api"
-  if api.tree.is_visible() then
-    api.tree.focus()
-  else
-    api.tree.toggle { focus = true }
-  end
-end, { desc = "filetree focus/open (cmd+shift+e)" })
+  require("nvim-tree.api").tree.find_file { open = true, focus = true }
+end, { desc = "filetree reveal/focus (cmd+shift+e)" })
 
 -- map({ "n", "i", "v" }, "<C-s>", "<cmd> w <cr>")
 
@@ -28,7 +23,8 @@ end, { desc = "filetree focus/open (cmd+shift+e)" })
 -- (macOS/Ghostty swallow cmd); tmux forwards the Alt sequence to the pane.
 map({ "n", "i", "v" }, "<A-p>", "<cmd>Telescope find_files<CR>", { desc = "find files (cmd+p)" })
 map({ "n", "i", "v" }, "<A-P>", "<cmd>Telescope commands<CR>", { desc = "command palette (cmd+shift+p)" })
-map("n", "<A-n>", function()
+map({ "n", "i", "v" }, "<A-n>", function()
+  vim.cmd "stopinsert"
   vim.cmd "enew"
   vim.cmd "startinsert"
 end, { desc = "new blank buffer (cmd+n)" })
