@@ -160,6 +160,9 @@ this file is the reference for changing or debugging anything.
 - Both configs bind `enter` -> `gh pr view --web` and `o` -> review in nvim
   (overriding gh-dash's built-in open-in-GitHub; the helper falls back to the
   browser), with the same `defaults` and preview settings.
+- Both configs set `theme.ui` to `sectionsShowCount: false` and
+  `table.compact/showSeparator: false` for a denser list. gh-dash's own section
+  title and separator header cannot be hidden (no config for it).
 - gh-dash reads its config at launch; each workspace runs its own
   `gh dash --config ...` so the review pane shows the right sections.
 - gh-dash has no Actions/workflow-runs view or section (v4.26), and the

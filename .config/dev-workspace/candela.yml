@@ -27,6 +27,15 @@ defaults:
   preview:
     open: true
 
+# Denser table: drop the per-section count, row separators, and row padding.
+# (gh-dash's own title/separator header cannot be hidden.)
+theme:
+  ui:
+    sectionsShowCount: false
+    table:
+      compact: true
+      showSeparator: false
+
 # `enter` opens in the browser; `o` opens the PR in the candela editor pane
 # (octo.nvim), falling back to the browser when the pane is unavailable.
 keybindings:
