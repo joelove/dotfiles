@@ -63,6 +63,8 @@ ln -s ~/Projects/dotfiles/.local/bin/candela-workspace ~/.local/bin/candela-work
 mkdir -p ~/.agents/skills ~/.pi/agent/skills
 ln -s ~/Projects/dotfiles/.agents/skills/github-prs ~/.agents/skills/github-prs
 ln -s ~/.agents/skills/github-prs ~/.pi/agent/skills/github-prs
+ln -s ~/Projects/dotfiles/.agents/skills/local-dev-environment ~/.agents/skills/local-dev-environment
+ln -s ~/.agents/skills/local-dev-environment ~/.pi/agent/skills/local-dev-environment
 ```
 
 ```sh
