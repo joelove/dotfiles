@@ -103,7 +103,17 @@ keybind = ctrl+shift+tab=goto_window:previous
 # See ~/.config/nvim/lua/mappings.lua.
 keybind = super+p=text:\x1bp
 keybind = super+shift+p=text:\x1bP
+keybind = super+n=text:\x1bn
+keybind = super+shift+e=text:\x1bE
 keybind = super+s=text:\x1bs
 keybind = super+f=text:\x1bf
 keybind = super+shift+f=text:\x1bF
 keybind = super+/=text:\x1b/
+
+# ---------------------------------------------------------------------------
+# Quit
+# ---------------------------------------------------------------------------
+# tmux owns session lifetime: cmd+q only detaches and resurrect reattaches the
+# workspace, so there is nothing to lose by closing a surface. Disable Ghostty's
+# default "process is running, close anyway?" prompt.
+confirm-close-surface = false
