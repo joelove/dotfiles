@@ -51,11 +51,11 @@ build_prs() {
   have candela-prs && return 0
   local top bottom bottom_right top_right
   top=$("$TMUX_BIN" new-session -d -s candela-prs -n editor -c "$CANDELA" -P -F '#{pane_id}')
-  # bottom strip (16 lines)
-  bottom=$("$TMUX_BIN" split-window -v -t "$top" -l 16 -c "$CANDELA/candela-infra" -P -F '#{pane_id}')
+  # bottom strip (14 lines)
+  bottom=$("$TMUX_BIN" split-window -v -t "$top" -l 14 -c "$CANDELA/candela-infra" -P -F '#{pane_id}')
   bottom_right=$("$TMUX_BIN" split-window -h -t "$bottom" -l 50% -c "$CANDELA/candela-orchestrator" -P -F '#{pane_id}')
-  # top row right (80 cols)
-  top_right=$("$TMUX_BIN" split-window -h -t "$top" -l 80 -c "$CANDELA" -P -F '#{pane_id}')
+  # top row right (76 cols)
+  top_right=$("$TMUX_BIN" split-window -h -t "$top" -l 76 -c "$CANDELA" -P -F '#{pane_id}')
   "$TMUX_BIN" set-option -p -t "$top" @candela_review_pane 1
   "$TMUX_BIN" send-keys -t "$top"       "nvim ." Enter
   "$TMUX_BIN" send-keys -t "$top_right" "gh dash" Enter
@@ -107,8 +107,8 @@ normalize_editor() {
   nvim=$(printf '%s\n' "$panes" | awk -v t="$top_min" '$2 == t { print $3, $1 }' | sort -n | head -n1 | awk '{ print $2 }')
   bottom=$(printf '%s\n' "$panes" | awk -v t="$bot_max" '$2 == t { print $3, $1 }' | sort -n | head -n1 | awk '{ print $2 }')
 
-  [ -n "$gh" ] && "$TMUX_BIN" resize-pane -t "$gh" -x 80 2>/dev/null || true
-  [ -n "$bottom" ] && "$TMUX_BIN" resize-pane -t "$bottom" -y 16 2>/dev/null || true
+  [ -n "$gh" ] && "$TMUX_BIN" resize-pane -t "$gh" -x 76 2>/dev/null || true
+  [ -n "$bottom" ] && "$TMUX_BIN" resize-pane -t "$bottom" -y 14 2>/dev/null || true
   [ -n "$nvim" ] && "$TMUX_BIN" set-option -p -t "$nvim" @candela_review_pane 1 2>/dev/null || true
   return 0
 }
