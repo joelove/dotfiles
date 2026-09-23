@@ -47,7 +47,7 @@ have_client() { "$TMUX_BIN" list-clients -t "$1" -F '#{client_tty}' 2>/dev/null 
 reset_profile() {
   unset DEV_NAME DEV_ROOT DEV_AGENT_DIR DEV_AGENT_CMD DEV_AGENT_PANES DEV_AGENT_SESSION \
     DEV_EDITOR_DIR DEV_EDITOR_CMD DEV_EDITOR_SESSION DEV_REVIEW_CMD DEV_GH_COLS \
-    DEV_BOTTOM_LINES DEV_TERM_DIRS DEV_TERM_PATHS
+    DEV_BOTTOM_LINES DEV_TERM_DIRS DEV_TERM_PATHS DEV_TERM_CMDS
 }
 
 apply_defaults() {
@@ -73,6 +73,13 @@ apply_defaults() {
       *) DEV_TERM_PATHS+=("$DEV_ROOT/$d") ;;
     esac
   done
+  # Optional per-pane commands, parallel to DEV_TERM_DIRS. Empty entries just
+  # leave a shell. Profiles set e.g. a live actions view in one bottom pane.
+  declare -p DEV_TERM_CMDS >/dev/null 2>&1 || {
+    DEV_TERM_CMDS=()
+    local c
+    for c in "${DEV_TERM_PATHS[@]}"; do DEV_TERM_CMDS+=(""); done
+  }
 }
 
 load_profile() {
@@ -115,16 +122,19 @@ build_agent() {
 
 build_editor() {
   have "$DEV_EDITOR_SESSION" && return 0
-  local top bottom top_right n j
+  local top bottom top_right n j pane
+  local -a bottom_panes=()
   top=$("$TMUX_BIN" new-session -d -s "$DEV_EDITOR_SESSION" -n editor -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
 
   # bottom strip: one pane per terminal dir
   n=${#DEV_TERM_PATHS[@]}
   if [ "$n" -gt 0 ]; then
     bottom=$("$TMUX_BIN" split-window -v -t "$top" -l "$DEV_BOTTOM_LINES" -c "${DEV_TERM_PATHS[0]}" -P -F '#{pane_id}')
+    bottom_panes+=("$bottom")
     j=1
     while [ "$j" -lt "$n" ]; do
       bottom=$("$TMUX_BIN" split-window -h -t "$bottom" -l 50% -c "${DEV_TERM_PATHS[$j]}" -P -F '#{pane_id}')
+      bottom_panes+=("$bottom")
       j=$((j + 1))
     done
   fi
@@ -139,6 +149,16 @@ build_editor() {
   "$TMUX_BIN" send-keys -t "$top" "$DEV_EDITOR_CMD" Enter
   if [ -n "$top_right" ]; then
     "$TMUX_BIN" send-keys -t "$top_right" "$DEV_REVIEW_CMD" Enter
+  fi
+  j=0
+  if [ "${#bottom_panes[@]}" -gt 0 ]; then
+    for pane in "${bottom_panes[@]}"; do
+      if [ -n "${DEV_TERM_CMDS[$j]:-}" ]; then
+        "$TMUX_BIN" send-keys -t "$pane" "${DEV_TERM_CMDS[$j]}" Enter
+        "$TMUX_BIN" set-option -p -t "$pane" @dev_term_started 1
+      fi
+      j=$((j + 1))
+    done
   fi
 }
 
@@ -204,6 +224,21 @@ start_views_in_shells() {
   send_if_shell "$editor" "$DEV_EDITOR_CMD"
   if [ "$review" != "$editor" ]; then
     send_if_shell "$review" "$DEV_REVIEW_CMD"
+  fi
+  # Restart bottom-strip commands (left to right) that resurrect left as shells.
+  if [ "${#DEV_TERM_CMDS[@]}" -gt 0 ]; then
+    local i=0 bottom_pane mark cmd
+    while IFS= read -r bottom_pane; do
+      cmd="${DEV_TERM_CMDS[$i]:-}"
+      if [ -n "$cmd" ]; then
+        mark=$("$TMUX_BIN" show-options -p -t "$bottom_pane" -qv @dev_term_started 2>/dev/null || true)
+        if [ "$mark" != "1" ]; then
+          send_if_shell "$bottom_pane" "$cmd"
+          "$TMUX_BIN" set-option -p -t "$bottom_pane" @dev_term_started 1
+        fi
+      fi
+      i=$((i + 1))
+    done < <(printf '%s\n' "$panes" | awk -v t="$top_min" '$2 > t { print $3, $1 }' | sort -n | awk '{ print $2 }')
   fi
 }
 
@@ -523,6 +558,7 @@ case "$CMD" in
     printf 'DEV_EDITOR_SESSION=%s\n' "$DEV_EDITOR_SESSION"
     printf 'DEV_REVIEW_CMD=%s\n' "$DEV_REVIEW_CMD"
     printf 'DEV_TERM_PATHS=%s\n' "${DEV_TERM_PATHS[*]}"
+    printf 'DEV_TERM_CMDS=%s\n' "${DEV_TERM_CMDS[*]}"
     printf 'DEV_GH_COLS=%s\n' "$DEV_GH_COLS"
     printf 'DEV_BOTTOM_LINES=%s\n' "$DEV_BOTTOM_LINES"
     ;;
