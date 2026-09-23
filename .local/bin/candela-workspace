@@ -51,8 +51,8 @@ build_prs() {
   have candela-prs && return 0
   local top bottom bottom_right top_right
   top=$("$TMUX_BIN" new-session -d -s candela-prs -n editor -c "$CANDELA" -P -F '#{pane_id}')
-  # bottom strip (~25%)
-  bottom=$("$TMUX_BIN" split-window -v -t "$top" -l 25% -c "$CANDELA/candela-infra" -P -F '#{pane_id}')
+  # bottom strip (20 lines)
+  bottom=$("$TMUX_BIN" split-window -v -t "$top" -l 20 -c "$CANDELA/candela-infra" -P -F '#{pane_id}')
   bottom_right=$("$TMUX_BIN" split-window -h -t "$bottom" -l 50% -c "$CANDELA/candela-orchestrator" -P -F '#{pane_id}')
   # top row right (80 cols)
   top_right=$("$TMUX_BIN" split-window -h -t "$top" -l 80 -c "$CANDELA" -P -F '#{pane_id}')
