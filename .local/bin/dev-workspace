@@ -18,6 +18,7 @@
 #   attach-only [session] attach without touching sessions or layout
 #   review <pr>           open a PR in the editor pane's nvim (octo.nvim)
 #   review-pane           (re)launch the review pane command only if it is closed
+#   editor-cmd <cmd>      send a literal Vim command to the editor pane's nvim
 #   normalize-editor [--all]   re-pin the pane sizes and review-pane tag
 #   post-restore [--all]       resurrect hook: restart the agent and normalize
 #   list                  list profiles
@@ -447,6 +448,47 @@ review() {
   fi
 }
 
+# The nvim pane for the open workspace, tagged by build_editor/normalize_editor
+# (@dev_review_pane). Profile-agnostic so the tmux `editor` table can call it
+# without knowing which workspace is open; prefers a pane whose session has an
+# attached client (window open), else the first tagged nvim pane.
+editor_pane() {
+  local pane
+  pane=$("$TMUX_BIN" list-panes -a -F '#{pane_id} #{@dev_review_pane} #{pane_current_command} #{session_attached}' 2>/dev/null \
+    | awk '$2 != "" && $3 == "nvim" && $4 == 1 { print $1; exit }')
+  [ -n "$pane" ] || pane=$("$TMUX_BIN" list-panes -a -F '#{pane_id} #{@dev_review_pane} #{pane_current_command}' 2>/dev/null \
+    | awk '$2 != "" && $3 == "nvim" { print $1; exit }')
+  printf '%s' "$pane"
+}
+
+# Send a literal Vim command to the editor (nvim) pane from any pane, selecting
+# it server-side first. Only touches tmux state: it never calls yabai or focuses
+# a Ghostty window (use the workspace focus shortcut for that). The tmux `editor`
+# table calls this for cmd+t and cmd+shift+e.
+editor_cmd() {
+  local dry=0 pane cmd
+  [ "${1:-}" = "--dry-run" ] && { dry=1; shift; }
+  cmd="${1:-}"
+  if [ -z "$cmd" ]; then
+    echo "usage: dev-workspace editor-cmd [--dry-run] <vim-command>" >&2
+    return 1
+  fi
+  pane=$(editor_pane)
+  if [ -z "$pane" ]; then
+    echo "dev-workspace: no nvim editor pane found" >&2
+    return 1
+  fi
+  if [ "$dry" = "1" ]; then
+    printf 'pane=%s cmd=:%s\n' "$pane" "$cmd"
+    return 0
+  fi
+  "$TMUX_BIN" select-window -t "$pane" 2>/dev/null || true
+  "$TMUX_BIN" select-pane -t "$pane" 2>/dev/null || true
+  "$TMUX_BIN" send-keys -t "$pane" Escape
+  "$TMUX_BIN" send-keys -t "$pane" -l ":$cmd"
+  "$TMUX_BIN" send-keys -t "$pane" Enter
+}
+
 # Create one Ghostty window attached to a session, inside the existing Ghostty
 # app instance. Ghostty runs a multiple-argument `command` through /bin/sh -c.
 new_ghostty_window() {
@@ -548,7 +590,7 @@ if [ "$#" -eq 0 ]; then
   REST=()
 else
   case "$1" in
-    open|build|ensure|attach|attach-only|review|review-pane|normalize-editor|post-restore|list|print-config)
+    open|build|ensure|attach|attach-only|review|review-pane|editor-cmd|normalize-editor|post-restore|list|print-config)
       PROFILE="$DEFAULT_PROFILE"
       CMD="$1"
       REST=("${@:2}")
@@ -571,6 +613,7 @@ case "$CMD" in
   attach-only) attach_only "${REST[0]:-}" ;;
   review)      review "${REST[0]:-}" "${REST[1]:-}" ;;
   review-pane) ensure_review_pane ;;
+  editor-cmd)  editor_cmd "${REST[0]:-}" "${REST[1]:-}" ;;
   normalize-editor)
     if [ "${REST[0]:-}" = "--all" ]; then
       normalize_editor_all_debounced
