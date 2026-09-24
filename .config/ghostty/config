@@ -92,19 +92,25 @@ keybind = super+alt+arrow_down=text:\x02\x1b[B
 # ---------------------------------------------------------------------------
 # Cycle between Ghostty windows (not tabs). This overrides the default
 # ctrl+tab=next_tab / ctrl+shift+tab=previous_tab; tabs are still reachable via
-# super+t, super+[ / super+], and the tab overview.
+# super+[ / super+], and the tab overview.
 keybind = ctrl+tab=goto_window:next
 keybind = ctrl+shift+tab=goto_window:previous
 
 # ---------------------------------------------------------------------------
 # GUI-editor bridges
 # ---------------------------------------------------------------------------
-# Send Alt+<key>; tmux forwards it to the pane and nvim maps <A-...>.
-# See ~/.config/nvim/lua/mappings.lua.
+# Two editor actions are tmux-wide: cmd+t (find file) and cmd+shift+e
+# (focus/reveal filetree). They send C-b C-v <slot>; the tmux `editor` table
+# selects the nvim pane in whichever workspace is open and runs the literal Vim
+# command there. See ~/.tmux.conf and dev-workspace editor-cmd.
+#
+# The rest send Alt+<key>; tmux forwards it to the focused pane and nvim maps
+# <A-...>. See ~/.config/nvim/lua/mappings.lua.
+keybind = super+t=text:\x02\x16f
+keybind = super+shift+e=text:\x02\x16e
 keybind = super+p=text:\x1bp
 keybind = super+shift+p=text:\x1bP
 keybind = super+n=text:\x1bn
-keybind = super+shift+e=text:\x1bE
 keybind = super+s=text:\x1bs
 keybind = super+f=text:\x1bf
 keybind = super+shift+f=text:\x1bF
