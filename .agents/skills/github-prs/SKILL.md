@@ -1,10 +1,6 @@
 ---
 name: github-prs
-description: >-
-  Create GitHub pull requests and open them for review in the workspace editor
-  pane (tmux + Neovim + octo.nvim). Use after `gh pr create`, when asked to open
-  a PR for review, or when starting a review of an existing PR. Triggers on:
-  open PR, open pull request, PR review, review this PR, after creating a PR.
+description: Open a GitHub pull request for review in the workspace editor pane (tmux + Neovim + octo.nvim). Use after creating a PR, when asked to open one for review, or when starting a review of an existing PR.
 ---
 
 # GitHub PRs: create and open for review
@@ -38,4 +34,3 @@ review mode: `<localleader>ca` comment, `<localleader>sa` suggestion,
 - gh-dash's PR list has an `o` keybinding that calls the same helper (it
   replaces the built-in open-in-GitHub, and still falls back to the browser
   when the editor pane is unavailable).
-- Related skills: review-code, autopilot, git-sync-from-main, linear-project-tracking.

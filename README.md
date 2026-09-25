@@ -62,13 +62,39 @@ ln -s ~/Projects/dotfiles/.config/dev-workspace ~/.config/dev-workspace
 mkdir -p ~/.local/bin
 ln -s ~/Projects/dotfiles/.local/bin/dev-workspace ~/.local/bin/dev-workspace
 ln -s ~/Projects/dotfiles/.local/bin/running-actions ~/.local/bin/running-actions
-# per-project wrappers (one-line `exec dev-workspace <profile> "$@"`) are added alongside
-mkdir -p ~/.agents/skills ~/.pi/agent/skills
-ln -s ~/Projects/dotfiles/.agents/skills/github-prs ~/.agents/skills/github-prs
-ln -s ~/.agents/skills/github-prs ~/.pi/agent/skills/github-prs
-ln -s ~/Projects/dotfiles/.agents/skills/local-dev-environment ~/.agents/skills/local-dev-environment
-ln -s ~/.agents/skills/local-dev-environment ~/.pi/agent/skills/local-dev-environment
+ln -s ~/Projects/dotfiles/.local/bin/audit-agent-context.mjs ~/.local/bin/audit-agent-context
+# All public skills live in dotfiles; pi discovers ~/.agents/skills natively, so
+# symlink every skill directory back. Do not mirror into ~/.pi/agent/skills.
+mkdir -p ~/.agents/skills
+for d in ~/Projects/dotfiles/.agents/skills/*/; do
+  ln -sfn "$d" "$HOME/.agents/skills/$(basename "$d")"
+done
+
+# Privileged skills (production DB access, CMS admin) live in a private repo,
+# not here. Clone agent-skills and link it the same way.
+for d in ~/Projects/agent-skills/.agents/skills/*/; do
+  ln -sfn "$d" "$HOME/.agents/skills/$(basename "$d")"
+done
 ```
+
+### Agent context
+
+`audit-agent-context` reports what pi advertises into context for a repo, using
+pi's own resource loader. Run it against any repo:
+
+```sh
+cd ~/Projects/my-app
+node ~/Projects/dotfiles/.local/bin/audit-agent-context.mjs --cwd .
+node ~/Projects/dotfiles/.local/bin/audit-agent-context.mjs --cwd . --check --context-max 4096
+```
+
+`--repo NAME` resolves against `$AGENT_AUDIT_ROOT` (default `~/Projects`).
+It prints the advertised skills with description and body bytes, the hidden
+skills, and the context-file bytes. `--check` exits non-zero above 13 advertised
+skills or 4,000 description bytes; `--context-max` adds a context-file cap. The
+2026-09 streamlining pass took a repo from 24 advertised skills to 9-10 and from
+~7.5KB of descriptions to ~2.2KB, and the git/Linear cluster from ~30.7KB of
+body to a single short router.
 
 ```sh
 git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
