@@ -167,7 +167,7 @@ this file is the reference for changing or debugging anything.
   `gh dash --config ...` so the review pane shows the right sections.
 - gh-dash has no Actions/workflow-runs view or section (v4.26), and the
   `status:pending` PR qualifier matches PRs whose head commit has no checks, not
-  PRs with running checks. To watch running Actions, the candela profile runs
+  PRs with running checks. To watch running Actions, a project profile runs
   `.local/bin/running-actions` directly below the gh-dash pane via
   `DEV_REVIEW_SUB_CMD`. It queries the REST `/actions/runs?status=in_progress`
   endpoint per repo with `gh api --cache` (default 60s) on a 30s poll loop, shows
