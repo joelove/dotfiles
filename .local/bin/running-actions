@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 #
-# running-actions - a live, self-sizing readout of in-progress GitHub Actions
-# runs across a set of repos, for a dev-workspace pane.
+# running-actions - a live, self-sizing readout of running and recently
+# finished GitHub Actions runs across a set of repos, for a dev-workspace pane.
 #
 # Behaviour:
-# - Prints one compact line per running action (an n-liner) with a live run
-#   duration (mm:ss, or h:mm:ss) that ticks every RUNNING_ACTIONS_TICK seconds
-#   (1 by default). Each row is an OSC 8 hyperlink to the run, so Cmd+click in
-#   Ghostty opens it in the browser (tmux forwards the link via
+# - Prints one compact line per run (an n-liner): live (queued or in-progress)
+#   runs with a duration that ticks every RUNNING_ACTIONS_TICK seconds (1 by
+#   default), plus runs that finished within the last RUNNING_ACTIONS_RECENT
+#   seconds (15 min by default). The dot is yellow while live, green on success,
+#   red on failure, and dim for other conclusions. Only the newest run per
+#   workflow is shown, so a completed row disappears as soon as a newer run for
+#   that workflow exists. Each row is an OSC 8 hyperlink to the run, so
+#   Cmd+click in Ghostty opens it in the browser (tmux forwards the link via
 #   `xterm*:hyperlinks`).
 # - Resizes its own tmux pane to n lines (clamped to RUNNING_ACTIONS_MAX_LINES),
 #   so the pane it shares vertical space with keeps the rest. At n=0 it collapses
@@ -39,13 +43,15 @@ tick="${RUNNING_ACTIONS_TICK:-1}"
 interval="${RUNNING_ACTIONS_INTERVAL:-30}"
 cache="${RUNNING_ACTIONS_CACHE:-60s}"
 maxlines="${RUNNING_ACTIONS_MAX_LINES:-8}"
+recent="${RUNNING_ACTIONS_RECENT:-900}"
+fetch="${RUNNING_ACTIONS_FETCH:-50}"
 
 pane="${TMUX_PANE:-}"
 
 if [ -t 1 ]; then
-  bold=$'\033[1m' dim=$'\033[2m' yellow=$'\033[33m' reset=$'\033[0m'
+  bold=$'\033[1m' dim=$'\033[2m' yellow=$'\033[33m' green=$'\033[32m' red=$'\033[31m' reset=$'\033[0m'
 else
-  bold="" dim="" yellow="" reset=""
+  bold="" dim="" yellow="" green="" red="" reset=""
 fi
 
 iso_to_epoch() {
@@ -69,36 +75,81 @@ fmt_duration() {
 }
 
 # Fetched runs, one record per line:
-# repo<TAB>name<TAB>branch<TAB>start_epoch<TAB>html_url
+# repo<TAB>name<TAB>branch<TAB>start_epoch<TAB>end_epoch<TAB>state<TAB>html_url
+# state is running|success|failure|other; end_epoch is 0 while still running.
+# Live rows precede completed rows so the pane clamp never hides a running run.
 RUNS=""
 fetch_runs() {
-  local r out name br started url epoch rec
+  local r out wid name br status conclusion started updated url
+  local start_epoch end_epoch state rec seen live="" done=""
   RUNS=""
   for r in "${repos[@]}"; do
+    # Runs come newest first, so the first line per workflow_id is the newest.
+    seen=$'\n'
     out=$(gh api --cache "$cache" \
-      "/repos/$r/actions/runs?status=in_progress&per_page=$maxlines" \
-      --jq '.workflow_runs[] | [.name, .head_branch, .run_started_at, .html_url] | @tsv' 2>/dev/null) || continue
-    while IFS=$'\t' read -r name br started url; do
+      "/repos/$r/actions/runs?per_page=$fetch" \
+      --jq '.workflow_runs[] | [.workflow_id, .name, (.head_branch // "-"), .status, (.conclusion // "none"), (.run_started_at // .created_at), .updated_at, .html_url] | @tsv' 2>/dev/null) || continue
+    while IFS=$'\t' read -r wid name br status conclusion started updated url; do
       [ -n "$name" ] || continue
-      epoch=$(iso_to_epoch "$started")
-      rec=$(printf '%s\t%s\t%s\t%s\t%s' "${r##*/}" "$name" "$br" "$epoch" "$url")
-      if [ -z "$RUNS" ]; then RUNS="$rec"; else RUNS="$RUNS"$'\n'"$rec"; fi
+      case "$seen" in *$'\n'"$wid"$'\n'*) continue ;; esac
+      seen="$seen$wid"$'\n'
+      if [ "$status" = "completed" ]; then
+        end_epoch=$(iso_to_epoch "$updated")
+        case "$conclusion" in
+          success) state=success ;;
+          failure|timed_out|startup_failure|action_required) state=failure ;;
+          *) state=other ;;
+        esac
+      else
+        state=running
+        end_epoch=0
+      fi
+      start_epoch=$(iso_to_epoch "$started")
+      rec=$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s' \
+        "${r##*/}" "$name" "$br" "$start_epoch" "$end_epoch" "$state" "$url")
+      if [ "$state" = running ]; then
+        if [ -z "$live" ]; then live="$rec"; else live="$live"$'\n'"$rec"; fi
+      else
+        if [ -z "$done" ]; then done="$rec"; else done="$done"$'\n'"$rec"; fi
+      fi
     done <<<"$out"
   done
+  if [ -n "$live" ] && [ -n "$done" ]; then RUNS="$live"$'\n'"$done"
+  elif [ -n "$done" ]; then RUNS="$done"
+  else RUNS="$live"
+  fi
 }
 
 # Render RUNS into FRAME_BODY / FRAME_N.
 FRAME_BODY=""
 FRAME_N=0
 build_frame() {
-  local now line body="" n=0 repo name br epoch url
+  local now line body="" n=0
+  local repo name br start_epoch end_epoch state url dot durcolor dur
   now=$(now_epoch)
   if [ -n "$RUNS" ]; then
-    while IFS=$'\t' read -r repo name br epoch url; do
+    while IFS=$'\t' read -r repo name br start_epoch end_epoch state url; do
       [ -n "$name" ] || continue
+      case "$state" in
+        running)
+          dot="$yellow" durcolor="$yellow" dur=$((now - start_epoch))
+          ;;
+        success)
+          dot="$green" durcolor="$dim" dur=$((end_epoch - start_epoch))
+          [ $((now - end_epoch)) -gt "$recent" ] && continue
+          ;;
+        failure)
+          dot="$red" durcolor="$dim" dur=$((end_epoch - start_epoch))
+          [ $((now - end_epoch)) -gt "$recent" ] && continue
+          ;;
+        *)
+          dot="$dim" durcolor="$dim" dur=$((end_epoch - start_epoch))
+          [ $((now - end_epoch)) -gt "$recent" ] && continue
+          ;;
+      esac
       printf -v line '  %s●%s %s%-18.18s%s %-14.14s %s%-20.20s%s %s%7s%s' \
-        "$yellow" "$reset" "$bold" "$repo" "$reset" "$name" \
-        "$dim" "$br" "$reset" "$yellow" "$(fmt_duration "$((now - epoch))")" "$reset"
+        "$dot" "$reset" "$bold" "$repo" "$reset" "$name" \
+        "$dim" "$br" "$reset" "$durcolor" "$(fmt_duration "$dur")" "$reset"
       # OSC 8 hyperlink, closed right after the row, so Cmd+click opens the run.
       if [ -n "$url" ]; then
         printf -v line '\033]8;;%s\033\\%s\033]8;;\033\\' "$url" "$line"
