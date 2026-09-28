@@ -15,6 +15,7 @@
 | `.config/gh-dash/config.yml` | gh-dash default profile (all `user:joelove` PRs) |
 | `.config/croft/config.json` | croft settings (exact-match `monokai-terminal` theme, format-on-save) |
 | `.config/croft/extensions/monokai-terminal/**` | user `[[themes]]` manifest equal to the Ghostty palette |
+| `.config/croft/patches/tmux-monokai.patch` | local croft source patch (numbered-colour chrome, tmux Alt-to-Cmd) |
 | `.agents/skills/*/SKILL.md` | agent skills |
 | `.skhdrc` / `.automations.sh` / `.yabairc` | hotkeys, yabai sizing/space helpers, signals |
 | `.zshrc` / `.zprofile` / `.zshenv` / `.p10k.zsh` | shell, aliases (`v`/`vim`/`code`/`c` -> croft), PATH, `EDITOR`/`GIT_EDITOR` (`croft edit --wait`) |
@@ -31,7 +32,7 @@ skills are discovered from `~/.agents/skills`.
 | Ghostty | `cmd+shift+,` or restart | `ghostty +validate-config`, `+list-keybinds` |
 | tmux | `prefix r` or `tmux source-file ~/.tmux.conf` | `tmux show-options -g`, `show-hooks -g`, `list-keys -T prefix` |
 | dev-workspace | `bash -n`, `dev-workspace <profile> print-config` | `dev-workspace [<profile>] ensure`, `normalize-editor` |
-| croft | restart croft (settings hot-reload; layout/scrollback need a relaunch) | `croft keys`, theme picker, `croft --version` |
+| croft | restart croft; rebuild from `~/Projects/croft` after a `git pull` and patch re-apply | `croft keys`, theme picker, `croft --version` |
 | gh-dash | relaunch `gh dash` (config read at launch) | gh-dash schema |
 | skhd | `skhd --reload` | `/tmp/skhd_joelove.{out,err}.log` |
 | yabai | `yabai --restart-service` | `.automations.sh` helpers |
@@ -60,3 +61,7 @@ skills are discovered from `~/.agents/skills`.
 - gh-dash reads config at launch; its keys are stock (`o` opens the browser).
 - croft's `config.json` must be strict JSON; a `//` comment made 0.1.942 fall
   back to defaults. croft rewrites the file expanded on any UI toggle.
+- tmux has no Super: it maps the Cmd (CSI-u super) bit to Meta, so croft sees
+  Alt under tmux. `tmux-monokai.patch` promotes Alt back to Super on macOS
+  (guarded by `$TMUX`); genuine Alt chords fold onto Cmd. Re-apply the patch and
+  rebuild after `git pull` in `~/Projects/croft`.

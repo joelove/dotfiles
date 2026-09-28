@@ -30,7 +30,10 @@ brew install --cask karabiner-elements
 brew install --cask logi-options+
 brew install koekeishiya/formulae/skhd
 brew install koekeishiya/formulae/yabai
-cargo install croft-software --locked
+
+# croft: clone, apply the local patch, install (see .config/croft/patches/)
+git clone --depth 1 https://github.com/vitali87/croft.git ~/Projects/croft
+(cd ~/Projects/croft && git apply ~/.config/croft/patches/tmux-monokai.patch && cargo install --path . --locked)
 ```
 
 ### Configure
@@ -39,7 +42,7 @@ cargo install croft-software --locked
 - [yabai](https://github.com/koekeishiya/yabai)
 - [Ghostty](https://ghostty.org) (config symlinked from `.config/ghostty`)
 - [tmux](https://github.com/tmux/tmux) with tpm plugins (see `.tmux.conf`)
-- [croft](https://docs.croft.software) VS Code-style terminal editor (built from crates.io; config symlinked from `.config/croft`; run `croft setup-ghostty` once to forward the Cmd chords)
+- [croft](https://docs.croft.software) VS Code-style terminal editor (built from a patched `~/Projects/croft` checkout; config symlinked from `.config/croft`; run `croft setup-ghostty` once for the Cmd chords)
 - `dev-workspace` tmux/Ghostty workspace engine with per-project profiles (symlinked from `.local/bin` and `.config/dev-workspace`); needs `tmux`, `jq`, `yabai`
 
 ### Symlinks

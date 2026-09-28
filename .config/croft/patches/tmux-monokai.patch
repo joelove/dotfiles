@@ -1,0 +1,129 @@
+diff --git a/src/app/mod.rs b/src/app/mod.rs
+index d085add..e293164 100644
+--- a/src/app/mod.rs
++++ b/src/app/mod.rs
+@@ -21257,6 +21257,23 @@ impl App {
+     /// built-in defaults call their app methods directly, so a command-level
+     /// recorder would miss most of what a user does.
+     fn handle_key(&mut self, key: KeyEvent) -> Result<()> {
++        // tmux has no Super modifier: it maps the kitty/CSI-u super bit onto
++        // Meta (src/tty-keys.c), so while croft runs inside tmux every macOS
++        // Cmd chord arrives as Alt. Promote Alt to Super there so the VS Code
++        // Cmd keybindings work. tmux cannot tell Cmd from Alt apart, so the few
++        // genuine Alt chords fold onto their Cmd counterparts.
++        #[cfg(target_os = "macos")]
++        let key = if std::env::var_os("TMUX").is_some()
++            && key.modifiers.contains(KeyModifiers::ALT)
++            && !key.modifiers.contains(KeyModifiers::SUPER)
++        {
++            let mut mods = key.modifiers;
++            mods.remove(KeyModifiers::ALT);
++            mods.insert(KeyModifiers::SUPER);
++            KeyEvent::new(key.code, mods)
++        } else {
++            key
++        };
+         // Esc dismisses an open ssh-pane offer (#364) without being consumed:
+         // the offer is a status-bar hint, not a modal, so whatever Esc meant
+         // to the focused pane still happens.
+diff --git a/src/gradient.rs b/src/gradient.rs
+index f32a005..0b1bcb5 100644
+--- a/src/gradient.rs
++++ b/src/gradient.rs
+@@ -6,39 +6,39 @@ use ratatui::buffer::Buffer;
+ use ratatui::layout::Rect;
+ use ratatui::style::{Color, Style};
+ 
+-pub const GRAD_TL: (u8, u8, u8) = (0x5c, 0xd6, 0xc8);
+-pub const GRAD_TR: (u8, u8, u8) = (0xec, 0x8c, 0x5a);
+-pub const GRAD_BR: (u8, u8, u8) = (0x4f, 0xb1, 0xa6);
+-pub const GRAD_BL: (u8, u8, u8) = (0x35, 0x80, 0x78);
++pub const GRAD_TL: (u8, u8, u8) = (0x66, 0xd9, 0xef);
++pub const GRAD_TR: (u8, u8, u8) = (0xff, 0xa8, 0x27);
++pub const GRAD_BR: (u8, u8, u8) = (0xa6, 0xe2, 0x2e);
++pub const GRAD_BL: (u8, u8, u8) = (0x75, 0x71, 0x5e);
+ 
+ /// Muted dark-teal fill for the selected row of popups/menus under the Black
+ /// theme, replacing the legacy bright-blue (`#4e9aff`) highlight inherited from
+ /// the pre-brand VS Code accent. Quiet enough that the gradient border carries
+ /// the brand identity; white text reads cleanly on top.
+-pub const POPUP_SEL_BG: (u8, u8, u8) = (0x26, 0x4f, 0x4a);
++pub const POPUP_SEL_BG: (u8, u8, u8) = (0x75, 0x71, 0x5e);
+ 
+ /// Bright teal/cyan card accent (borders, line-art illustrations, links) on
+ /// the empty-state cards under the Black theme — the same value the Remote
+ /// Explorer card has always used locally as `CARD_BORDER`/`LINK_FG`.
+-pub const CARD_ACCENT: (u8, u8, u8) = (0x3e, 0xd8, 0xc4);
++pub const CARD_ACCENT: (u8, u8, u8) = (0x66, 0xd9, 0xef);
+ 
+ /// Brand-teal fill for primary action buttons (`Initialize Repository`,
+ /// `Run and Debug`, the Remote Explorer `Connect`) under the Black theme,
+ /// replacing the legacy VS Code button blue (#0967b8). Same value the remote
+ /// empty-state card has always used, promoted here as the single source.
+-pub const PRIMARY_BTN_BG: (u8, u8, u8) = (0x0e, 0x7e, 0x76);
++pub const PRIMARY_BTN_BG: (u8, u8, u8) = (0x75, 0x71, 0x5e);
+ 
+ /// VS Code's `panelTitle.activeForeground` (#E7E7E7): the chipless panel
+ /// header text under the Black theme (e.g. the TERMINAL title), replacing the
+ /// legacy white-on-navy chip so the gradient border alone carries the brand.
+-pub const PANEL_TITLE_FG: (u8, u8, u8) = (0xe7, 0xe7, 0xe7);
++pub const PANEL_TITLE_FG: (u8, u8, u8) = (0xf8, 0xf8, 0xf2);
+ 
+ /// Muted brand teal (the gradient's bottom-right corner) used as the inner
+ /// stroke accent under the Black theme — input-box focus rings, text cursors,
+ /// chevrons, and magnifier glyphs — replacing the legacy bright-blue
+ /// (`#4e9aff`). Quieter than the top-left teal so inner chrome doesn't shout
+ /// over the gradient border that carries the brand.
+-pub const INNER_ACCENT: (u8, u8, u8) = (0x4f, 0xb1, 0xa6);
++pub const INNER_ACCENT: (u8, u8, u8) = (0x66, 0xd9, 0xef);
+ 
+ pub fn lerp_rgb(a: (u8, u8, u8), b: (u8, u8, u8), t: f32) -> (u8, u8, u8) {
+     let t = t.clamp(0.0, 1.0);
+@@ -46,8 +46,46 @@ pub fn lerp_rgb(a: (u8, u8, u8), b: (u8, u8, u8), t: f32) -> (u8, u8, u8) {
+     (mix(a.0, b.0), mix(a.1, b.1), mix(a.2, b.2))
+ }
+ 
++/// The Ghostty/iTerm Monokai 16-colour ANSI palette (black..bright white),
++/// the same values the tracked croft theme uses. Chrome colours are snapped to
++/// the nearest of these so they render through the host terminal's *numbered*
++/// colours rather than truecolor, and follow a terminal palette change.
++const MONOKAI_ANSI: [(u8, u8, u8); 16] = [
++    (0x22, 0x22, 0x22),
++    (0xf9, 0x2a, 0x72),
++    (0xa6, 0xe2, 0x2e),
++    (0xff, 0xa8, 0x27),
++    (0xae, 0x81, 0xff),
++    (0xf9, 0x2a, 0x72),
++    (0x66, 0xd9, 0xef),
++    (0xcf, 0xcf, 0xc2),
++    (0x75, 0x71, 0x5e),
++    (0xf9, 0x2a, 0x72),
++    (0xa6, 0xe2, 0x2e),
++    (0xe6, 0xdb, 0x74),
++    (0xae, 0x81, 0xff),
++    (0xf9, 0x2a, 0x72),
++    (0x66, 0xd9, 0xef),
++    (0xf8, 0xf8, 0xf2),
++];
++
+ pub fn rgb_color((r, g, b): (u8, u8, u8)) -> Color {
+-    Color::Rgb(r, g, b)
++    // Snap to the nearest terminal ANSI index so croft's chrome is painted with
++    // the host terminal's numbered colours (Ghostty's Monokai palette) instead
++    // of truecolor. A palette change on the terminal is then picked up for free.
++    let mut best = 0u8;
++    let mut best_d = i32::MAX;
++    for (i, (pr, pg, pb)) in MONOKAI_ANSI.iter().enumerate() {
++        let dr = r as i32 - *pr as i32;
++        let dg = g as i32 - *pg as i32;
++        let db = b as i32 - *pb as i32;
++        let d = dr * dr + dg * dg + db * db;
++        if d < best_d {
++            best_d = d;
++            best = i as u8;
++        }
++    }
++    Color::Indexed(best)
+ }
+ 
+ /// Paint a rounded-rectangle border whose stroke colour interpolates

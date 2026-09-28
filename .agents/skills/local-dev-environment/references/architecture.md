@@ -121,9 +121,11 @@ this file is the reference for changing or debugging anything.
 
 - Repo path: `~/Projects/dotfiles/.config/croft/`, symlinked to `~/.config/croft`
   (directory symlink).
-- Installed with `cargo install croft-software --locked` into `~/.cargo/bin/croft`
-  (the `vitali87/croft` Homebrew tap no longer exists and releases ship no
-  binaries). Upgrade by re-running the same command.
+- Built from a local `~/Projects/croft` checkout of git main into
+  `~/.cargo/bin/croft` (the `vitali87/croft` Homebrew tap no longer exists and
+  releases ship no binaries; crates.io is 0.1.942 and hardcodes chrome). The
+  checkout carries `.config/croft/patches/tmux-monokai.patch`; after `git pull`,
+  re-apply it and run `cargo install --path . --locked`.
 - Launch: the editor pane runs `croft` with its cwd at `DEV_EDITOR_DIR`, so it
   opens that folder. `croft <file>` opens a file; `croft pr <n>` opens a native
   PR review tab; `croft edit --wait` opens a file in the croft hosting the pane
@@ -133,16 +135,23 @@ this file is the reference for changing or debugging anything.
   JSON**: 0.1.942 loaded defaults when the file had `//` comments (despite the
   docs), and croft rewrites it expanded on any UI toggle.
 - Theme: `extensions/monokai-terminal/extension.toml` is a user `[[themes]]`
-  manifest that reproduces the Ghostty/iTerm monokai exactly. croft has **no
-  ANSI-passthrough mode** (themes are RGB hex), so the exact match is the
-  16-entry `ansi` array (equals the Ghostty `palette =` lines) plus syntax roles
-  drawn from the same palette. If the Ghostty palette changes, update both.
+  manifest with `gradient = true` and monokai chrome fields. croft has **no
+  ANSI-passthrough mode**, so the patch snaps its brand chrome through
+  `rgb_color()` to the nearest of the 16 Ghostty/iTerm monokai ANSI indices,
+  which the terminal renders from its own palette; the editor frame, gutter,
+  activity pill and inner accents become terminal-numbered colours instead of
+  truecolor. The `ansi` array equals the Ghostty `palette =` lines. If the
+  Ghostty palette changes, update both.
 - LSP: croft provisions its own servers on first use (vtsls,
   yaml-language-server, json/html/css, bash, ty/ruff) into `~/.croft/servers`,
   and uses `rust-analyzer`/`taplo`/`clangd` from PATH when present.
 - Vim mode is a per-session toggle on `Cmd+E` (not config-persisted).
 - Cmd chords reach croft via the managed Ghostty block (see Ghostty above); tmux
-  `extended-keys` carries the CSI-u sequences.
+  `extended-keys` carries the CSI-u sequences. tmux has no Super modifier and
+  maps the CSI-u super bit onto Meta, so inside tmux every Cmd chord arrives as
+  Alt; the patch promotes Alt back to Super in `App::handle_key` on macOS
+  (guarded by `$TMUX`). tmux cannot tell Cmd from Alt apart, so croft's genuine
+  Alt chords fold onto their Cmd counterparts.
 - croft runs inside tmux, which blocks its inline-image protocol, so it uses
   the image-less fallback: activity-bar/file icons render as Nerd Font glyphs
   and previews as a metadata line. `suppress_terminal_warning: true` silences
