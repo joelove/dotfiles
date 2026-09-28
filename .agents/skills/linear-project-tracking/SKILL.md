@@ -21,6 +21,7 @@ in Linear.
 - Discover tools: `mcp({ search: "issue" })` (also `project`, `comment`,
   `team`).
 - Call: `mcp({ tool: "<name>", args: { ... } })`.
+- Plan lifecycle tools (`plan_task`, `plan_reconcile`, `plan_complete`, `plan_finish`) are pi harness tools, not MCP tools. Call them directly. Never generalize the gateway to them. See the global `AGENTS.md` "Plan tools" section.
 - Operation names used below (`list_issues`, `get_issue`, `save_issue`, ...)
   map to whatever the gateway reports for the `linear` server.
 
