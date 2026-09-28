@@ -102,7 +102,12 @@ this file is the reference for changing or debugging anything.
 - `default-shell /bin/zsh`.
 - terminal-features: `*:RGB` (truecolor), `xterm*:extkeys` (modified keys like
   Shift+Enter), `xterm*:hyperlinks` (OSC 8).
-- `mouse on` (click to focus, scroll, border drag).
+- `mouse on` (click to focus, scroll, border drag). `MouseDown1Pane` is
+  overridden: a plain left click on an OSC 8 hyperlink whose URL contains
+  `actions/runs` opens it with `/usr/bin/open` (tmux resolves the link via
+  `#{mouse_hyperlink}`); any other click keeps the default focus-and-forward
+  behaviour. This is what makes the running-actions rows clickable without
+  relying on Ghostty's Cmd+click.
 - `set-titles on` + `set-titles-string '#S'` (unique session name; used by
   dev-workspace to find each Ghostty window).
 - `cursor-style blinking-block` (focused pane flashes; Ghostty hollows the
@@ -179,7 +184,8 @@ this file is the reference for changing or debugging anything.
   (clamped to 8, and effectively hidden at a single empty line when zero), so it
   and gh-dash share the right column dynamically. Each row is an OSC 8 hyperlink
   to the run, so Cmd+click opens it in the browser (via tmux's
-  `xterm*:hyperlinks` and Ghostty's default link handling).
+  `xterm*:hyperlinks` and Ghostty's default link handling); a plain left click
+  also opens it through the tmux `MouseDown1Pane` binding above.
 
 ## pi
 
