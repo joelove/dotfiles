@@ -174,7 +174,9 @@ this file is the reference for changing or debugging anything.
   a live `mm:ss`/`h:mm:ss` duration that redraws every second, and resizes its
   own pane to one line per running action (clamped to 8, and effectively hidden
   at a single empty line when zero), so it and gh-dash share the right column
-  dynamically.
+  dynamically. Each row is an OSC 8 hyperlink to the run, so Cmd+click opens it
+  in the browser (via tmux's `xterm*:hyperlinks` and Ghostty's default link
+  handling).
 
 ## pi
 
