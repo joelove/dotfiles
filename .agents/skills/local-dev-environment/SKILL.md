@@ -26,10 +26,11 @@ Config map, reload/debug, and pitfalls:
 - `cmd` never reaches the terminal. croft's managed Ghostty block
   (`croft setup-ghostty`) re-emits croft's Cmd chords as CSI-u, and tmux's
   `extended-keys on` + `extended-keys-format csi-u` carries them to croft. The
-  iTerm-like pane chords (`Cmd+D`, `Cmd+Shift+D`, `Cmd+W`, `Cmd+Shift+Enter`,
-  `Cmd+Alt+arrows`) are deliberately excluded so tmux wins them. Never hand-edit
-  between the block's markers; re-run `croft setup-ghostty` and re-remove those
-  pane chords.
+  colliding pane chords (`Cmd+D`, `Cmd+Shift+D`, `Cmd+W`, `Cmd+Shift+Enter`,
+  `Cmd+Alt+arrows`) are excluded from that block and sent through tmux's `croft`
+  key table instead, which gives them to croft when it is focused and runs the
+  pane action otherwise. Never hand-edit between the block's markers; re-run
+  `croft setup-ghostty` and re-remove those pane chords.
 - Workspaces are data: a profile (`~/.config/dev-workspace/<name>.conf`) sets
   directories, commands, and sizes; the engine has no project-specific code.
 - The editor layout is pinned. `build_editor` creates it and `normalize_editor`

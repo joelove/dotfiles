@@ -1,5 +1,5 @@
 diff --git a/src/app/mod.rs b/src/app/mod.rs
-index d085add..a67d7c9 100644
+index d085add..8f504c2 100644
 --- a/src/app/mod.rs
 +++ b/src/app/mod.rs
 @@ -5469,7 +5469,10 @@ impl App {
@@ -38,6 +38,17 @@ index d085add..a67d7c9 100644
          // Esc dismisses an open ssh-pane offer (#364) without being consumed:
          // the offer is a status-bar hint, not a modal, so whatever Esc meant
          // to the focused pane still happens.
+@@ -46791,6 +46811,10 @@ impl App {
+                 }
+             }
+             Cmd::ReopenClosedEditor => self.reopen_closed_tab(),
++            Cmd::NewFile => {
++                self.editor.new_empty_tab();
++                self.status = String::from("New file");
++            }
+             Cmd::SplitEditor => self.split_editor(),
+             Cmd::QuickOpen => self.open_file_finder(),
+             Cmd::TakeTheTour => self.start_demo(),
 diff --git a/src/gradient.rs b/src/gradient.rs
 index f32a005..0b1bcb5 100644
 --- a/src/gradient.rs
@@ -139,3 +150,77 @@ index f32a005..0b1bcb5 100644
  }
  
  /// Paint a rounded-rectangle border whose stroke colour interpolates
+diff --git a/src/widgets/command_palette.rs b/src/widgets/command_palette.rs
+index d9028d0..17e3b19 100644
+--- a/src/widgets/command_palette.rs
++++ b/src/widgets/command_palette.rs
+@@ -109,6 +109,7 @@ pub enum Command {
+     RestoreSnapshot,
+     CloseEditor,
+     ReopenClosedEditor,
++    NewFile,
+     SplitEditor,
+     QuickOpen,
+     TakeTheTour,
+@@ -472,6 +473,7 @@ pub const ALL_COMMANDS: &[Command] = &[
+     Command::RestoreSnapshot,
+     Command::CloseEditor,
+     Command::ReopenClosedEditor,
++    Command::NewFile,
+     Command::SplitEditor,
+     Command::QuickOpen,
+     Command::TakeTheTour,
+@@ -788,6 +790,7 @@ impl Command {
+             Command::RestoreSnapshot => "Local History: Restore Snapshot",
+             Command::CloseEditor => "View: Close Editor",
+             Command::ReopenClosedEditor => "View: Reopen Closed Editor",
++            Command::NewFile => "File: New Untitled File",
+             Command::SplitEditor => "View: Split Editor",
+             Command::QuickOpen => "Go to File",
+             Command::TakeTheTour => "Help: Take the Tour",
+@@ -1111,6 +1114,7 @@ impl Command {
+             Command::Redo => "Shift+Cmd+Z",
+             Command::CloseEditor => "Cmd+W",
+             Command::ReopenClosedEditor => "Cmd+K Shift+W",
++            Command::NewFile => "Cmd+N",
+             Command::SplitEditor => "Cmd+\\",
+             Command::QuickOpen => "Cmd+P",
+             Command::TakeTheTour => "",
+@@ -1437,6 +1441,7 @@ impl Command {
+             Command::RestoreSnapshot => "restore_snapshot",
+             Command::CloseEditor => "close_editor",
+             Command::ReopenClosedEditor => "reopen_closed_editor",
++            Command::NewFile => "new_file",
+             Command::SplitEditor => "split_editor",
+             Command::QuickOpen => "quick_open",
+             Command::TakeTheTour => "help_take_the_tour",
+diff --git a/src/widgets/editor.rs b/src/widgets/editor.rs
+index 4061416..c4e19be 100644
+--- a/src/widgets/editor.rs
++++ b/src/widgets/editor.rs
+@@ -16093,6 +16093,25 @@ impl EditorTabs {
+         }
+     }
+ 
++    /// Open a new empty (untitled) tab after the active one, VS Code's `Cmd+N`.
++    /// The buffer has no path, so saving it prompts for one.
++    pub fn new_empty_tab(&mut self) {
++        let active = self.active;
++        let mut e = Editor::new();
++        e.focused = self.editors[active].focused;
++        e.theme = self.editors[active].theme;
++        e.focus_gradient = self.editors[active].focus_gradient;
++        e.search_highlight = self.search_highlight_term.clone();
++        e.search_highlight_opts = self.search_highlight_opts;
++        let pos = active + 1;
++        self.editors.insert(pos, e);
++        self.editors[active].focused = false;
++        self.active = pos;
++        for (i, ed) in self.editors.iter_mut().enumerate() {
++            ed.focused = i == self.active;
++        }
++    }
++
+     /// VS Code "preview tab" semantics: open `path` in the single
+     /// replaceable preview slot. If the file is already in some tab, just
+     /// switch to it. Otherwise reuse the existing preview slot, or create a

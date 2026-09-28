@@ -67,30 +67,32 @@ split-divider-color = #2a2a2a
 shell-integration-features = no-cursor,no-sudo,title,no-ssh-env,no-ssh-terminfo,path
 
 # ---------------------------------------------------------------------------
-# Tmux pane management
+# Tmux pane management (conditional)
 # ---------------------------------------------------------------------------
-# iTerm-like tmux pane controls. These chords are deliberately excluded from
-# croft's managed block below so tmux wins them while the croft pane is focused.
-# Uses the `text:` action, which takes Zig string-literal escapes (`\x02` sends
-# Ctrl-B, the tmux prefix).
+# iTerm-like tmux pane controls, but croft wins them while its pane is focused.
+# Sent as tmux prefix + C-v + slot; tmux's `croft` key table (see .tmux.conf)
+# forwards the real chord to croft when it is the focused pane, otherwise it
+# runs the pane action. A key-table sequence rather than CSI-u keeps genuine
+# Alt chords out of the dispatch.
 #
 # NOTE: re-running `croft setup-ghostty` re-adds these chords to its managed
-# block. Remove them again (the eight `cmd+d`, `cmd+shift+d`, `cmd+w`,
-# `cmd+shift+enter`, and `cmd+alt+arrow_*` lines) so tmux keeps winning.
+# block as CSI-u, which would win over these lines. Remove them again (the
+# eight `cmd+d`, `cmd+shift+d`, `cmd+w`, `cmd+shift+enter`, and
+# `cmd+alt+arrow_*` lines) after a re-run.
 #
 # split right (vertical divider)
-keybind = super+d=text:\x02%
+keybind = super+d=text:\x02\x16d
 # split down
-keybind = super+shift+d=text:\x02\x22
+keybind = super+shift+d=text:\x02\x16D
 # kill pane
-keybind = super+w=text:\x02\x17
+keybind = super+w=text:\x02\x16w
 # zoom / unzoom pane
-keybind = super+shift+enter=text:\x02z
+keybind = super+shift+enter=text:\x02\x16e
 # move pane focus
-keybind = super+alt+arrow_left=text:\x02\x1b[D
-keybind = super+alt+arrow_right=text:\x02\x1b[C
-keybind = super+alt+arrow_up=text:\x02\x1b[A
-keybind = super+alt+arrow_down=text:\x02\x1b[B
+keybind = super+alt+arrow_left=text:\x02\x16h
+keybind = super+alt+arrow_right=text:\x02\x16l
+keybind = super+alt+arrow_up=text:\x02\x16k
+keybind = super+alt+arrow_down=text:\x02\x16j
 
 # ---------------------------------------------------------------------------
 # croft settings
@@ -99,6 +101,9 @@ keybind = super+alt+arrow_down=text:\x02\x1b[B
 # (croft's keybindings.json binds mod+, to open_settings). `croft setup-ghostty`
 # also forwards this from keybindings.json on its next run.
 keybind = super+,=csi:44;9u
+# Cmd+N opens a new empty tab in croft (keybindings.json binds mod+n to
+# new_file); Ghostty's default there is new_window.
+keybind = super+n=csi:110;9u
 
 # ---------------------------------------------------------------------------
 # Window cycling

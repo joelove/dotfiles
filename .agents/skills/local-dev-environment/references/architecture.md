@@ -73,12 +73,12 @@ this file is the reference for changing or debugging anything.
 - `shell-integration-features = no-cursor,no-sudo,title,no-ssh-env,no-ssh-terminfo,path`.
 - `ctrl+tab` / `ctrl+shift+tab` cycle Ghostty windows (not tabs).
 - croft's Cmd chords: `croft setup-ghostty` appends a marker-fenced managed
-  `keybind` block (re-run it to update; do not hand-edit inside). It re-emits
-  croft's chords as CSI-u. The iTerm-like tmux pane controls live in Ghostty too,
-  as `text:` actions (`Cmd+D` split right, `Cmd+Shift+D` split down, `Cmd+W`
-  kill pane, `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows` focus), and their lines are
-  removed from croft's managed block so tmux wins them (Ghostty is last-wins).
-  Re-running `croft setup-ghostty` re-adds them; remove them again.
+  `keybind` block (re-run it to update; do not hand-edit inside) that re-emits
+  croft's chords as CSI-u. The colliding pane chords are the exception: Ghostty
+  sends them as `text:` `C-b C-v <slot>` and tmux's `croft` key table decides
+  (see tmux below), so their lines are removed from the managed block. `super+n`
+  is forwarded too (croft's new untitled tab). Re-running `croft setup-ghostty`
+  re-adds the pane chords as CSI-u; remove those eight lines again.
 - Reload: `cmd+shift+,` or restart. Validate: `ghostty +validate-config`;
   inspect `ghostty +list-keybinds`.
 
@@ -109,6 +109,13 @@ this file is the reference for changing or debugging anything.
   unfocused window).
 - `extended-keys on` with `extended-keys-format csi-u` (carries croft's
   Ghostty-forwarded Cmd chords through tmux).
+- `croft` key table: `C-b C-v` enters it (Ghostty sends that for the colliding
+  pane chords). Each binding `if-shell`-checks `pane_current_command=croft`:
+  when croft is focused it re-injects the raw CSI-u with `send-keys -H` so croft
+  wins the chord, otherwise it runs the iTerm-like pane action (`Cmd+D` and
+  `Cmd+Shift+D` split, `Cmd+W` kill, `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows`
+  focus). A key table, not a global `M-` binding, so genuine Alt chords are
+  untouched.
 - Prefix is default `C-b`. `prefix r` sources the config. `C-w` is the default
   `kill-pane`; croft closes its own editor tab with `Cmd+W` (a croft chord, not
   a tmux one).
@@ -153,10 +160,14 @@ this file is the reference for changing or debugging anything.
 - Vim mode is a per-session toggle on `Cmd+E` (not config-persisted).
 - Cmd chords reach croft via the managed Ghostty block (see Ghostty above); tmux
   `extended-keys` carries the CSI-u sequences. tmux has no Super modifier and
-  maps the CSI-u super bit onto Meta, so inside tmux every Cmd chord arrives as
+  maps the CSI-u super bit onto Meta, so inside tmux most Cmd chords arrive as
   Alt; the patch promotes Alt back to Super in `App::handle_key` on macOS
-  (guarded by `$TMUX`). tmux cannot tell Cmd from Alt apart, so croft's genuine
-  Alt chords fold onto their Cmd counterparts.
+  (guarded by `$TMUX`). The colliding pane chords skip that path: the `croft`
+  key table re-injects their raw CSI-u when croft is focused (see tmux above).
+  tmux cannot tell Cmd from Alt apart, so croft's genuine Alt chords fold onto
+  their Cmd counterparts.
+- `keybindings.json` binds `Cmd+,` to `open_settings` and `Cmd+N` to the patched
+  `new_file` command, which opens a new untitled tab (VS Code behaviour).
 - croft runs inside tmux, which blocks its inline-image protocol, so it uses
   the image-less fallback: activity-bar/file icons render as Nerd Font glyphs
   and previews as a metadata line. `suppress_terminal_warning: true` silences
