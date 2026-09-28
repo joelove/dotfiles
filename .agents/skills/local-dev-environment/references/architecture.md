@@ -74,9 +74,11 @@ this file is the reference for changing or debugging anything.
 - `ctrl+tab` / `ctrl+shift+tab` cycle Ghostty windows (not tabs).
 - croft's Cmd chords: `croft setup-ghostty` appends a marker-fenced managed
   `keybind` block (re-run it to update; do not hand-edit inside). It re-emits
-  `cmd+p`, `cmd+shift+p`, `cmd+d`, `cmd+s`, `cmd+f`, and the rest as CSI-u,
-  replacing the old Alt bridges and the tmux pane Cmd keybinds. tmux still owns
-  panes, now via the `C-b` prefix only.
+  croft's chords as CSI-u. The iTerm-like tmux pane controls live in Ghostty too,
+  as `text:` actions (`Cmd+D` split right, `Cmd+Shift+D` split down, `Cmd+W`
+  kill pane, `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows` focus), and their lines are
+  removed from croft's managed block so tmux wins them (Ghostty is last-wins).
+  Re-running `croft setup-ghostty` re-adds them; remove them again.
 - Reload: `cmd+shift+,` or restart. Validate: `ghostty +validate-config`;
   inspect `ghostty +list-keybinds`.
 

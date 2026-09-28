@@ -46,7 +46,10 @@ skills are discovered from `~/.agents/skills`.
 - resurrect restores the saved (often old) layout and drops pane options;
   `normalize_editor` is what fixes it.
 - croft's managed Ghostty block uses `csi:` actions; re-run `croft setup-ghostty`
-  to update it, never hand-edit between the marker comments.
+  to update it, never hand-edit between the marker comments. That re-run also
+  re-adds the pane chords (`cmd+d`, `cmd+shift+d`, `cmd+w`, `cmd+shift+enter`,
+  `cmd+alt+arrow_*`), which are removed so the `text:` tmux controls win
+  (Ghostty is last-wins); remove them again after a re-run.
 - croft cannot inherit the host terminal's ANSI palette (themes are RGB hex);
   mirror Ghostty `palette =` changes into the `monokai-terminal` `ansi` array.
 - croft saves `config.json` by renaming a temp file over it, so track the config

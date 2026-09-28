@@ -69,10 +69,28 @@ shell-integration-features = no-cursor,no-sudo,title,no-ssh-env,no-ssh-terminfo,
 # ---------------------------------------------------------------------------
 # Tmux pane management
 # ---------------------------------------------------------------------------
-# tmux still owns panes, but croft now owns the Cmd chords: `croft
-# setup-ghostty` appends a managed keybind block (marker-fenced, below) that
-# forwards them to croft. Manage panes from the tmux prefix instead:
-# C-b d split down, C-b v split right, C-b m zoom, C-b s / C-b t select pane.
+# iTerm-like tmux pane controls. These chords are deliberately excluded from
+# croft's managed block below so tmux wins them while the croft pane is focused.
+# Uses the `text:` action, which takes Zig string-literal escapes (`\x02` sends
+# Ctrl-B, the tmux prefix).
+#
+# NOTE: re-running `croft setup-ghostty` re-adds these chords to its managed
+# block. Remove them again (the eight `cmd+d`, `cmd+shift+d`, `cmd+w`,
+# `cmd+shift+enter`, and `cmd+alt+arrow_*` lines) so tmux keeps winning.
+#
+# split right (vertical divider)
+keybind = super+d=text:\x02%
+# split down
+keybind = super+shift+d=text:\x02\x22
+# kill pane
+keybind = super+w=text:\x02\x17
+# zoom / unzoom pane
+keybind = super+shift+enter=text:\x02z
+# move pane focus
+keybind = super+alt+arrow_left=text:\x02\x1b[D
+keybind = super+alt+arrow_right=text:\x02\x1b[C
+keybind = super+alt+arrow_up=text:\x02\x1b[A
+keybind = super+alt+arrow_down=text:\x02\x1b[B
 
 # ---------------------------------------------------------------------------
 # Window cycling
@@ -103,27 +121,23 @@ keybind = cmd+alt+enter=csi:13;11u
 keybind = cmd+/=csi:47;9u
 keybind = cmd+.=csi:46;9u
 keybind = cmd+shift+/=csi:63;10u
-keybind = cmd+shift+enter=csi:13;10u
 keybind = cmd+a=csi:97;9u
 keybind = cmd+c=csi:99;9u
 keybind = cmd+s=csi:115;9u
 keybind = cmd+x=csi:120;9u
 keybind = cmd+z=csi:122;9u
 keybind = cmd+shift+z=csi:90;10u
-keybind = cmd+d=csi:100;9u
 keybind = cmd+g=csi:103;9u
 keybind = cmd+k=csi:107;9u
 keybind = cmd+y=csi:121;9u
 keybind = cmd+o=csi:111;9u
 keybind = cmd+e=csi:101;9u
 keybind = cmd+p=csi:112;9u
-keybind = cmd+w=csi:119;9u
 keybind = cmd+b=csi:98;9u
 keybind = cmd+shift+g=csi:71;10u
 keybind = cmd+shift+o=csi:79;10u
 keybind = cmd+shift+e=csi:69;10u
 keybind = cmd+shift+s=csi:83;10u
-keybind = cmd+shift+d=csi:68;10u
 keybind = cmd+shift+r=csi:82;10u
 keybind = cmd+shift+x=csi:88;10u
 keybind = cmd+shift+l=csi:76;10u
@@ -149,10 +163,6 @@ keybind = cmd+alt+shift+a=csi:65;12u
 keybind = cmd+alt+shift+d=csi:68;12u
 keybind = cmd+alt+shift+w=csi:87;12u
 keybind = cmd+alt+shift+f=csi:70;12u
-keybind = cmd+alt+arrow_left=csi:1;11D
-keybind = cmd+alt+arrow_right=csi:1;11C
-keybind = cmd+alt+arrow_up=csi:1;11A
-keybind = cmd+alt+arrow_down=csi:1;11B
 keybind = cmd+shift+p=csi:80;10u
 keybind = cmd+f12=csi:24;9~
 keybind = ctrl+shift+f12=csi:24;6~
