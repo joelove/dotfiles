@@ -93,6 +93,14 @@ keybind = super+alt+arrow_up=text:\x02\x1b[A
 keybind = super+alt+arrow_down=text:\x02\x1b[B
 
 # ---------------------------------------------------------------------------
+# croft settings
+# ---------------------------------------------------------------------------
+# Ghostty's default cmd+, opens Ghostty's own config; send it to croft instead
+# (croft's keybindings.json binds mod+, to open_settings). `croft setup-ghostty`
+# also forwards this from keybindings.json on its next run.
+keybind = super+,=csi:44;9u
+
+# ---------------------------------------------------------------------------
 # Window cycling
 # ---------------------------------------------------------------------------
 # Cycle between Ghostty windows (not tabs). This overrides the default

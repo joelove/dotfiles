@@ -1,0 +1,7 @@
+// croft keyboard shortcuts. "mod" is Cmd on macOS, Ctrl on Linux.
+// See croft docs: KEYBINDINGS.md -> Settings, custom keybindings & snippets.
+// Ghostty must forward the chord first (see .config/ghostty/config); Cmd+,
+// otherwise opens Ghostty's own config.
+[
+  { "key": "mod+,", "command": "open_settings" }
+]

@@ -4,3 +4,5 @@
 shell-integration/
 config.local.json
 config.synced.json
+terminal_sessions.json
+terminal_sessions.lock
