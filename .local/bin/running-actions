@@ -6,7 +6,9 @@
 # Behaviour:
 # - Prints one compact line per running action (an n-liner) with a live run
 #   duration (mm:ss, or h:mm:ss) that ticks every RUNNING_ACTIONS_TICK seconds
-#   (1 by default).
+#   (1 by default). Each row is an OSC 8 hyperlink to the run, so Cmd+click in
+#   Ghostty opens it in the browser (tmux forwards the link via
+#   `xterm*:hyperlinks`).
 # - Resizes its own tmux pane to n lines (clamped to RUNNING_ACTIONS_MAX_LINES),
 #   so the pane it shares vertical space with keeps the rest. At n=0 it collapses
 #   to a single empty line, i.e. effectively hidden.
@@ -66,19 +68,20 @@ fmt_duration() {
   fi
 }
 
-# Fetched runs, one record per line: repo<TAB>name<TAB>branch<TAB>start_epoch
+# Fetched runs, one record per line:
+# repo<TAB>name<TAB>branch<TAB>start_epoch<TAB>html_url
 RUNS=""
 fetch_runs() {
-  local r out name br started epoch rec
+  local r out name br started url epoch rec
   RUNS=""
   for r in "${repos[@]}"; do
     out=$(gh api --cache "$cache" \
       "/repos/$r/actions/runs?status=in_progress&per_page=$maxlines" \
-      --jq '.workflow_runs[] | [.name, .head_branch, .run_started_at] | @tsv' 2>/dev/null) || continue
-    while IFS=$'\t' read -r name br started; do
+      --jq '.workflow_runs[] | [.name, .head_branch, .run_started_at, .html_url] | @tsv' 2>/dev/null) || continue
+    while IFS=$'\t' read -r name br started url; do
       [ -n "$name" ] || continue
       epoch=$(iso_to_epoch "$started")
-      rec=$(printf '%s\t%s\t%s\t%s' "${r##*/}" "$name" "$br" "$epoch")
+      rec=$(printf '%s\t%s\t%s\t%s\t%s' "${r##*/}" "$name" "$br" "$epoch" "$url")
       if [ -z "$RUNS" ]; then RUNS="$rec"; else RUNS="$RUNS"$'\n'"$rec"; fi
     done <<<"$out"
   done
@@ -88,14 +91,18 @@ fetch_runs() {
 FRAME_BODY=""
 FRAME_N=0
 build_frame() {
-  local now line body="" n=0 repo name br epoch
+  local now line body="" n=0 repo name br epoch url
   now=$(now_epoch)
   if [ -n "$RUNS" ]; then
-    while IFS=$'\t' read -r repo name br epoch; do
+    while IFS=$'\t' read -r repo name br epoch url; do
       [ -n "$name" ] || continue
       printf -v line '  %s●%s %s%-18.18s%s %-14.14s %s%-20.20s%s %s%7s%s' \
         "$yellow" "$reset" "$bold" "$repo" "$reset" "$name" \
         "$dim" "$br" "$reset" "$yellow" "$(fmt_duration "$((now - epoch))")" "$reset"
+      # OSC 8 hyperlink, closed right after the row, so Cmd+click opens the run.
+      if [ -n "$url" ]; then
+        printf -v line '\033]8;;%s\033\\%s\033]8;;\033\\' "$url" "$line"
+      fi
       if [ -z "$body" ]; then body="$line"; else body="$body"$'\n'"$line"; fi
       n=$((n + 1))
     done <<<"$RUNS"
