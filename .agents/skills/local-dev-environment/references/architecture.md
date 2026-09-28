@@ -169,14 +169,17 @@ this file is the reference for changing or debugging anything.
   `status:pending` PR qualifier matches PRs whose head commit has no checks, not
   PRs with running checks. To watch running Actions, a project profile runs
   `.local/bin/running-actions` directly below the gh-dash pane via
-  `DEV_REVIEW_SUB_CMD`. It queries the REST `/actions/runs?status=in_progress`
-  endpoint per repo with `gh api --cache` (default 60s) on a 30s poll loop, shows
-  a live `mm:ss`/`h:mm:ss` duration that redraws every second, and resizes its
-  own pane to one line per running action (clamped to 8, and effectively hidden
-  at a single empty line when zero), so it and gh-dash share the right column
-  dynamically. Each row is an OSC 8 hyperlink to the run, so Cmd+click opens it
-  in the browser (via tmux's `xterm*:hyperlinks` and Ghostty's default link
-  handling).
+  `DEV_REVIEW_SUB_CMD`. It queries the REST `/actions/runs` endpoint per repo
+  with `gh api --cache` (default 60s) on a 30s poll loop, keeps only the newest
+  run per workflow, and shows live (queued/in-progress) runs with a live
+  `mm:ss`/`h:mm:ss` duration that redraws every second plus any run that
+  finished within `RUNNING_ACTIONS_RECENT` (15 min). The dot is yellow while
+  live, green on success, red on failure, and dim for other conclusions. Live
+  rows are listed first, and the pane resizes itself to one line per row
+  (clamped to 8, and effectively hidden at a single empty line when zero), so it
+  and gh-dash share the right column dynamically. Each row is an OSC 8 hyperlink
+  to the run, so Cmd+click opens it in the browser (via tmux's
+  `xterm*:hyperlinks` and Ghostty's default link handling).
 
 ## pi
 
