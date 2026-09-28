@@ -1,16 +1,17 @@
 ---
 name: local-dev-environment
-description: Architecture, invariants, and configuration map of Joe's local macOS dev environment (Ghostty, tmux, zsh, Neovim/NvChad, gh-dash, dev-workspace, skhd/yabai, pi). Use before changing local tool config, dotfiles, terminal/editor keybindings, or the tmux editor layout, and when debugging the workspace.
+description: Architecture, invariants, and configuration map of Joe's local macOS dev environment (Ghostty, tmux, zsh, croft, gh-dash, dev-workspace, skhd/yabai, pi). Use before changing local tool config, dotfiles, terminal/editor keybindings, or the tmux editor layout, and when debugging the workspace.
 ---
 
 # Local development environment
 
 `dev-workspace` (a generic bash engine) builds tmux/Ghostty workspaces from
 per-project profiles. A workspace is two tmux sessions in two Ghostty windows:
-an agent view (pi panes) and an editor view (nvim + a review pane + terminal
+an agent view (pi panes) and an editor view (croft + a review pane + terminal
 shells). Ghostty is a thin front end; tmux owns panes; zsh/oh-my-zsh/p10k is the
-shell; Neovim is NvChad v2.5 with octo.nvim; skhd/yabai manage windows. All
-config lives in `~/Projects/dotfiles`, symlinked into `$HOME`.
+shell; croft is the VS Code-style terminal editor wearing a custom Monokai theme
+that matches the terminal palette; skhd/yabai manage windows. All config lives
+in `~/Projects/dotfiles`, symlinked into `$HOME`.
 
 Per-tool detail: [references/architecture.md](references/architecture.md).
 Config map, reload/debug, and pitfalls:
@@ -22,18 +23,21 @@ Config map, reload/debug, and pitfalls:
   the symlink target, then commit and push.
 - Ghostty is a thin front end. tmux owns panes and splits; never add
   Ghostty/AppleScript splits.
-- `cmd` never reaches the terminal. Bridge GUI shortcuts: Ghostty sends
-  `Alt+<key>` (`text:\x1b...`), tmux forwards it, Neovim maps `<A-...>`.
+- `cmd` never reaches the terminal. croft's managed Ghostty block
+  (`croft setup-ghostty`) re-emits every Cmd chord as CSI-u, and tmux's
+  `extended-keys on` + `extended-keys-format csi-u` carries it to croft. Never
+  hand-edit between the block's marker comments; re-run `croft setup-ghostty`.
 - Workspaces are data: a profile (`~/.config/dev-workspace/<name>.conf`) sets
   directories, commands, and sizes; the engine has no project-specific code.
 - The editor layout is pinned. `build_editor` creates it and `normalize_editor`
   re-applies the review width (`DEV_GH_COLS`) and bottom row height
   (`DEV_BOTTOM_LINES`). Change sizes only in the profile.
 - tmux-resurrect restores panes but not pane options or pinned sizes, so
-  `normalize_editor` re-applies them and re-tags `@dev_review_pane <profile>`;
-  global hooks call `dev-workspace ... --all`.
-- Palette stays consistent: Ghostty monokai, tmux-nova `#2a2a2a` borders, nvim
-  `ghostty`.
+  `normalize_editor` re-applies them; global hooks call `dev-workspace ... --all`.
+- Palette stays consistent: Ghostty monokai, tmux-nova `#2a2a2a` borders, croft
+  `monokai-terminal` (its 16-entry `ansi` array is the Ghostty palette).
+- croft has no ANSI-passthrough mode; a theme is RGB hex, so any Ghostty palette
+  change must be mirrored into the croft theme's `ansi` array.
 - Never commit secrets. `mcp.json`'s GitHub token is `!gh auth token`.
 - pi lives outside dotfiles: `~/.pi/agent/{settings.json,mcp.json,agents,extensions,themes}`;
   skills are discovered from `~/.agents/skills`.
@@ -44,6 +48,6 @@ Config map, reload/debug, and pitfalls:
 2. Validate with the tool's check (see references/operations.md).
 3. Reload/restart the tool and confirm the behaviour.
 4. Commit and push `~/Projects/dotfiles`.
-5. Keep coupled changes together: a new shortcut needs both the Ghostty bridge
-   and the nvim `<A-...>` map; a layout size is a profile field, not engine
-   code.
+5. Keep coupled changes together: a new croft shortcut goes in croft's
+   `keybindings.json`, then `croft setup-ghostty` re-emits it; a layout size is a
+   profile field, not engine code.

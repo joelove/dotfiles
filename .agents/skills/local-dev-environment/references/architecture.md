@@ -15,7 +15,7 @@ this file is the reference for changing or debugging anything.
 - Profile fields and defaults: `DEV_NAME` (basename of root, lowercased),
   `DEV_ROOT` (`~/Projects`), `DEV_AGENT_DIR` (root), `DEV_AGENT_CMD` (`pi`; empty
   skips the agent session), `DEV_AGENT_PANES` (2), `DEV_AGENT_SESSION`
-  (`${DEV_NAME}-agent`), `DEV_EDITOR_DIR` (root), `DEV_EDITOR_CMD` (`nvim .`),
+  (`${DEV_NAME}-agent`), `DEV_EDITOR_DIR` (root), `DEV_EDITOR_CMD` (`croft`),
   `DEV_EDITOR_SESSION` (`${DEV_NAME}-editor`), `DEV_REVIEW_CMD` (`gh dash`;
   empty omits the pane), `DEV_REVIEW_SUB_CMD` (empty omits the pane; e.g. a live
   actions readout) with `DEV_REVIEW_SUB_LINES` (5; the pane's baseline height,
@@ -29,9 +29,9 @@ this file is the reference for changing or debugging anything.
   optional `DEV_REVIEW_SUB_CMD` pane stacked directly below it, bottom row of
   `DEV_TERM_DIRS`). Window names are `agent` / `editor`.
 - Commands: `open` (default), `build`, `ensure`, `attach [session]`,
-  `attach-only [session]`, `review <pr>`, `review-pane` (idempotently relaunch
-  the review command in its pane), `normalize-editor [--all]`,
-  `post-restore [--all]`, `list`, `print-config`.
+  `attach-only [session]`, `review-pane` (idempotently relaunch the review
+  command in its pane), `normalize-editor [--all]`, `post-restore [--all]`,
+  `list`, `print-config`.
 - `open`: `ensure`, then focus if all sessions have clients, else create only
   the missing Ghostty windows in one instance (fresh launch uses
   `--initial-window=false`; window command is `dev-workspace <profile>
@@ -40,8 +40,8 @@ this file is the reference for changing or debugging anything.
 - `ensure`: restore the newest tmux-resurrect save when a session is missing,
   `build`, `normalize-editor`. Per-profile lock dir
   `/tmp/dev-workspace-<name>.lock`.
-- `normalize_editor`: geometry-based (no pane tags needed). Top row: leftmost
-  pane is the editor (`@dev_review_pane <DEV_NAME>`), rightmost is the review
+- `normalize_editor`: geometry-based. Top row: leftmost pane is the editor,
+  rightmost is the review
   pane resized to `DEV_GH_COLS` when present; the pane directly below the review
   pane (same left, next top) is resized to `DEV_REVIEW_SUB_LINES`. Bottom row:
   leftmost pane resized to `DEV_BOTTOM_LINES`. `--all` iterates every profile
@@ -54,10 +54,6 @@ this file is the reference for changing or debugging anything.
   restarts the `DEV_REVIEW_SUB_CMD` pane below the review pane and any non-empty
   `DEV_TERM_CMDS` in the bottom row, left to right; pane options
   (`@dev_review_sub_started`, `@dev_term_started`) stop a second restart.
-- `review <pr>`: `pr_url` accepts a full URL, `owner/repo#n`, or `owner/repo n`;
-  `review_pane` selects the pane tagged `@dev_review_pane <profile>`; sends
-  `Escape`, `:Octo <url>`, Enter, waits 2s, `:Octo review`, Enter. Browser
-  fallback when the editor pane is absent or not nvim.
 - A project wrapper is one line: `exec dev-workspace <profile> "$@"`. Profiles
   can pin session names (e.g. to preserve an existing resurrect save), point
   `DEV_REVIEW_CMD` at a project-specific `gh dash --config` kept under
@@ -75,15 +71,14 @@ this file is the reference for changing or debugging anything.
   unfocused (built-in renderer behaviour, not a setting).
 - `unfocused-split-opacity = 0.85`, `split-divider-color = #2a2a2a`.
 - `shell-integration-features = no-cursor,no-sudo,title,no-ssh-env,no-ssh-terminfo,path`.
-- tmux pane keybinds (send the tmux prefix + key): `cmd+d` split right,
-  `cmd+shift+d` split down, `cmd+w` kill pane, `cmd+shift+enter` zoom,
-  `cmd+alt+arrows` pane focus.
-- GUI-editor bridges (send `Alt+<key>`; nvim maps `<A-...>`): `cmd+p`,
-  `cmd+shift+p`, `cmd+s`, `cmd+f`, `cmd+shift+f`, `cmd+/`.
 - `ctrl+tab` / `ctrl+shift+tab` cycle Ghostty windows (not tabs).
+- croft's Cmd chords: `croft setup-ghostty` appends a marker-fenced managed
+  `keybind` block (re-run it to update; do not hand-edit inside). It re-emits
+  `cmd+p`, `cmd+shift+p`, `cmd+d`, `cmd+s`, `cmd+f`, and the rest as CSI-u,
+  replacing the old Alt bridges and the tmux pane Cmd keybinds. tmux still owns
+  panes, now via the `C-b` prefix only.
 - Reload: `cmd+shift+,` or restart. Validate: `ghostty +validate-config`;
-  inspect `ghostty +list-keybinds`. `text:` actions use Zig escapes (single
-  backslash in the file); keep comments on their own lines.
+  inspect `ghostty +list-keybinds`.
 
 ## tmux
 
@@ -91,14 +86,12 @@ this file is the reference for changing or debugging anything.
 - Status on top (`status-position top`), tmux-nova with `mode` + `time`
   segments; pane label `#I ... #W`. Borders are `#2a2a2a` for both active and
   inactive (no green highlight).
-- Plugins via tpm: tmux-resurrect, tmux-continuum, vim-tmux-navigator,
-  tmux-nova.
+- Plugins via tpm: tmux-resurrect, tmux-continuum, tmux-nova.
 - resurrect: `capture-pane-contents on`; `continuum-restore off`
-  (dev-workspace drives restore); `@resurrect-processes '"~nvim->nvim ."'`
-  (only nvim, since resurrect cannot restore a command with arguments); the
-  post-restore hook runs
-  `/Users/joelove/.local/bin/dev-workspace post-restore --all`, which starts the
-  agent and the per-profile editor/review commands.
+  (dev-workspace drives restore); no `@resurrect-processes` entries (croft and
+  the review command have arguments resurrect cannot restore); the post-restore
+  hook runs `/Users/joelove/.local/bin/dev-workspace post-restore --all`, which
+  starts the agent and the per-profile editor/review commands from their shells.
 - `default-shell /bin/zsh`.
 - terminal-features: `*:RGB` (truecolor), `xterm*:extkeys` (modified keys like
   Shift+Enter), `xterm*:hyperlinks` (OSC 8).
@@ -112,59 +105,59 @@ this file is the reference for changing or debugging anything.
   dev-workspace to find each Ghostty window).
 - `cursor-style blinking-block` (focused pane flashes; Ghostty hollows the
   unfocused window).
-- `extended-keys on`.
-- Prefix is default `C-b`. `prefix r` sources the config. `C-w` is
-  context-aware: nvim focused -> `send-keys M-w` (close buffer), else
-  `kill-pane`.
+- `extended-keys on` with `extended-keys-format csi-u` (carries croft's
+  Ghostty-forwarded Cmd chords through tmux).
+- Prefix is default `C-b`. `prefix r` sources the config. `C-w` is the default
+  `kill-pane`; croft closes its own editor tab with `Cmd+W` (a croft chord, not
+  a tmux one).
 - `set-hook -g window-resized` runs
   `dev-workspace normalize-editor --all` (debounced).
 - Inspect: `tmux show-options -g`, `tmux show-hooks -g`,
   `tmux list-keys -T prefix`.
 
-## Neovim (NvChad v2.5 + plugins)
+## croft
 
-- Repo path: `~/Projects/dotfiles/.config/nvim`, symlinked to `~/.config/nvim`.
-- Bootstrap: `init.lua` sets `mapleader = " "`, bootstraps lazy.nvim, imports
-  NvChad v2.5 and `plugins`.
-- `lua/mappings.lua`: `;` -> `:`, `jk` -> Esc, nvim-tree (`<leader>e` toggle,
-  `ef` find, `er` refresh), GUI bridges `<A-p|P|s|f|F|/>` and `<A-w>`, octo
-  `<leader>op|os|or|oc`.
-- `lua/options.lua`: `guicursor` block with `blinkon500-blinkoff500`; insert
-  bar, replace underline, terminal block.
-- `lua/plugins/init.lua`: conform.nvim, nvim-lspconfig, nvim-tree.lua (width 35,
-  git, diagnostics, shown at startup), octo.nvim (telescope picker,
-  `projects_v2` warning suppressed, markdown treesitter registered).
-- `lazy-lock.json` is committed.
-- Theme: `lua/themes/ghostty.lua`, selected in `lua/chadrc.lua`
-  (`theme = "ghostty"`), monokai-derived.
-- LSP via mason: `lua_ls`, `html`, `cssls`.
-- `:checkhealth octo` only finds the provider once octo has loaded (`:Octo ...`).
-
-## octo.nvim review flow
-
-- Install is lazy (`cmd = "Octo"`); opens from `:Octo pr list`,
-  `:Octo search ...`, `:Octo <url>`, or `dev-workspace [<profile>] review`.
-- Review: `:Octo review` starts review mode (files panel + side-by-side diff).
-  `<localleader>ca` comment, `<localleader>sa` suggestion, `:Octo review submit`
-  (Ctrl-a approve, Ctrl-m comment, Ctrl-r request changes).
-- The editor pane's cwd is the project root and may not be a git repo, so use
-  explicit repo/URL commands. `resurrect` drops the pane tag; `normalize_editor`
-  re-adds it (`@dev_review_pane <profile>`).
+- Repo path: `~/Projects/dotfiles/.config/croft/`, symlinked to `~/.config/croft`
+  (directory symlink).
+- Installed with `cargo install croft-software --locked` into `~/.cargo/bin/croft`
+  (the `vitali87/croft` Homebrew tap no longer exists and releases ship no
+  binaries). Upgrade by re-running the same command.
+- Launch: the editor pane runs `croft` with its cwd at `DEV_EDITOR_DIR`, so it
+  opens that folder. `croft <file>` opens a file; `croft pr <n>` opens a native
+  PR review tab; `croft edit --wait` opens a file in the croft hosting the pane
+  (what `EDITOR`/`GIT_EDITOR` use).
+- Config: `config.json` in the same directory; `theme: "monokai-terminal"`,
+  `format_on_save: true`, `suppress_terminal_warning: true`. Keep it **strict
+  JSON**: 0.1.942 loaded defaults when the file had `//` comments (despite the
+  docs), and croft rewrites it expanded on any UI toggle.
+- Theme: `extensions/monokai-terminal/extension.toml` is a user `[[themes]]`
+  manifest that reproduces the Ghostty/iTerm monokai exactly. croft has **no
+  ANSI-passthrough mode** (themes are RGB hex), so the exact match is the
+  16-entry `ansi` array (equals the Ghostty `palette =` lines) plus syntax roles
+  drawn from the same palette. If the Ghostty palette changes, update both.
+- LSP: croft provisions its own servers on first use (vtsls,
+  yaml-language-server, json/html/css, bash, ty/ruff) into `~/.croft/servers`,
+  and uses `rust-analyzer`/`taplo`/`clangd` from PATH when present.
+- Vim mode is a per-session toggle on `Cmd+E` (not config-persisted).
+- Cmd chords reach croft via the managed Ghostty block (see Ghostty above); tmux
+  `extended-keys` carries the CSI-u sequences.
+- croft runs inside tmux, which blocks its inline-image protocol, so it uses
+  the image-less fallback: activity-bar/file icons render as Nerd Font glyphs
+  and previews as a metadata line. `suppress_terminal_warning: true` silences
+  the startup "switch terminal" nudge.
 
 ## gh-dash
 
 - Repo path: `~/Projects/dotfiles/.config/gh-dash/`, symlinked to
   `~/.config/gh-dash`.
 - `config.yml` is the default profile: `prSections` lists all open PRs for
-  `user:joelove`; `repoPaths` maps local checkouts; `o` runs
-  `dev-workspace review ...` (default workspace).
+  `user:joelove`; `repoPaths` maps local checkouts.
 - A project profile can keep its own gh-dash config in
   `.config/dev-workspace/<name>.yml` and set
-  `DEV_REVIEW_CMD="gh dash --config ~/.config/dev-workspace/<name>.yml"`; its
-  `o` binding calls the project wrapper.
-- Both configs bind `enter` -> `gh pr view --web` and `o` -> review in nvim
-  (overriding gh-dash's built-in open-in-GitHub; the helper falls back to the
-  browser), with the same `defaults` and preview settings.
+  `DEV_REVIEW_CMD="gh dash --config ~/.config/dev-workspace/<name>.yml"`.
+- Both configs use gh-dash's stock keys (`o` opens the PR in the browser), with
+  the same `defaults` and preview settings; the old `o`-to-nvim diff binding is
+  gone with octo.nvim.
 - Both configs set `theme.ui` to `sectionsShowCount: false` and
   `table.compact/showSeparator: false` for a denser list. gh-dash's own section
   title and separator header cannot be hidden (no config for it).
@@ -206,8 +199,9 @@ this file is the reference for changing or debugging anything.
 ## zsh and git
 
 - `.zshrc` (symlinked): oh-my-zsh + powerlevel10k, nvm/zoxide/fzf/pyenv, PATH
-  additions, `EDITOR=GIT_EDITOR=vim`, aliases `v`/`code`/`c` -> nvim, `cat` ->
-  bat, git aliases, `pr` helper.
+  additions, `EDITOR`/`GIT_EDITOR`/`GIT_SEQUENCE_EDITOR` = `croft edit --wait`,
+  aliases `v`/`vim`/`code`/`c` -> croft, `cat` -> bat, git aliases, `pr`
+  helper.
 - `.zprofile`, `.zshenv` (sources `.automations.sh`), `.p10k.zsh`.
 - `.gitconfig`: identity plus `gh auth git-credential` helpers for github.com
   and gist.github.com.
@@ -247,39 +241,42 @@ this file is the reference for changing or debugging anything.
   later re-pinned by `normalize_editor`.
 - 2026-09-23 `f50ae50` normalize on ensure/restore; `4c65d9b` `window-resized`
   hook.
-- Latest: generic `dev-workspace` engine + per-project profiles, one-line
-  project wrappers, per-profile gh-dash configs (default all `user:joelove`,
-  per-project configs under `.config/dev-workspace/`), `@dev_review_pane
-  <profile>`, `set-titles-string #S`, and `dev-workspace ... --all` hooks.
+- Generic `dev-workspace` engine + per-project profiles, one-line project
+  wrappers, per-profile gh-dash configs (default all `user:joelove`, per-project
+  configs under `.config/dev-workspace/`), `set-titles-string #S`, and
+  `dev-workspace ... --all` hooks.
+- Latest: replaced Neovim with croft (editor pane, `croft setup-ghostty` Cmd
+  chords, exact-match `monokai-terminal` theme, format-on-save), removed the
+  nvim config and the Ghostty/tmux/gh-dash/octo integrations, and moved shell
+  editing to `croft edit --wait`.
 
 ## Debugging playbook
 
 - Layout wrong after restart or resize: `dev-workspace [<profile>]
   normalize-editor` (or `ensure`); check
-  `tmux list-panes -t <session> -F '#{pane_id} #{pane_width} #{pane_height} #{@dev_review_pane}'`.
-- `dev-workspace` acts on the wrong server / "not running nvim": a `TMUX`
-  variable is shadowing the socket env; check the engine uses `TMUX_BIN`.
+  `tmux list-panes -t <session> -F '#{pane_id} #{pane_width} #{pane_height}'`.
+- `dev-workspace` acts on the wrong server: a `TMUX` variable is shadowing the
+  socket env; check the engine uses `TMUX_BIN`.
 - Modified keys (Shift+Enter) not working: `extended-keys`/`extkeys` need a
   fresh client attach; restart tmux or re-attach.
-- GUI shortcut does nothing: verify the Ghostty bridge (`ghostty +list-keybinds`)
-  and the nvim `<A-...>` map; both are required.
+- croft Cmd shortcut does nothing: verify the managed Ghostty block
+  (`ghostty +list-keybinds`, `grep 'croft keybindings'`), then run `croft keys`
+  in the editor pane to see whether the CSI-u sequence reaches croft through
+  tmux (`extended-keys` must be on with `csi-u`).
 - Ghostty keybind sends garbage: check for inline comments or a doubled
-  backslash in `text:` escapes.
-- octo "No healthcheck found": load octo first (`:Octo ...`), then
-  `:checkhealth octo`.
-- octo/review helper can't find the repo: the editor pane cwd is the project
-  root; use an explicit URL/repo.
-- Review helper does nothing in gh-dash: gh-dash read the config at launch;
-  relaunch it, and check the workspace's `DEV_REVIEW_CMD` config file.
+  backslash in `text:` escapes, and that the croft managed block is intact.
+- Theme looks wrong: croft has no ANSI passthrough; confirm the
+  `monokai-terminal` manifest's `ansi` array equals the Ghostty `palette =`
+  lines and that `~/.config/croft` is the repo symlink.
 - resurrect brought back old panes/options: expected; `normalize_editor`
-  re-applies sizes and the review tag.
+  re-applies sizes.
 - tmux config parse errors: `tmux source-file ~/.tmux.conf` and read stderr;
   `tmux show-options -g` / `show-hooks -g` to confirm what applied.
 
 ## Improving safely
 
-- Add a shortcut as a pair: Ghostty keybind (Alt sequence) + nvim `<A-...>` map,
-  then reload both.
+- Add a croft shortcut in `~/.config/croft/keybindings.json`, then re-run
+  `croft setup-ghostty` so the Cmd chord is forwarded; reload Ghostty and croft.
 - Change editor sizes as profile fields (`DEV_GH_COLS`, `DEV_BOTTOM_LINES`,
   `DEV_REVIEW_SUB_LINES`); `normalize_editor` consumes them.
 - Add a pane below the review pane as `DEV_REVIEW_SUB_CMD`, or a bottom-strip
@@ -288,8 +285,9 @@ this file is the reference for changing or debugging anything.
 - Add a project as a profile in `~/.config/dev-workspace/<name>.conf` plus a
   one-line wrapper in `.local/bin/<name>-workspace`; do not fork the engine.
 - Keep tmux as the only pane owner; do not introduce Ghostty splits.
-- Keep the palette consistent with the existing monokai values.
+- Keep the palette consistent with the existing monokai values, and mirror any
+  Ghostty palette change into the croft `monokai-terminal` `ansi` array.
 - Validate before committing: `ghostty +validate-config`,
-  `tmux source-file`, `bash -n dev-workspace`, `:Lazy`/`:checkhealth`.
+  `tmux source-file`, `bash -n dev-workspace`, `croft --version`.
 - Commit and push `~/Projects/dotfiles`; home config is a symlink, so an
   uncommitted edit is easy to lose.

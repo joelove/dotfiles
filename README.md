@@ -29,7 +29,8 @@ brew install --cask cursor
 brew install --cask karabiner-elements
 brew install --cask logi-options+
 brew install koekeishiya/formulae/skhd
-brew install koekeishiya/formulae/yabai  
+brew install koekeishiya/formulae/yabai
+cargo install croft-software --locked
 ```
 
 ### Configure
@@ -38,7 +39,7 @@ brew install koekeishiya/formulae/yabai
 - [yabai](https://github.com/koekeishiya/yabai)
 - [Ghostty](https://ghostty.org) (config symlinked from `.config/ghostty`)
 - [tmux](https://github.com/tmux/tmux) with tpm plugins (see `.tmux.conf`)
-- [Neovim](https://neovim.io) NvChad-based config (symlinked from `.config/nvim`)
+- [croft](https://docs.croft.software) VS Code-style terminal editor (built from crates.io; config symlinked from `.config/croft`; run `croft setup-ghostty` once to forward the Cmd chords)
 - `dev-workspace` tmux/Ghostty workspace engine with per-project profiles (symlinked from `.local/bin` and `.config/dev-workspace`); needs `tmux`, `jq`, `yabai`
 
 ### Symlinks
@@ -56,7 +57,7 @@ ln -s ~/Projects/dotfiles/.tmux.conf ~/.tmux.conf
 ln -s ~/Projects/dotfiles/.p10k.zsh ~/.p10k.zsh
 mkdir -p ~/.config
 ln -s ~/Projects/dotfiles/.config/ghostty ~/.config/ghostty
-ln -s ~/Projects/dotfiles/.config/nvim ~/.config/nvim
+ln -s ~/Projects/dotfiles/.config/croft ~/.config/croft
 ln -s ~/Projects/dotfiles/.config/gh-dash ~/.config/gh-dash
 ln -s ~/Projects/dotfiles/.config/dev-workspace ~/.config/dev-workspace
 mkdir -p ~/.local/bin

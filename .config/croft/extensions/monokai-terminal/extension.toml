@@ -1,0 +1,34 @@
+# Monokai that matches the Ghostty/iTerm terminal palette exactly.
+#
+# croft has no ANSI-passthrough mode: a theme is RGB hex by design, so these
+# values are copied from the iTerm Monokai profile / ~/.config/ghostty/config.
+# The 16-entry `ansi` array is what croft's own terminal panes render, so they
+# match the host terminal byte-for-byte. Syntax roles are drawn from the same
+# palette (comment bright-black, keyword red, string bright-yellow, constant
+# bright-blue, function green, type cyan).
+id = "monokai-terminal"
+name = "Monokai (Ghostty)"
+description = "Monokai matching the Ghostty/iTerm ANSI palette."
+api_version = 1
+
+[[themes]]
+id = "monokai-terminal"
+label = "Monokai (Ghostty)"
+background = "#000000"
+accent = "#ffa827"
+selection = "#403d3d"
+search = "#222222"
+button = "#75715e"
+gradient = false
+osk_key = "#403d3d"
+osk_special = "#222222"
+osk_armed = "#ffa827"
+syn_comment = "#75715e"
+syn_keyword = "#f92a72"
+syn_string = "#e6db74"
+syn_constant = "#ae81ff"
+syn_function = "#a6e22e"
+syn_type = "#66d9ef"
+syn_tag = "#f92a72"
+syn_fg = "#f8f8f2"
+ansi = ["#222222","#f92a72","#a6e22e","#ffa827","#ae81ff","#f92a72","#66d9ef","#cfcfc2","#75715e","#f92a72","#a6e22e","#e6db74","#ae81ff","#f92a72","#66d9ef","#f8f8f2"]
