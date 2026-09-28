@@ -1,8 +1,20 @@
 diff --git a/src/app/mod.rs b/src/app/mod.rs
-index d085add..e293164 100644
+index d085add..a67d7c9 100644
 --- a/src/app/mod.rs
 +++ b/src/app/mod.rs
-@@ -21257,6 +21257,23 @@ impl App {
+@@ -5469,7 +5469,10 @@ impl App {
+             },
+             focus: Pane::Tree,
+             show_tree: true,
+-            show_terminal: true,
++            // The dev-workspace lives in tmux, which already owns panes and a
++            // bottom row; croft's internal panel starts hidden (Ctrl+J shows
++            // it). Patch: croft-tmux-monokai.
++            show_terminal: false,
+             terminal_maximized: false,
+             activity_bar_visible: layout_prefs.activity_bar,
+             status_bar_visible: layout_prefs.status_bar,
+@@ -21257,6 +21260,23 @@ impl App {
      /// built-in defaults call their app methods directly, so a command-level
      /// recorder would miss most of what a user does.
      fn handle_key(&mut self, key: KeyEvent) -> Result<()> {

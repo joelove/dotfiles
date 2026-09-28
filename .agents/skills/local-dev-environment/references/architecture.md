@@ -142,8 +142,9 @@ this file is the reference for changing or debugging anything.
   activity pill and inner accents become terminal-numbered colours instead of
   truecolor. The `ansi` array equals the Ghostty `palette =` lines. If the
   Ghostty palette changes, update both.
-- Settings: `Ctrl+J` toggles the bottom panel and `Cmd+B` the primary side bar
-  (croft does not persist either across launches); `Cmd+,` opens the settings
+- Settings: croft's bottom panel is patched to start hidden (`show_terminal:
+  false` in `App::new`); `Ctrl+J` toggles it and `Cmd+B` the primary side bar
+  (croft does not persist either across launches). `Cmd+,` opens the settings
   hub via the tracked `keybindings.json`, forwarded by a `super+,` Ghostty
   keybind (Ghostty's default there opens its own config).
 - LSP: croft provisions its own servers on first use (vtsls,
