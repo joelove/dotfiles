@@ -114,17 +114,11 @@ this file is the reference for changing or debugging anything.
   `pane_current_command=croft`: when croft is focused they re-inject the raw
   CSI-u with `send-keys -H` so croft wins the chord, otherwise they run the
   iTerm-like pane action (`Cmd+D` and `Cmd+Shift+D` split, `Cmd+W` kill,
-  `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows` focus). The remaining slots
-  (`1-8`, `b`, `f`, `,`, `n`, `y`) also `if-shell`-check croft: they inject the
-  raw Cmd chord only while croft is focused (slot `b` falls back to `C-u`,
-  Ghostty's old `text:\x15`), so croft sequences never leak into shell or TUI
-  panes. A key table, not a global `M-` binding, so genuine Alt chords are
-  untouched.
-- Limitation: `croft setup-ghostty`'s managed block overrides many Ghostty
-  `super+` defaults (new tab/window, goto tab/split, copy, undo, search, open
-  config) with croft CSI-u. Those are Ghostty app actions tmux cannot invoke,
-  so they are lost on non-croft panes; only byte-sequence defaults (currently
-  `super+backspace`) can be restored conditionally.
+  `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows` focus). The slots `1-8/b/f` inject
+  the raw chord unconditionally for the non-pane colliding Cmd chords
+  (`Cmd+Left/Right/Up/Down`, `Cmd+Shift+Left/Right/Up/Down`,
+  `Cmd+Backspace/Delete`). A key table, not a global `M-` binding, so genuine
+  Alt chords are untouched.
 - Prefix is default `C-b`. `prefix r` sources the config. `C-w` is the default
   `kill-pane`; croft closes its own editor tab with `Cmd+W` (a croft chord, not
   a tmux one).

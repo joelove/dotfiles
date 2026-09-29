@@ -100,10 +100,10 @@ keybind = super+alt+arrow_down=text:\x02\x16j
 # Ghostty's default cmd+, opens Ghostty's own config; send it to croft instead
 # (croft's keybindings.json binds mod+, to open_settings). `croft setup-ghostty`
 # also forwards this from keybindings.json on its next run.
-keybind = super+,=text:\x02\x16,
+keybind = super+,=csi:44;9u
 # Cmd+N opens a new empty tab in croft (keybindings.json binds mod+n to
 # new_file); Ghostty's default there is new_window.
-keybind = super+n=text:\x02\x16n
+keybind = super+n=csi:110;9u
 
 # ---------------------------------------------------------------------------
 # Sublime/Atom editor chords
@@ -131,7 +131,7 @@ keybind = super+shift+up=text:\x02\x167
 keybind = super+shift+down=text:\x02\x168
 keybind = super+backspace=text:\x02\x16b
 keybind = super+delete=text:\x02\x16f
-keybind = super+l=text:\x02\x16y
+keybind = super+l=csi:108;9u
 
 # ---------------------------------------------------------------------------
 # Window cycling
