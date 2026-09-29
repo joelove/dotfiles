@@ -28,13 +28,4 @@ theme:
       compact: true
       showSeparator: false
 
-# gh-dash's stock "open in GitHub" key is `o`; here it opens the PR in the
-# dev-workspace editor pane (octo.nvim), falling back to the browser.
-keybindings:
-  prs:
-    - key: enter
-      name: open in browser
-      command: "gh pr view {{.PrNumber}} --repo {{.RepoName}} --web"
-    - key: o
-      name: review in nvim
-      command: "dev-workspace review https://github.com/{{.RepoName}}/pull/{{.PrNumber}}"
+# Stock gh-dash keys: `o` opens the PR in the browser, `enter` views it.

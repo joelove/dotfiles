@@ -99,9 +99,10 @@ export PATH="/opt/homebrew/opt/postgresql@17/bin:${PATH}"
 # Add Cargo to PATH
 export PATH="$HOME/.cargo/bin:$PATH"
 
-# Set default editors
-export EDITOR="vim"
-export GIT_EDITOR="vim"
+# Set default editors (croft; `edit --wait` opens in the croft hosting the pane)
+export EDITOR="croft edit --wait"
+export GIT_EDITOR="croft edit --wait"
+export GIT_SEQUENCE_EDITOR="croft edit --wait"
 
 bold=$(tput bold)
 italic=$(tput sitm)
@@ -288,10 +289,10 @@ list_profiles() {
 }
 
 # general
-alias v='nvim'
-alias vim='nvim'
-alias code='nvim'
-alias c='nvim'
+alias v='croft'
+alias vim='croft'
+alias code='croft'
+alias c='croft'
 alias r='recent'
 alias cat='bat'
 alias catp='bat -p'

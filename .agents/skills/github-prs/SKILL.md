@@ -1,36 +1,35 @@
 ---
 name: github-prs
-description: Open a GitHub pull request for review in the workspace editor pane (tmux + Neovim + octo.nvim). Use after creating a PR, when asked to open one for review, or when starting a review of an existing PR.
+description: Open a GitHub pull request for review in the browser. Use after creating a PR, when asked to open one for review, or when starting a review of an existing PR.
 ---
 
 # GitHub PRs: create and open for review
 
-## Open a PR for review in the editor pane
+## Open a PR for review
 
-`dev-workspace [<profile>] review <ref>` opens a PR in the workspace's editor
-pane (octo.nvim) and enters review mode. It accepts a full URL, `owner/repo#n`,
-or `owner/repo n`:
+Open the PR in the browser:
 
-    dev-workspace review https://github.com/OWNER/repo/pull/123
-    dev-workspace review OWNER/repo#123
-    dev-workspace review OWNER/repo 123
+    gh pr view <ref> --web
 
-A project wrapper is a one-line `exec dev-workspace <profile> "$@"`, so
-`<project>-workspace review <ref>` does the same for that project. If the editor
-pane is not running nvim, it falls back to opening the PR in the browser. In
-review mode: `<localleader>ca` comment, `<localleader>sa` suggestion,
-`:Octo review submit` to submit (Ctrl-a approve / Ctrl-r request changes).
+`<ref>` is a PR number, URL, or `owner/repo#n`. From a checkout, `gh pr view
+--web` uses the current branch's PR; from anywhere, name the PR. A project
+wrapper can also be used, and any `owner/repo n` reference works:
+
+    gh pr view OWNER/repo#123 --web
+    gh pr view https://github.com/OWNER/repo/pull/123 --web
+
+In the tmux dev-workspace, the gh-dash review pane opens PRs too: its stock `o`
+opens the selected PR in the browser. (The old `o`-to-octo.nvim diff editing was
+removed with Neovim.)
 
 ## After creating a PR
 
 1. Create the PR (`gh pr create ...` or the GitHub MCP tools).
-2. Open it for review: `dev-workspace [<profile>] review <the URL gh prints>`.
+2. Open it for review: `gh pr view <the URL gh prints> --web`.
 3. Continue with review-code or autopilot as appropriate.
 
 ## Notes
 
-- The helper finds the profile's nvim pane via the tmux option
-  `@dev_review_pane <profile>`.
-- gh-dash's PR list has an `o` keybinding that calls the same helper (it
-  replaces the built-in open-in-GitHub, and still falls back to the browser
-  when the editor pane is unavailable).
+- croft's native `croft pr <n>` opens a PR review tab (files, checks, viewed
+  marks) inside the running editor pane. It is an in-editor option a human can
+  use; it is not wired into this browser flow.
