@@ -131,11 +131,13 @@ this file is the reference for changing or debugging anything.
 
 - Repo path: `~/Projects/dotfiles/.config/croft/`, symlinked to `~/.config/croft`
   (directory symlink).
-- Built from a local `~/Projects/croft` checkout of git main into
+- Built from the personal fork `joelove/croft` branch `personal` into
   `~/.cargo/bin/croft` (the `vitali87/croft` Homebrew tap no longer exists and
   releases ship no binaries; crates.io is 0.1.942 and hardcodes chrome). The
-  checkout carries `.config/croft/patches/tmux-monokai.patch`; after `git pull`,
-  re-apply it and run `cargo install --path . --locked`.
+  `~/Projects/croft` checkout has `origin` = the fork and `upstream` =
+  `vitali87/croft`; install with `cargo install --path . --locked`. To take
+  upstream changes, `git fetch upstream && git merge upstream/main` on
+  `personal`.
 - Launch: the editor pane runs `croft` with its cwd at `DEV_EDITOR_DIR`, so it
   opens that folder. `croft <file>` opens a file; `croft pr <n>` opens a native
   PR review tab; `croft edit --wait` opens a file in the croft hosting the pane
