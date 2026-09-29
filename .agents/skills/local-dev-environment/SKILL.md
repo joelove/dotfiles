@@ -26,11 +26,16 @@ Config map, reload/debug, and pitfalls:
 - `cmd` never reaches the terminal. croft's managed Ghostty block
   (`croft setup-ghostty`) re-emits croft's Cmd chords as CSI-u, and tmux's
   `extended-keys on` + `extended-keys-format csi-u` carries them to croft. The
-  colliding pane chords (`Cmd+D`, `Cmd+Shift+D`, `Cmd+W`, `Cmd+Shift+Enter`,
-  `Cmd+Alt+arrows`) are excluded from that block and sent through tmux's `croft`
-  key table instead, which gives them to croft when it is focused and runs the
-  pane action otherwise. Never hand-edit between the block's markers; re-run
-  `croft setup-ghostty` and re-remove those pane chords.
+  chords that collide with Ghostty or tmux (`Cmd+D/Shift+D/W/Shift+Enter`,
+  `Cmd+Alt+arrows`, `Cmd+Left/Right/Up/Down`, `Cmd+Shift+Left/Right/Up/Down`,
+  `Cmd+Backspace/Delete`) are excluded from that block and sent as `C-b C-v
+  <slot>`; tmux's `croft` key table re-injects the raw chord while croft is
+  focused and runs the pane fallback otherwise. croft's own Alt chords stay Alt.
+  Never hand-edit between the block's markers; re-run `croft setup-ghostty` and
+  re-remove those chords.
+- croft is a soft fork: changes live on `joelove/croft` branch `personal`, not
+  as a patch in dotfiles. Edit in `~/Projects/croft`, commit, push, then
+  `cargo install --path . --locked`.
 - Workspaces are data: a profile (`~/.config/dev-workspace/<name>.conf`) sets
   directories, commands, and sizes; the engine has no project-specific code.
 - The editor layout is pinned. `build_editor` creates it and `normalize_editor`
@@ -53,5 +58,6 @@ Config map, reload/debug, and pitfalls:
 3. Reload/restart the tool and confirm the behaviour.
 4. Commit and push `~/Projects/dotfiles`.
 5. Keep coupled changes together: a new croft shortcut goes in croft's
-   `keybindings.json`, then `croft setup-ghostty` re-emits it; a layout size is a
-   profile field, not engine code.
+   `keybindings.json`, then `croft setup-ghostty` re-emits it; a croft UI change
+   goes on the `personal` branch and is reinstalled; a layout size is a profile
+   field, not engine code.

@@ -74,11 +74,15 @@ this file is the reference for changing or debugging anything.
 - `ctrl+tab` / `ctrl+shift+tab` cycle Ghostty windows (not tabs).
 - croft's Cmd chords: `croft setup-ghostty` appends a marker-fenced managed
   `keybind` block (re-run it to update; do not hand-edit inside) that re-emits
-  croft's chords as CSI-u. The colliding pane chords are the exception: Ghostty
-  sends them as `text:` `C-b C-v <slot>` and tmux's `croft` key table decides
-  (see tmux below), so their lines are removed from the managed block. `super+n`
-  is forwarded too (croft's new untitled tab). Re-running `croft setup-ghostty`
-  re-adds the pane chords as CSI-u; remove those eight lines again.
+  croft's chords as CSI-u. The colliding chords are the exception: Ghostty sends
+  them as `text:` `C-b C-v <slot>` and tmux's `croft` key table decides (see tmux
+  below), so their lines are removed from the managed block. That set is the
+  pane chords (`Cmd+D`, `Cmd+Shift+D`, `Cmd+W`, `Cmd+Shift+Enter`,
+  `Cmd+Alt+arrows`) plus the Sublime/Atom arrows and deletes (`Cmd+Left/Right/Up/Down`,
+  `Cmd+Shift+Left/Right/Up/Down`, `Cmd+Backspace/Delete`). Ghostty also forwards
+  `super+,` (settings), `super+n` (new untitled tab), `super+l` (expand to line),
+  and the real `Alt+Left/Right` (its defaults send `ESC b`/`ESC f`). Re-running
+  `croft setup-ghostty` re-adds the colliding chords as CSI-u; remove them again.
 - Reload: `cmd+shift+,` or restart. Validate: `ghostty +validate-config`;
   inspect `ghostty +list-keybinds`.
 
@@ -114,11 +118,11 @@ this file is the reference for changing or debugging anything.
   `pane_current_command=croft`: when croft is focused they re-inject the raw
   CSI-u with `send-keys -H` so croft wins the chord, otherwise they run the
   iTerm-like pane action (`Cmd+D` and `Cmd+Shift+D` split, `Cmd+W` kill,
-  `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows` focus). The slots `1-8/b/f` inject
-  the raw chord unconditionally for the non-pane colliding Cmd chords
-  (`Cmd+Left/Right/Up/Down`, `Cmd+Shift+Left/Right/Up/Down`,
-  `Cmd+Backspace/Delete`). A key table, not a global `M-` binding, so genuine
-  Alt chords are untouched.
+  `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows` focus). Slots `1-8` and `f` inject the
+  raw chord for the non-pane colliding Cmd chords (`Cmd+Left/Right/Up/Down`,
+  `Cmd+Shift+Left/Right/Up/Down`, `Cmd+Delete`), and `b` injects `Cmd+Backspace`
+  or falls back to `C-u` (Ghostty's old `text:\x15`). A key table, not a global
+  `M-` binding, so genuine Alt chords are untouched.
 - Prefix is default `C-b`. `prefix r` sources the config. `C-w` is the default
   `kill-pane`; croft closes its own editor tab with `Cmd+W` (a croft chord, not
   a tmux one).
@@ -166,11 +170,11 @@ this file is the reference for changing or debugging anything.
 - Cmd chords reach croft via the managed Ghostty block (see Ghostty above); tmux
   `extended-keys` carries the CSI-u sequences. tmux has no Super modifier and
   maps the CSI-u super bit onto Meta, so inside tmux most Cmd chords arrive as
-  Alt; the patch promotes Alt back to Super in `App::handle_key` on macOS
-  (guarded by `$TMUX`). The colliding pane chords skip that path: the `croft`
-  key table re-injects their raw CSI-u when croft is focused (see tmux above).
-  tmux cannot tell Cmd from Alt apart, so croft's genuine Alt chords fold onto
-  their Cmd counterparts.
+  Alt; the fork promotes Alt back to Super in `App::handle_key` on macOS
+  (guarded by `$TMUX`) except for the Alt chords croft owns (`alt_is_croft_chord`:
+  arrows, up/down, backspace/delete), which stay Alt. The colliding Cmd chords
+  skip the promotion entirely because the `croft` key table re-injects their raw
+  CSI-u when croft is focused (see tmux above).
 - `keybindings.json` binds `Cmd+,` to `open_settings`, `Cmd+N` to the patched
   `new_file` command (a new untitled tab), and `Cmd+T` to `quick_open` (Go to
   File), overriding croft's new-terminal binding.
@@ -291,10 +295,16 @@ this file is the reference for changing or debugging anything.
   wrappers, per-profile gh-dash configs (default all `user:joelove`, per-project
   configs under `.config/dev-workspace/`), `set-titles-string #S`, and
   `dev-workspace ... --all` hooks.
-- Latest: replaced Neovim with croft (editor pane, `croft setup-ghostty` Cmd
-  chords, exact-match `monokai-terminal` theme, format-on-save), removed the
-  nvim config and the Ghostty/tmux/gh-dash/octo integrations, and moved shell
-  editing to `croft edit --wait`.
+- Replaced Neovim with croft (editor pane, `croft setup-ghostty` Cmd chords,
+  exact-match `monokai-terminal` theme, format-on-save), removed the nvim config
+  and the Ghostty/tmux/gh-dash/octo integrations, and moved shell editing to
+  `croft edit --wait`.
+- Latest: croft is a soft fork (`joelove/croft` branch `personal`) carrying
+  numbered-colour Monokai chrome, the tmux Meta-to-Super promotion, a hidden
+  bottom panel, `new_file`, Sublime/Atom cursor/selection/edit commands, and
+  borderless tabless chrome; `Cmd+T` is Go to File; the colliding Cmd chords are
+  routed through the tmux `croft` key table, and croft's Alt chords are skipped
+  by the promotion.
 
 ## Debugging playbook
 
@@ -323,6 +333,8 @@ this file is the reference for changing or debugging anything.
 
 - Add a croft shortcut in `~/.config/croft/keybindings.json`, then re-run
   `croft setup-ghostty` so the Cmd chord is forwarded; reload Ghostty and croft.
+- Croft UI or source changes go on the `personal` branch of `~/Projects/croft`,
+  then `git push origin personal` and `cargo install --path . --locked`.
 - Change editor sizes as profile fields (`DEV_GH_COLS`, `DEV_BOTTOM_LINES`,
   `DEV_REVIEW_SUB_LINES`); `normalize_editor` consumes them.
 - Add a pane below the review pane as `DEV_REVIEW_SUB_CMD`, or a bottom-strip

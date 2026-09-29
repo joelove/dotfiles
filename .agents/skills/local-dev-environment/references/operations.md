@@ -10,11 +10,12 @@
 | `.local/bin/*-workspace` | per-project one-line wrappers over a profile |
 | `.config/dev-workspace/*.conf` | per-project profiles |
 | `.config/dev-workspace/*.yml` | per-project gh-dash configs |
-| `.config/ghostty/config` | Ghostty theme, cursor, croft's managed Cmd-chord block |
+| `.config/ghostty/config` | Ghostty theme, cursor, croft's managed Cmd block, the `C-b C-v` pane/Sublime forwards |
 | `.tmux.conf` | status/nova, tpm plugins, mouse, titles, cursor, extended-keys, hooks |
 | `.config/gh-dash/config.yml` | gh-dash default profile (all `user:joelove` PRs) |
 | `.config/croft/config.json` | croft settings (exact-match `monokai-terminal` theme, format-on-save) |
 | `.config/croft/extensions/monokai-terminal/**` | user `[[themes]]` manifest equal to the Ghostty palette |
+| `.config/croft/keybindings.json` | croft chords: settings, `new_file`, Go to File, and the Sublime/Atom move/select/delete set |
 | `.agents/skills/*/SKILL.md` | agent skills |
 | `.skhdrc` / `.automations.sh` / `.yabairc` | hotkeys, yabai sizing/space helpers, signals |
 | `.zshrc` / `.zprofile` / `.zshenv` / `.p10k.zsh` | shell, aliases (`v`/`vim`/`code`/`c` -> croft), PATH, `EDITOR`/`GIT_EDITOR` (`croft edit --wait`) |
@@ -22,7 +23,9 @@
 | `.config/karabiner/`, `qmk/` | keyboard remaps and QMK keymaps |
 
 pi lives outside dotfiles: `~/.pi/agent/{settings.json,mcp.json,agents,extensions,themes}`;
-skills are discovered from `~/.agents/skills`.
+skills are discovered from `~/.agents/skills`. The patched croft source lives
+outside dotfiles too: `~/Projects/croft` (`origin` = `joelove/croft`, branch
+`personal`; `upstream` = `vitali87/croft`).
 
 ## Reload / debug
 
