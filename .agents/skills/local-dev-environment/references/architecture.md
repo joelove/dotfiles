@@ -110,12 +110,15 @@ this file is the reference for changing or debugging anything.
 - `extended-keys on` with `extended-keys-format csi-u` (carries croft's
   Ghostty-forwarded Cmd chords through tmux).
 - `croft` key table: `C-b C-v` enters it (Ghostty sends that for the colliding
-  pane chords). Each binding `if-shell`-checks `pane_current_command=croft`:
-  when croft is focused it re-injects the raw CSI-u with `send-keys -H` so croft
-  wins the chord, otherwise it runs the iTerm-like pane action (`Cmd+D` and
-  `Cmd+Shift+D` split, `Cmd+W` kill, `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows`
-  focus). A key table, not a global `M-` binding, so genuine Alt chords are
-  untouched.
+  chords). The pane slots `d/D/w/e/h/l/k/j` `if-shell`-check
+  `pane_current_command=croft`: when croft is focused they re-inject the raw
+  CSI-u with `send-keys -H` so croft wins the chord, otherwise they run the
+  iTerm-like pane action (`Cmd+D` and `Cmd+Shift+D` split, `Cmd+W` kill,
+  `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows` focus). The slots `1-8/b/f` inject
+  the raw chord unconditionally for the non-pane colliding Cmd chords
+  (`Cmd+Left/Right/Up/Down`, `Cmd+Shift+Left/Right/Up/Down`,
+  `Cmd+Backspace/Delete`). A key table, not a global `M-` binding, so genuine
+  Alt chords are untouched.
 - Prefix is default `C-b`. `prefix r` sources the config. `C-w` is the default
   `kill-pane`; croft closes its own editor tab with `Cmd+W` (a croft chord, not
   a tmux one).
@@ -168,6 +171,14 @@ this file is the reference for changing or debugging anything.
   their Cmd counterparts.
 - `keybindings.json` binds `Cmd+,` to `open_settings` and `Cmd+N` to the patched
   `new_file` command, which opens a new untitled tab (VS Code behaviour).
+- Sublime/Atom parity: the patch adds `cursor_*`, `select_word`, `delete_*` and
+  `expand_selection_to_line` commands; `keybindings.json` binds line and word
+  move/select, `Ctrl+Shift+A/E/W`, `Cmd+Up/Down` (+Shift), and
+  `Alt+Backspace/Delete` / `Cmd+Backspace/Delete`. Because tmux collapses Cmd
+  onto Alt, the colliding Cmd chords go through the `croft` key table and
+  `App::handle_key` skips the Alt-to-Super promotion for the Alt chords croft
+  owns (`alt_is_croft_chord`), so both meanings survive.
+- focus-editor-group moved from `Cmd+Alt+Left/Right` to `Cmd+K Cmd+Left/Right`.
 - croft runs inside tmux, which blocks its inline-image protocol, so it uses
   the image-less fallback: activity-bar/file icons render as Nerd Font glyphs
   and previews as a metadata line. `suppress_terminal_warning: true` silences

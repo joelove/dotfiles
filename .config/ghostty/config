@@ -106,6 +106,28 @@ keybind = super+,=csi:44;9u
 keybind = super+n=csi:110;9u
 
 # ---------------------------------------------------------------------------
+# Sublime/Atom editor chords
+# ---------------------------------------------------------------------------
+# Ghostty has no defaults for most of these, and Cmd+Shift+Up/Down would
+# otherwise hit its jump_to_prompt; forward them so the keybindings.json
+# bindings fire. Cmd+Alt+Left/Right still route through the tmux croft table.
+# Sublime/Atom editor chords. The colliding Cmd chords go through tmux's
+# `croft` key table so croft receives true Cmd while genuine Alt chords stay
+# Alt (the promotion patch skips them); Cmd+L has no Alt collision, so it is
+# forwarded normally.
+keybind = super+left=text:\x02\x161
+keybind = super+right=text:\x02\x162
+keybind = super+up=text:\x02\x163
+keybind = super+down=text:\x02\x164
+keybind = super+shift+left=text:\x02\x165
+keybind = super+shift+right=text:\x02\x166
+keybind = super+shift+up=text:\x02\x167
+keybind = super+shift+down=text:\x02\x168
+keybind = super+backspace=text:\x02\x16b
+keybind = super+delete=text:\x02\x16f
+keybind = super+l=csi:108;9u
+
+# ---------------------------------------------------------------------------
 # Window cycling
 # ---------------------------------------------------------------------------
 # Cycle between Ghostty windows (not tabs). This overrides the default

@@ -7,3 +7,4 @@ config.synced.json
 terminal_sessions.json
 terminal_sessions.lock
 command_history.jsonl
+history/

@@ -1,8 +1,27 @@
 // croft keyboard shortcuts. "mod" is Cmd on macOS, Ctrl on Linux.
-// See croft docs: KEYBINDINGS.md -> Settings, custom keybindings & snippets.
-// Ghostty must forward the chord first (see .config/ghostty/config); Cmd+,
-// otherwise opens Ghostty's own config.
+// Sublime/Atom macOS editor parity plus settings and new_file. Ghostty must
+// forward the Cmd chords first (see .config/ghostty/config).
 [
   { "key": "mod+,", "command": "open_settings" },
-  { "key": "mod+n", "command": "new_file" }
+  { "key": "mod+n", "command": "new_file" },
+  { "key": "cmd+left", "command": "cursor_line_start" },
+  { "key": "cmd+right", "command": "cursor_line_end" },
+  { "key": "cmd+shift+left", "command": "cursor_line_start_select" },
+  { "key": "cmd+shift+right", "command": "cursor_line_end_select" },
+  { "key": "cmd+alt+left", "command": "cursor_word_start_left_select" },
+  { "key": "cmd+alt+right", "command": "cursor_word_end_right_select" },
+  { "key": "alt+shift+left", "command": "cursor_word_start_left_select" },
+  { "key": "alt+shift+right", "command": "cursor_word_end_right_select" },
+  { "key": "ctrl+shift+a", "command": "cursor_line_start_select" },
+  { "key": "ctrl+shift+e", "command": "cursor_line_end_select" },
+  { "key": "ctrl+shift+w", "command": "select_word" },
+  { "key": "cmd+up", "command": "cursor_top" },
+  { "key": "cmd+down", "command": "cursor_bottom" },
+  { "key": "cmd+shift+up", "command": "cursor_top_select" },
+  { "key": "cmd+shift+down", "command": "cursor_bottom_select" },
+  { "key": "alt+backspace", "command": "delete_word_left" },
+  { "key": "alt+delete", "command": "delete_word_right" },
+  { "key": "cmd+backspace", "command": "delete_line_start" },
+  { "key": "cmd+delete", "command": "delete_line_end" },
+  { "key": "cmd+l", "command": "expand_selection_to_line" }
 ]

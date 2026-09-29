@@ -1,5 +1,5 @@
 diff --git a/src/app/mod.rs b/src/app/mod.rs
-index d085add..8f504c2 100644
+index d085add..2fd3864 100644
 --- a/src/app/mod.rs
 +++ b/src/app/mod.rs
 @@ -5469,7 +5469,10 @@ impl App {
@@ -14,7 +14,25 @@ index d085add..8f504c2 100644
              terminal_maximized: false,
              activity_bar_visible: layout_prefs.activity_bar,
              status_bar_visible: layout_prefs.status_bar,
-@@ -21257,6 +21260,23 @@ impl App {
+@@ -20748,6 +20751,17 @@ impl App {
+         let plain = !key.modifiers.contains(KeyModifiers::ALT);
+         let shifted = key.modifiers.contains(KeyModifiers::SHIFT);
+         match key.code {
++            // Cmd+K Cmd+Left/Right: focus the left/right editor group
++            // (Sublime's focus_neighboring_group). Relocated off Cmd+Alt+Left/Right
++            // so those can select by word.
++            KeyCode::Left if plain => {
++                self.focus_editor_group(true);
++                true
++            }
++            KeyCode::Right if plain => {
++                self.focus_editor_group(false);
++                true
++            }
+             // Cmd+K N in the editor: leave a sticky note on this line (#367).
+             // In a terminal the same chord keeps its meaning (below).
+             KeyCode::Char(c)
+@@ -21257,6 +21271,24 @@ impl App {
      /// built-in defaults call their app methods directly, so a command-level
      /// recorder would miss most of what a user does.
      fn handle_key(&mut self, key: KeyEvent) -> Result<()> {
@@ -27,6 +45,7 @@ index d085add..8f504c2 100644
 +        let key = if std::env::var_os("TMUX").is_some()
 +            && key.modifiers.contains(KeyModifiers::ALT)
 +            && !key.modifiers.contains(KeyModifiers::SUPER)
++            && !alt_is_croft_chord(key)
 +        {
 +            let mut mods = key.modifiers;
 +            mods.remove(KeyModifiers::ALT);
@@ -38,7 +57,7 @@ index d085add..8f504c2 100644
          // Esc dismisses an open ssh-pane offer (#364) without being consumed:
          // the offer is a status-bar hint, not a modal, so whatever Esc meant
          // to the focused pane still happens.
-@@ -46791,6 +46811,10 @@ impl App {
+@@ -46791,6 +46823,82 @@ impl App {
                  }
              }
              Cmd::ReopenClosedEditor => self.reopen_closed_tab(),
@@ -46,9 +65,105 @@ index d085add..8f504c2 100644
 +                self.editor.new_empty_tab();
 +                self.status = String::from("New file");
 +            }
++            Cmd::CursorLineStart => {
++                self.editor.clear_selection();
++                self.editor.home_line();
++            }
++            Cmd::CursorLineEnd => {
++                self.editor.clear_selection();
++                self.editor.end_line();
++            }
++            Cmd::CursorLineStartSelect => {
++                if self.editor.selection.is_none() {
++                    self.editor.start_selection_at_cursor();
++                }
++                self.editor.home_line();
++                self.editor.extend_selection_to_cursor();
++            }
++            Cmd::CursorLineEndSelect => {
++                if self.editor.selection.is_none() {
++                    self.editor.start_selection_at_cursor();
++                }
++                self.editor.end_line();
++                self.editor.extend_selection_to_cursor();
++            }
++            Cmd::CursorWordStartLeft => {
++                self.editor.clear_selection();
++                self.editor.move_word_left();
++            }
++            Cmd::CursorWordEndRight => {
++                self.editor.clear_selection();
++                self.editor.move_word_right();
++            }
++            Cmd::CursorWordStartLeftSelect => {
++                if self.editor.selection.is_none() {
++                    self.editor.start_selection_at_cursor();
++                }
++                self.editor.move_word_left();
++                self.editor.extend_selection_to_cursor();
++            }
++            Cmd::CursorWordEndRightSelect => {
++                if self.editor.selection.is_none() {
++                    self.editor.start_selection_at_cursor();
++                }
++                self.editor.move_word_right();
++                self.editor.extend_selection_to_cursor();
++            }
++            Cmd::CursorTop => {
++                self.editor.clear_selection();
++                self.editor.move_to_first_line();
++            }
++            Cmd::CursorBottom => {
++                self.editor.clear_selection();
++                self.editor.move_to_last_line();
++            }
++            Cmd::CursorTopSelect => {
++                if self.editor.selection.is_none() {
++                    self.editor.start_selection_at_cursor();
++                }
++                self.editor.move_to_first_line();
++                self.editor.extend_selection_to_cursor();
++            }
++            Cmd::CursorBottomSelect => {
++                if self.editor.selection.is_none() {
++                    self.editor.start_selection_at_cursor();
++                }
++                self.editor.move_to_last_line();
++                self.editor.extend_selection_to_cursor();
++            }
++            Cmd::SelectWord => self.editor.select_word_under_cursor(),
++            Cmd::ExpandSelectionToLine => self.editor.expand_selection_to_line(),
++            Cmd::DeleteWordLeft => self.editor.delete_word_left(),
++            Cmd::DeleteWordRight => self.editor.delete_word_right(),
++            Cmd::DeleteLineStart => self.editor.delete_to_line_start(),
++            Cmd::DeleteLineEnd => self.editor.delete_to_line_end(),
              Cmd::SplitEditor => self.split_editor(),
              Cmd::QuickOpen => self.open_file_finder(),
              Cmd::TakeTheTour => self.start_demo(),
+@@ -62655,6 +62763,23 @@ fn is_cmd_alt_shift_letter(key: KeyEvent, letter: char) -> bool {
+     has_shift && has_alt && has_cmd_or_ctrl
+ }
+ 
++/// True for the Alt chords croft owns itself (word motion, move/copy line,
++/// delete word, word select). tmux collapses Cmd onto Alt, so the promotion
++/// that recovers Cmd from Alt must leave these alone; their Cmd counterparts
++/// are routed through the tmux `croft` key table instead (see `.tmux.conf`).
++fn alt_is_croft_chord(key: KeyEvent) -> bool {
++    key.modifiers.contains(KeyModifiers::ALT)
++        && matches!(
++            key.code,
++            KeyCode::Left
++                | KeyCode::Right
++                | KeyCode::Up
++                | KeyCode::Down
++                | KeyCode::Backspace
++                | KeyCode::Delete
++        )
++}
++
+ /// `Cmd+Opt+Left`: move keyboard focus to the LEFT editor group while
+ /// split. Distinct from the plain `Opt+Left` word-left motion (no SUPER)
+ /// by requiring both SUPER and ALT. iTerm2 forwards it as `ESC [ 1 ; 12 D`.
 diff --git a/src/gradient.rs b/src/gradient.rs
 index f32a005..0b1bcb5 100644
 --- a/src/gradient.rs
@@ -151,54 +266,276 @@ index f32a005..0b1bcb5 100644
  
  /// Paint a rounded-rectangle border whose stroke colour interpolates
 diff --git a/src/widgets/command_palette.rs b/src/widgets/command_palette.rs
-index d9028d0..17e3b19 100644
+index d9028d0..ff11c1c 100644
 --- a/src/widgets/command_palette.rs
 +++ b/src/widgets/command_palette.rs
-@@ -109,6 +109,7 @@ pub enum Command {
+@@ -109,6 +109,27 @@ pub enum Command {
      RestoreSnapshot,
      CloseEditor,
      ReopenClosedEditor,
 +    NewFile,
++    // Sublime/Atom-style cursor, selection, and edit commands (croft-tmux-monokai
++    // patch). Bound from keybindings.json and forwarded by Ghostty.
++    CursorLineStart,
++    CursorLineEnd,
++    CursorLineStartSelect,
++    CursorLineEndSelect,
++    CursorWordStartLeft,
++    CursorWordEndRight,
++    CursorWordStartLeftSelect,
++    CursorWordEndRightSelect,
++    CursorTop,
++    CursorBottom,
++    CursorTopSelect,
++    CursorBottomSelect,
++    SelectWord,
++    ExpandSelectionToLine,
++    DeleteWordLeft,
++    DeleteWordRight,
++    DeleteLineStart,
++    DeleteLineEnd,
      SplitEditor,
      QuickOpen,
      TakeTheTour,
-@@ -472,6 +473,7 @@ pub const ALL_COMMANDS: &[Command] = &[
+@@ -472,6 +493,25 @@ pub const ALL_COMMANDS: &[Command] = &[
      Command::RestoreSnapshot,
      Command::CloseEditor,
      Command::ReopenClosedEditor,
 +    Command::NewFile,
++    Command::CursorLineStart,
++    Command::CursorLineEnd,
++    Command::CursorLineStartSelect,
++    Command::CursorLineEndSelect,
++    Command::CursorWordStartLeft,
++    Command::CursorWordEndRight,
++    Command::CursorWordStartLeftSelect,
++    Command::CursorWordEndRightSelect,
++    Command::CursorTop,
++    Command::CursorBottom,
++    Command::CursorTopSelect,
++    Command::CursorBottomSelect,
++    Command::SelectWord,
++    Command::ExpandSelectionToLine,
++    Command::DeleteWordLeft,
++    Command::DeleteWordRight,
++    Command::DeleteLineStart,
++    Command::DeleteLineEnd,
      Command::SplitEditor,
      Command::QuickOpen,
      Command::TakeTheTour,
-@@ -788,6 +790,7 @@ impl Command {
+@@ -788,6 +828,25 @@ impl Command {
              Command::RestoreSnapshot => "Local History: Restore Snapshot",
              Command::CloseEditor => "View: Close Editor",
              Command::ReopenClosedEditor => "View: Reopen Closed Editor",
 +            Command::NewFile => "File: New Untitled File",
++            Command::CursorLineStart => "Cursor: Line Start",
++            Command::CursorLineEnd => "Cursor: Line End",
++            Command::CursorLineStartSelect => "Cursor: Select to Line Start",
++            Command::CursorLineEndSelect => "Cursor: Select to Line End",
++            Command::CursorWordStartLeft => "Cursor: Word Start (Left)",
++            Command::CursorWordEndRight => "Cursor: Word End (Right)",
++            Command::CursorWordStartLeftSelect => "Cursor: Select to Word Start (Left)",
++            Command::CursorWordEndRightSelect => "Cursor: Select to Word End (Right)",
++            Command::CursorTop => "Cursor: Top",
++            Command::CursorBottom => "Cursor: Bottom",
++            Command::CursorTopSelect => "Cursor: Select to Top",
++            Command::CursorBottomSelect => "Cursor: Select to Bottom",
++            Command::SelectWord => "Selection: Select Word",
++            Command::ExpandSelectionToLine => "Selection: Expand to Line",
++            Command::DeleteWordLeft => "Delete: Word Left",
++            Command::DeleteWordRight => "Delete: Word Right",
++            Command::DeleteLineStart => "Delete: To Line Start",
++            Command::DeleteLineEnd => "Delete: To Line End",
              Command::SplitEditor => "View: Split Editor",
              Command::QuickOpen => "Go to File",
              Command::TakeTheTour => "Help: Take the Tour",
-@@ -1111,6 +1114,7 @@ impl Command {
+@@ -1111,6 +1170,25 @@ impl Command {
              Command::Redo => "Shift+Cmd+Z",
              Command::CloseEditor => "Cmd+W",
              Command::ReopenClosedEditor => "Cmd+K Shift+W",
 +            Command::NewFile => "Cmd+N",
++            Command::CursorLineStart => "Cmd+Left",
++            Command::CursorLineEnd => "Cmd+Right",
++            Command::CursorLineStartSelect => "Cmd+Shift+Left",
++            Command::CursorLineEndSelect => "Cmd+Shift+Right",
++            Command::CursorWordStartLeft => "Alt+Left",
++            Command::CursorWordEndRight => "Alt+Right",
++            Command::CursorWordStartLeftSelect => "Cmd+Alt+Left",
++            Command::CursorWordEndRightSelect => "Cmd+Alt+Right",
++            Command::CursorTop => "Cmd+Up",
++            Command::CursorBottom => "Cmd+Down",
++            Command::CursorTopSelect => "Cmd+Shift+Up",
++            Command::CursorBottomSelect => "Cmd+Shift+Down",
++            Command::SelectWord => "Ctrl+Shift+W",
++            Command::ExpandSelectionToLine => "Cmd+L",
++            Command::DeleteWordLeft => "Alt+Backspace",
++            Command::DeleteWordRight => "Alt+Delete",
++            Command::DeleteLineStart => "Cmd+Backspace",
++            Command::DeleteLineEnd => "Cmd+Delete",
              Command::SplitEditor => "Cmd+\\",
              Command::QuickOpen => "Cmd+P",
              Command::TakeTheTour => "",
-@@ -1437,6 +1441,7 @@ impl Command {
+@@ -1437,6 +1515,25 @@ impl Command {
              Command::RestoreSnapshot => "restore_snapshot",
              Command::CloseEditor => "close_editor",
              Command::ReopenClosedEditor => "reopen_closed_editor",
 +            Command::NewFile => "new_file",
++            Command::CursorLineStart => "cursor_line_start",
++            Command::CursorLineEnd => "cursor_line_end",
++            Command::CursorLineStartSelect => "cursor_line_start_select",
++            Command::CursorLineEndSelect => "cursor_line_end_select",
++            Command::CursorWordStartLeft => "cursor_word_start_left",
++            Command::CursorWordEndRight => "cursor_word_end_right",
++            Command::CursorWordStartLeftSelect => "cursor_word_start_left_select",
++            Command::CursorWordEndRightSelect => "cursor_word_end_right_select",
++            Command::CursorTop => "cursor_top",
++            Command::CursorBottom => "cursor_bottom",
++            Command::CursorTopSelect => "cursor_top_select",
++            Command::CursorBottomSelect => "cursor_bottom_select",
++            Command::SelectWord => "select_word",
++            Command::ExpandSelectionToLine => "expand_selection_to_line",
++            Command::DeleteWordLeft => "delete_word_left",
++            Command::DeleteWordRight => "delete_word_right",
++            Command::DeleteLineStart => "delete_line_start",
++            Command::DeleteLineEnd => "delete_line_end",
              Command::SplitEditor => "split_editor",
              Command::QuickOpen => "quick_open",
              Command::TakeTheTour => "help_take_the_tour",
 diff --git a/src/widgets/editor.rs b/src/widgets/editor.rs
-index 4061416..c4e19be 100644
+index 4061416..d7670f7 100644
 --- a/src/widgets/editor.rs
 +++ b/src/widgets/editor.rs
-@@ -16093,6 +16093,25 @@ impl EditorTabs {
+@@ -8095,6 +8095,129 @@ impl Editor {
+             .collect()
+     }
+ 
++    /// Move the caret to the first line (Sublime/Atom `Cmd+Up`).
++    pub fn move_to_first_line(&mut self) {
++        if !self.lines.is_empty() {
++            self.goto_line(1);
++        }
++    }
++
++    /// Move the caret to the last line (Sublime/Atom `Cmd+Down`).
++    pub fn move_to_last_line(&mut self) {
++        if !self.lines.is_empty() {
++            self.goto_line(self.lines.len());
++        }
++    }
++
++    /// Select the word under the caret (Sublime/Atom `Ctrl+Shift+W`).
++    pub fn select_word_under_cursor(&mut self) {
++        if self.lines.is_empty() {
++            self.selection = None;
++            return;
++        }
++        let r = self.cursor_row.min(self.lines.len() - 1);
++        let chars: Vec<char> = self.lines[r].chars().collect();
++        let c = self.cursor_col.min(chars.len());
++        let pivot = if c < chars.len() && is_word_char(chars[c]) {
++            Some(c)
++        } else if c > 0 && is_word_char(chars[c - 1]) {
++            Some(c - 1)
++        } else {
++            None
++        };
++        let Some(p) = pivot else {
++            self.selection = None;
++            return;
++        };
++        let mut start = p;
++        while start > 0 && is_word_char(chars[start - 1]) {
++            start -= 1;
++        }
++        let mut end = p + 1;
++        while end < chars.len() && is_word_char(chars[end]) {
++            end += 1;
++        }
++        self.selection = Some(EditorSelection {
++            anchor: (r, start),
++            head: (r, end),
++        });
++        self.cursor_row = r;
++        self.cursor_col = end;
++    }
++
++    /// Grow the selection to whole lines (Sublime `Cmd+L`).
++    pub fn expand_selection_to_line(&mut self) {
++        if self.lines.is_empty() {
++            return;
++        }
++        let (first, last) = self
++            .selection_rows()
++            .unwrap_or((self.cursor_row, self.cursor_row));
++        let last_col = self.line_char_len(last);
++        self.selection = Some(EditorSelection {
++            anchor: (first, 0),
++            head: (last, last_col),
++        });
++        self.cursor_row = last;
++        self.cursor_col = last_col;
++    }
++
++    /// Delete the word before the caret (Sublime/Atom `Alt+Backspace`).
++    pub fn delete_word_left(&mut self) {
++        if self.lines.is_empty() {
++            return;
++        }
++        self.pin_on_edit();
++        self.push_undo(EditKind::Backspace);
++        self.selection = Some(EditorSelection::new(self.cursor_row, self.cursor_col));
++        self.move_word_left();
++        self.extend_selection_to_cursor();
++        self.backspace_raw();
++        self.recompute_highlights();
++    }
++
++    /// Delete the word after the caret (Sublime/Atom `Alt+Delete`).
++    pub fn delete_word_right(&mut self) {
++        if self.lines.is_empty() {
++            return;
++        }
++        self.pin_on_edit();
++        self.push_undo(EditKind::DeleteForward);
++        self.selection = Some(EditorSelection::new(self.cursor_row, self.cursor_col));
++        self.move_word_right();
++        self.extend_selection_to_cursor();
++        self.delete_forward_raw();
++        self.recompute_highlights();
++    }
++
++    /// Delete from the caret to the start of the line (Atom `Cmd+Backspace`).
++    pub fn delete_to_line_start(&mut self) {
++        if self.lines.is_empty() {
++            return;
++        }
++        self.pin_on_edit();
++        self.push_undo(EditKind::Backspace);
++        self.selection = Some(EditorSelection::new(self.cursor_row, self.cursor_col));
++        self.home_line();
++        self.extend_selection_to_cursor();
++        self.backspace_raw();
++        self.recompute_highlights();
++    }
++
++    /// Delete from the caret to the end of the line (Atom `Cmd+Delete`).
++    pub fn delete_to_line_end(&mut self) {
++        if self.lines.is_empty() {
++            return;
++        }
++        self.pin_on_edit();
++        self.push_undo(EditKind::DeleteForward);
++        self.selection = Some(EditorSelection::new(self.cursor_row, self.cursor_col));
++        self.end_line();
++        self.extend_selection_to_cursor();
++        self.delete_forward_raw();
++        self.recompute_highlights();
++    }
++
+     pub fn select_all(&mut self) {
+         if self.lines.is_empty() {
+             self.selection = None;
+@@ -16093,6 +16216,25 @@ impl EditorTabs {
          }
      }
  
