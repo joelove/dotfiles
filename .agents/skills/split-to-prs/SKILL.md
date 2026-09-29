@@ -45,7 +45,7 @@ Ask for approval before starting.
   fi
   ```
 
-- For each approved slice, create a branch from the right base, stage and commit only the planned files or hunks, then push and open the PR.
+- For each approved slice, create a branch from the right base, stage and commit only the planned files or hunks, then push and open the PR as a draft per `github-prs` (`gh pr create --draft`), opening it in the browser. Leave drafts draft unless the user explicitly asks to promote or merge.
 
 ## 4. Report back
 

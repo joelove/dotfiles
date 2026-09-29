@@ -51,7 +51,7 @@ Never change CI checks, workflows, or configs just to make failures pass, and ne
 
 - Batch known fixes into one push where possible; every push restarts checks.
 - Integrate the latest remote state of the PR branch before adding new commits. Never force-push.
-- Never merge the PR, enable auto-merge, or mark a draft ready yourself; report readiness and leave PR state changes to the user.
+- Never merge the PR, enable auto-merge, or mark a draft ready on your own; report readiness and leave PR state changes to the user. Exception: when the user explicitly asks autopilot to merge this PR, run `gh pr ready <ref>` then `gh pr merge <ref> --auto --squash`.
 
 ## Reporting
 

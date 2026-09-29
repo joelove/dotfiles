@@ -14,7 +14,12 @@ in Linear.
 1. **Planning**: find or create a project for the feature.
 2. **Plan confirmed**: create top-level issues and sub-issues.
 3. **Working**: update the issue state and post progress comments.
-4. **Completion**: close issues; close the project when its last issue is done.
+4. **Open PR (draft)**: once local checks pass, create the PR as a draft per
+   `github-prs` and open it in the browser. Keep the issue In Review while the
+   PR is open, and leave the PR draft until the user explicitly asks to promote
+   or merge it.
+5. **Completion**: after the PR merges, close issues; close the project when its
+   last issue is done.
 
 ## Accessing Linear
 
@@ -57,6 +62,9 @@ Comment style: first line a bold summary, then 2-5 bullets. No greetings or
 sign-offs.
 
 ## Completion
+
+Only close an issue whose PR has merged (or that has no PR). While the PR is
+draft or open, keep the issue In Review.
 
 1. `save_issue` with `id` and `state: "Done"`.
 2. Run the linear-worktrees sweep, even if you never made a worktree.
