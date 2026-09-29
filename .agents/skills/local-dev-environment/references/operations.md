@@ -10,18 +10,22 @@
 | `.local/bin/*-workspace` | per-project one-line wrappers over a profile |
 | `.config/dev-workspace/*.conf` | per-project profiles |
 | `.config/dev-workspace/*.yml` | per-project gh-dash configs |
-| `.config/ghostty/config` | Ghostty theme, cursor, tmux keybinds, cmd-to-Alt bridges |
+| `.config/ghostty/config` | Ghostty theme, cursor, croft's managed Cmd block, the `C-b C-v` pane/Sublime forwards |
 | `.tmux.conf` | status/nova, tpm plugins, mouse, titles, cursor, extended-keys, hooks |
 | `.config/gh-dash/config.yml` | gh-dash default profile (all `user:joelove` PRs) |
-| `.config/nvim/**` | NvChad config, mappings, cursor, octo, nvim-tree, theme |
+| `.config/croft/config.json` | croft settings (exact-match `monokai-terminal` theme, format-on-save) |
+| `.config/croft/extensions/monokai-terminal/**` | user `[[themes]]` manifest equal to the Ghostty palette |
+| `.config/croft/keybindings.json` | croft chords: settings, `new_file`, Go to File, and the Sublime/Atom move/select/delete set |
 | `.agents/skills/*/SKILL.md` | agent skills |
 | `.skhdrc` / `.automations.sh` / `.yabairc` | hotkeys, yabai sizing/space helpers, signals |
-| `.zshrc` / `.zprofile` / `.zshenv` / `.p10k.zsh` | shell, aliases (`v`/`code`/`c` -> nvim), PATH, EDITOR |
+| `.zshrc` / `.zprofile` / `.zshenv` / `.p10k.zsh` | shell, aliases (`v`/`vim`/`code`/`c` -> croft), PATH, `EDITOR`/`GIT_EDITOR` (`croft edit --wait`) |
 | `.gitconfig` | git identity + gh credential helper |
 | `.config/karabiner/`, `qmk/` | keyboard remaps and QMK keymaps |
 
 pi lives outside dotfiles: `~/.pi/agent/{settings.json,mcp.json,agents,extensions,themes}`;
-skills are discovered from `~/.agents/skills`.
+skills are discovered from `~/.agents/skills`. The patched croft source lives
+outside dotfiles too: `~/Projects/croft` (`origin` = `joelove/croft`, branch
+`personal`; `upstream` = `vitali87/croft`).
 
 ## Reload / debug
 
@@ -30,7 +34,7 @@ skills are discovered from `~/.agents/skills`.
 | Ghostty | `cmd+shift+,` or restart | `ghostty +validate-config`, `+list-keybinds` |
 | tmux | `prefix r` or `tmux source-file ~/.tmux.conf` | `tmux show-options -g`, `show-hooks -g`, `list-keys -T prefix` |
 | dev-workspace | `bash -n`, `dev-workspace <profile> print-config` | `dev-workspace [<profile>] ensure`, `normalize-editor` |
-| Neovim | restart nvim, `:Lazy` | `:checkhealth octo` (after `:Octo` loads) |
+| croft | restart croft; rebuild from `~/Projects/croft` (`cargo install --path . --locked`) | `croft keys`, theme picker, `croft --version` |
 | gh-dash | relaunch `gh dash` (config read at launch) | gh-dash schema |
 | skhd | `skhd --reload` | `/tmp/skhd_joelove.{out,err}.log` |
 | yabai | `yabai --restart-service` | `.automations.sh` helpers |
@@ -44,10 +48,25 @@ skills are discovered from `~/.agents/skills`.
   attach (restart or re-attach tmux).
 - resurrect restores the saved (often old) layout and drops pane options;
   `normalize_editor` is what fixes it.
-- Ghostty `text:` keybinds use Zig escapes (single backslash) and comments must
-  be on their own lines.
-- Neovim cannot see `cmd`; bridge every GUI shortcut via Ghostty to `Alt`.
-- octo is lazy (`cmd = "Octo"`), so `:checkhealth octo` needs it loaded first.
-- gh-dash reads config at launch; `o` overrides its built-in open-in-browser.
-- The editor pane's cwd is a project root that may not be a git repo; octo needs
-  an explicit repo or URL.
+- croft's managed Ghostty block uses `csi:` actions; re-run `croft setup-ghostty`
+  to update it, never hand-edit between the marker comments. That re-run also
+  re-adds the pane chords (`cmd+d`, `cmd+shift+d`, `cmd+w`, `cmd+shift+enter`,
+  `cmd+alt+arrow_*`) and the colliding Sublime/Atom Cmd chords (`cmd+left`,
+  `cmd+right`, `cmd+up`, `cmd+down`, `cmd+shift+left/right/up/down`,
+  `cmd+backspace`, `cmd+delete`) as CSI-u, which would win over the Ghostty
+  `C-b C-v` sequences; remove them again after a re-run.
+- croft cannot inherit the host terminal's ANSI palette (themes are RGB hex);
+  mirror Ghostty `palette =` changes into the `monokai-terminal` `ansi` array.
+- croft saves `config.json` by renaming a temp file over it, so track the config
+  **directory** (`~/.config/croft` is a symlink); a file symlink would be
+  clobbered.
+- croft's Cmd chords need the `croft setup-ghostty` managed Ghostty block plus
+  tmux `extended-keys on` with `csi-u`; verify with `croft keys` in the pane.
+- gh-dash reads config at launch; its keys are stock (`o` opens the browser).
+- croft's `config.json` must be strict JSON; a `//` comment made 0.1.942 fall
+  back to defaults. croft rewrites the file expanded on any UI toggle.
+- tmux has no Super: it maps the Cmd (CSI-u super) bit to Meta, so croft sees
+  Alt under tmux. The `joelove/croft` fork (branch `personal`) promotes Alt back
+  to Super on macOS (guarded by `$TMUX`) while leaving the Alt chords croft owns
+  alone. Rebuild with `cargo install --path ~/Projects/croft --locked` after
+  fetching upstream.

@@ -67,25 +67,71 @@ split-divider-color = #2a2a2a
 shell-integration-features = no-cursor,no-sudo,title,no-ssh-env,no-ssh-terminfo,path
 
 # ---------------------------------------------------------------------------
-# tmux integration
+# Tmux pane management (conditional)
 # ---------------------------------------------------------------------------
-# Send the tmux prefix (C-b) plus a pane command, so Ghostty drives tmux panes
-# instead of creating Ghostty splits. Uses the `text:` keybind action, which
-# takes Zig string-literal escapes (e.g. `\x02` sends Ctrl-B).
+# iTerm-like tmux pane controls, but croft wins them while its pane is focused.
+# Sent as tmux prefix + C-v + slot; tmux's `croft` key table (see .tmux.conf)
+# forwards the real chord to croft when it is the focused pane, otherwise it
+# runs the pane action. A key-table sequence rather than CSI-u keeps genuine
+# Alt chords out of the dispatch.
 #
-# split right
-keybind = super+d=text:\x02%
+# NOTE: re-running `croft setup-ghostty` re-adds these chords to its managed
+# block as CSI-u, which would win over these lines. Remove them again (the
+# eight `cmd+d`, `cmd+shift+d`, `cmd+w`, `cmd+shift+enter`, and
+# `cmd+alt+arrow_*` lines) after a re-run.
+#
+# split right (vertical divider)
+keybind = super+d=text:\x02\x16d
 # split down
-keybind = super+shift+d=text:\x02\x22
-# C-b C-w -> kill-pane
-keybind = super+w=text:\x02\x17
+keybind = super+shift+d=text:\x02\x16D
+# kill pane
+keybind = super+w=text:\x02\x16w
 # zoom / unzoom pane
-keybind = super+shift+enter=text:\x02z
+keybind = super+shift+enter=text:\x02\x16e
 # move pane focus
-keybind = super+alt+arrow_left=text:\x02\x1b[D
-keybind = super+alt+arrow_right=text:\x02\x1b[C
-keybind = super+alt+arrow_up=text:\x02\x1b[A
-keybind = super+alt+arrow_down=text:\x02\x1b[B
+keybind = super+alt+arrow_left=text:\x02\x16h
+keybind = super+alt+arrow_right=text:\x02\x16l
+keybind = super+alt+arrow_up=text:\x02\x16k
+keybind = super+alt+arrow_down=text:\x02\x16j
+
+# ---------------------------------------------------------------------------
+# croft settings
+# ---------------------------------------------------------------------------
+# Ghostty's default cmd+, opens Ghostty's own config; send it to croft instead
+# (croft's keybindings.json binds mod+, to open_settings). `croft setup-ghostty`
+# also forwards this from keybindings.json on its next run.
+keybind = super+,=csi:44;9u
+# Cmd+N opens a new empty tab in croft (keybindings.json binds mod+n to
+# new_file); Ghostty's default there is new_window.
+keybind = super+n=csi:110;9u
+
+# ---------------------------------------------------------------------------
+# Sublime/Atom editor chords
+# ---------------------------------------------------------------------------
+# Ghostty has no defaults for most of these, and Cmd+Shift+Up/Down would
+# otherwise hit its jump_to_prompt; forward them so the keybindings.json
+# bindings fire. Cmd+Alt+Left/Right still route through the tmux croft table.
+# Sublime/Atom editor chords. The colliding Cmd chords go through tmux's
+# `croft` key table so croft receives true Cmd while genuine Alt chords stay
+# Alt (the promotion patch skips them); Cmd+L has no Alt collision, so it is
+# forwarded normally.
+#
+# Ghostty's defaults send `ESC b` / `ESC f` for Alt+Left/Right; croft reads
+# those as Alt+B/Alt+F and the Cmd promotion turns them into Cmd+B (sidebar)
+# and Cmd+F (find). Forward the real Alt+Left/Right so croft's word motion runs.
+keybind = alt+arrow_left=csi:1;3D
+keybind = alt+arrow_right=csi:1;3C
+keybind = super+left=text:\x02\x161
+keybind = super+right=text:\x02\x162
+keybind = super+up=text:\x02\x163
+keybind = super+down=text:\x02\x164
+keybind = super+shift+left=text:\x02\x165
+keybind = super+shift+right=text:\x02\x166
+keybind = super+shift+up=text:\x02\x167
+keybind = super+shift+down=text:\x02\x168
+keybind = super+backspace=text:\x02\x16b
+keybind = super+delete=text:\x02\x16f
+keybind = super+l=csi:108;9u
 
 # ---------------------------------------------------------------------------
 # Window cycling
@@ -97,29 +143,78 @@ keybind = ctrl+tab=goto_window:next
 keybind = ctrl+shift+tab=goto_window:previous
 
 # ---------------------------------------------------------------------------
-# GUI-editor bridges
-# ---------------------------------------------------------------------------
-# Two editor actions are tmux-wide: cmd+t (find file) and cmd+shift+e
-# (focus/reveal filetree). They send C-b C-v <slot>; the tmux `editor` table
-# selects the nvim pane in whichever workspace is open and runs the literal Vim
-# command there. See ~/.tmux.conf and dev-workspace editor-cmd.
-#
-# The rest send Alt+<key>; tmux forwards it to the focused pane and nvim maps
-# <A-...>. See ~/.config/nvim/lua/mappings.lua.
-keybind = super+t=text:\x02\x16f
-keybind = super+shift+e=text:\x02\x16e
-keybind = super+p=text:\x1bp
-keybind = super+shift+p=text:\x1bP
-keybind = super+n=text:\x1bn
-keybind = super+s=text:\x1bs
-keybind = super+f=text:\x1bf
-keybind = super+shift+f=text:\x1bF
-keybind = super+/=text:\x1b/
-
-# ---------------------------------------------------------------------------
 # Quit
 # ---------------------------------------------------------------------------
 # tmux owns session lifetime: cmd+q only detaches and resurrect reattaches the
 # workspace, so there is nothing to lose by closing a surface. Disable Ghostty's
 # default "process is running, close anyway?" prompt.
 confirm-close-surface = false
+
+# >>> croft keybindings (managed by `croft setup-ghostty`) >>>
+keybind = cmd+shift+f=csi:70;10u
+keybind = cmd+f=csi:102;9u
+keybind = cmd+r=csi:114;9u
+keybind = cmd+alt+r=csi:114;11u
+keybind = cmd+alt+c=csi:99;11u
+keybind = cmd+alt+m=csi:109;11u
+keybind = cmd+alt+f=csi:102;11u
+keybind = cmd+alt+enter=csi:13;11u
+keybind = cmd+/=csi:47;9u
+keybind = cmd+.=csi:46;9u
+keybind = cmd+shift+/=csi:63;10u
+keybind = cmd+a=csi:97;9u
+keybind = cmd+c=csi:99;9u
+keybind = cmd+s=csi:115;9u
+keybind = cmd+x=csi:120;9u
+keybind = cmd+z=csi:122;9u
+keybind = cmd+shift+z=csi:90;10u
+keybind = cmd+g=csi:103;9u
+keybind = cmd+k=csi:107;9u
+keybind = cmd+y=csi:121;9u
+keybind = cmd+o=csi:111;9u
+keybind = cmd+e=csi:101;9u
+keybind = cmd+p=csi:112;9u
+keybind = cmd+b=csi:98;9u
+keybind = cmd+shift+g=csi:71;10u
+keybind = cmd+shift+o=csi:79;10u
+keybind = cmd+shift+e=csi:69;10u
+keybind = cmd+shift+s=csi:83;10u
+keybind = cmd+shift+r=csi:82;10u
+keybind = cmd+shift+x=csi:88;10u
+keybind = cmd+shift+l=csi:76;10u
+keybind = cmd+shift+n=csi:78;10u
+keybind = cmd+shift+b=csi:66;10u
+keybind = cmd+shift+t=csi:84;10u
+keybind = cmd+shift+v=csi:86;10u
+keybind = cmd+t=csi:116;9u
+keybind = cmd+[=csi:91;9u
+keybind = cmd+]=csi:93;9u
+keybind = ctrl+shift+j=csi:74;6u
+keybind = cmd+\=csi:92;9u
+keybind = cmd+shift+\=csi:92;10u
+keybind = cmd+alt+\=csi:92;11u
+keybind = cmd+alt+shift+s=csi:83;12u
+keybind = cmd+alt+shift+t=csi:84;12u
+keybind = cmd+alt+shift+n=csi:78;12u
+keybind = cmd+alt+shift+j=csi:74;12u
+keybind = cmd+alt+shift+u=csi:85;12u
+keybind = cmd+alt+shift+l=csi:76;12u
+keybind = cmd+alt+shift+c=csi:67;12u
+keybind = cmd+alt+shift+a=csi:65;12u
+keybind = cmd+alt+shift+d=csi:68;12u
+keybind = cmd+alt+shift+w=csi:87;12u
+keybind = cmd+alt+shift+f=csi:70;12u
+keybind = cmd+shift+p=csi:80;10u
+keybind = cmd+f12=csi:24;9~
+keybind = ctrl+shift+f12=csi:24;6~
+keybind = cmd+0=csi:48;9u
+keybind = cmd+1=csi:49;9u
+keybind = cmd+2=csi:50;9u
+keybind = cmd+3=csi:51;9u
+keybind = cmd+4=csi:52;9u
+keybind = cmd+5=csi:53;9u
+keybind = cmd+6=csi:54;9u
+keybind = cmd+7=csi:55;9u
+keybind = cmd+8=csi:56;9u
+keybind = cmd+9=csi:57;9u
+# <<< croft keybindings (managed by `croft setup-ghostty`) <<<

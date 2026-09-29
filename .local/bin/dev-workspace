@@ -16,9 +16,7 @@
 #   ensure                restore missing sessions, then re-pin the layout
 #   attach [session]      ensure, then attach (default: editor session)
 #   attach-only [session] attach without touching sessions or layout
-#   review <pr>           open a PR in the editor pane's nvim (octo.nvim)
 #   review-pane           (re)launch the review pane command only if it is closed
-#   editor-cmd <cmd>      send a literal Vim command to the editor pane's nvim
 #   normalize-editor [--all]   re-pin the pane sizes and review-pane tag
 #   post-restore [--all]       resurrect hook: restart the agent and normalize
 #   list                  list profiles
@@ -28,7 +26,7 @@ set -euo pipefail
 
 # Give the tmux server (and therefore every pane) a complete environment even
 # when we are launched by launchd / `open` with a minimal PATH.
-export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$HOME/.nvm/versions/node/v24.12.0/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$HOME/.nvm/versions/node/v24.12.0/bin:$HOME/.cargo/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 TMUX_BIN="/opt/homebrew/bin/tmux"
 DEV_CONFIG_DIR="$HOME/.config/dev-workspace"
@@ -60,7 +58,7 @@ apply_defaults() {
   DEV_AGENT_PANES="${DEV_AGENT_PANES:-2}"
   DEV_AGENT_SESSION="${DEV_AGENT_SESSION:-$DEV_NAME-agent}"
   DEV_EDITOR_DIR="${DEV_EDITOR_DIR:-$DEV_ROOT}"
-  DEV_EDITOR_CMD="${DEV_EDITOR_CMD:-nvim .}"
+  DEV_EDITOR_CMD="${DEV_EDITOR_CMD:-croft}"
   DEV_EDITOR_SESSION="${DEV_EDITOR_SESSION:-$DEV_NAME-editor}"
   DEV_REVIEW_CMD="${DEV_REVIEW_CMD-gh dash}"
   DEV_REVIEW_SUB_CMD="${DEV_REVIEW_SUB_CMD-}"
@@ -154,7 +152,6 @@ build_editor() {
     review_sub=$("$TMUX_BIN" split-window -v -t "$top_right" -l "$DEV_REVIEW_SUB_LINES" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
   fi
 
-  "$TMUX_BIN" set-option -p -t "$top" @dev_review_pane "$DEV_NAME"
   "$TMUX_BIN" send-keys -t "$top" "$DEV_EDITOR_CMD" Enter
   if [ -n "$top_right" ]; then
     "$TMUX_BIN" send-keys -t "$top_right" "$DEV_REVIEW_CMD" Enter
@@ -304,9 +301,9 @@ ensure_review_pane() {
   return 0
 }
 
-# Re-apply the editor window's fixed layout and pane tag. tmux-resurrect
-# restores the layout it saved and drops pane options, so a restart would
-# otherwise bring back old sizes and lose the review tag.
+# Re-apply the editor window's fixed layout. tmux-resurrect restores the layout
+# it saved and drops pane options, so a restart would otherwise bring back old
+# sizes.
 normalize_editor() {
   have "$DEV_EDITOR_SESSION" || return 0
   local panes top_min bot_max top_sorted editor review bottom review_left review_sub
@@ -331,9 +328,6 @@ normalize_editor() {
   fi
   if [ -n "$bottom" ]; then
     "$TMUX_BIN" resize-pane -t "$bottom" -y "$DEV_BOTTOM_LINES" 2>/dev/null || true
-  fi
-  if [ -n "$editor" ]; then
-    "$TMUX_BIN" set-option -p -t "$editor" @dev_review_pane "$DEV_NAME" 2>/dev/null || true
   fi
   return 0
 }
@@ -401,92 +395,6 @@ attach() {
 
 attach_only() {
   "$TMUX_BIN" attach-session -t "${1:-$DEV_EDITOR_SESSION}"
-}
-
-# --- PR review integration --------------------------------------------------
-
-# Canonicalize a PR reference to a GitHub URL. Accepts a full URL,
-# owner/repo#123, or owner/repo 123.
-pr_url() {
-  local ref="${1:-}" num="${2:-}"
-  case "$ref" in
-    https://*) printf '%s' "$ref" ;;
-    *"#"*)     printf 'https://github.com/%s/pull/%s' "${ref%%#*}" "${ref##*#}" ;;
-    */*)
-      if [ -n "$num" ]; then
-        printf 'https://github.com/%s/pull/%s' "$ref" "$num"
-      else
-        return 1
-      fi
-      ;;
-    *) return 1 ;;
-  esac
-}
-
-# The editor pane for this profile, tagged by normalize_editor/build_editor.
-review_pane() {
-  "$TMUX_BIN" list-panes -a -F '#{pane_id} #{@dev_review_pane}' 2>/dev/null \
-    | awk -v n="$DEV_NAME" '$2 == n { print $1; exit }' || true
-}
-
-# Open a PR in the editor pane's nvim (octo.nvim) and enter review mode.
-review() {
-  local url pane
-  url=$(pr_url "$@") || { echo "usage: dev-workspace $PROFILE review <pr-url|owner/repo#n|owner/repo n>" >&2; return 1; }
-  pane=$(review_pane)
-  if [ -n "$pane" ] && [ "$("$TMUX_BIN" display-message -p -t "$pane" '#{pane_current_command}' 2>/dev/null)" = "nvim" ]; then
-    "$TMUX_BIN" send-keys -t "$pane" Escape
-    "$TMUX_BIN" send-keys -t "$pane" -l ":Octo $url"
-    "$TMUX_BIN" send-keys -t "$pane" Enter
-    # octo fetches the PR asynchronously; give it a moment before review mode.
-    sleep 2
-    "$TMUX_BIN" send-keys -t "$pane" -l ":Octo review"
-    "$TMUX_BIN" send-keys -t "$pane" Enter
-  else
-    echo "dev-workspace: editor pane is not running nvim; opening $url in the browser" >&2
-    /usr/bin/open "$url"
-  fi
-}
-
-# The nvim pane for the open workspace, tagged by build_editor/normalize_editor
-# (@dev_review_pane). Profile-agnostic so the tmux `editor` table can call it
-# without knowing which workspace is open; prefers a pane whose session has an
-# attached client (window open), else the first tagged nvim pane.
-editor_pane() {
-  local pane
-  pane=$("$TMUX_BIN" list-panes -a -F '#{pane_id} #{@dev_review_pane} #{pane_current_command} #{session_attached}' 2>/dev/null \
-    | awk '$2 != "" && $3 == "nvim" && $4 == 1 { print $1; exit }')
-  [ -n "$pane" ] || pane=$("$TMUX_BIN" list-panes -a -F '#{pane_id} #{@dev_review_pane} #{pane_current_command}' 2>/dev/null \
-    | awk '$2 != "" && $3 == "nvim" { print $1; exit }')
-  printf '%s' "$pane"
-}
-
-# Send a literal Vim command to the editor (nvim) pane from any pane, selecting
-# it server-side first. Only touches tmux state: it never calls yabai or focuses
-# a Ghostty window (use the workspace focus shortcut for that). The tmux `editor`
-# table calls this for cmd+t and cmd+shift+e.
-editor_cmd() {
-  local dry=0 pane cmd
-  [ "${1:-}" = "--dry-run" ] && { dry=1; shift; }
-  cmd="${1:-}"
-  if [ -z "$cmd" ]; then
-    echo "usage: dev-workspace editor-cmd [--dry-run] <vim-command>" >&2
-    return 1
-  fi
-  pane=$(editor_pane)
-  if [ -z "$pane" ]; then
-    echo "dev-workspace: no nvim editor pane found" >&2
-    return 1
-  fi
-  if [ "$dry" = "1" ]; then
-    printf 'pane=%s cmd=:%s\n' "$pane" "$cmd"
-    return 0
-  fi
-  "$TMUX_BIN" select-window -t "$pane" 2>/dev/null || true
-  "$TMUX_BIN" select-pane -t "$pane" 2>/dev/null || true
-  "$TMUX_BIN" send-keys -t "$pane" Escape
-  "$TMUX_BIN" send-keys -t "$pane" -l ":$cmd"
-  "$TMUX_BIN" send-keys -t "$pane" Enter
 }
 
 # Create one Ghostty window attached to a session, inside the existing Ghostty
@@ -590,7 +498,7 @@ if [ "$#" -eq 0 ]; then
   REST=()
 else
   case "$1" in
-    open|build|ensure|attach|attach-only|review|review-pane|editor-cmd|normalize-editor|post-restore|list|print-config)
+    open|build|ensure|attach|attach-only|review-pane|normalize-editor|post-restore|list|print-config)
       PROFILE="$DEFAULT_PROFILE"
       CMD="$1"
       REST=("${@:2}")
@@ -611,9 +519,7 @@ case "$CMD" in
   ensure)      ensure ;;
   attach)      attach "${REST[0]:-}" ;;
   attach-only) attach_only "${REST[0]:-}" ;;
-  review)      review "${REST[0]:-}" "${REST[1]:-}" ;;
   review-pane) ensure_review_pane ;;
-  editor-cmd)  editor_cmd "${REST[0]:-}" "${REST[1]:-}" ;;
   normalize-editor)
     if [ "${REST[0]:-}" = "--all" ]; then
       normalize_editor_all_debounced

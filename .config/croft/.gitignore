@@ -1,0 +1,10 @@
+# croft-generated state, not dotfiles. Tracked here: config.json and
+# extensions/monokai-terminal/. croft regenerates the shell integration on
+# launch and writes per-machine overrides separately.
+shell-integration/
+config.local.json
+config.synced.json
+terminal_sessions.json
+terminal_sessions.lock
+command_history.jsonl
+history/

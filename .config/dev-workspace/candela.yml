@@ -36,13 +36,4 @@ theme:
       compact: true
       showSeparator: false
 
-# `enter` opens in the browser; `o` opens the PR in the candela editor pane
-# (octo.nvim), falling back to the browser when the pane is unavailable.
-keybindings:
-  prs:
-    - key: enter
-      name: open in browser
-      command: "gh pr view {{.PrNumber}} --repo {{.RepoName}} --web"
-    - key: o
-      name: review in nvim
-      command: "candela-workspace review https://github.com/{{.RepoName}}/pull/{{.PrNumber}}"
+# Stock gh-dash keys: `o` opens the PR in the browser, `enter` views it.
