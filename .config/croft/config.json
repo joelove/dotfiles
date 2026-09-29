@@ -46,5 +46,6 @@
   "sidebar_auto_hide": false,
   "suppress_terminal_warning": true,
   "terminal_scrollback": 0,
-  "theme": "monokai-terminal"
+  "theme": "monokai-terminal",
+  "tour_done": true
 }

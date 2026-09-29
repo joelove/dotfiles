@@ -179,6 +179,10 @@ this file is the reference for changing or debugging anything.
   `App::handle_key` skips the Alt-to-Super promotion for the Alt chords croft
   owns (`alt_is_croft_chord`), so both meanings survive.
 - focus-editor-group moved from `Cmd+Alt+Left/Right` to `Cmd+K Cmd+Left/Right`.
+- Borderless chrome: the fork removes the box borders around the sidebar, the
+  editor, and the welcome pane, plus the sidebar `EXPLORER` title (and its `⋯`
+  views button), so those rows and columns are content. View toggles stay in the
+  command palette and settings.
 - croft runs inside tmux, which blocks its inline-image protocol, so it uses
   the image-less fallback: activity-bar/file icons render as Nerd Font glyphs
   and previews as a metadata line. `suppress_terminal_warning: true` silences

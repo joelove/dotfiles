@@ -1,5 +1,5 @@
 diff --git a/src/app/mod.rs b/src/app/mod.rs
-index d085add..2fd3864 100644
+index d085add..eab070e 100644
 --- a/src/app/mod.rs
 +++ b/src/app/mod.rs
 @@ -5469,7 +5469,10 @@ impl App {
@@ -14,7 +14,35 @@ index d085add..2fd3864 100644
              terminal_maximized: false,
              activity_bar_visible: layout_prefs.activity_bar,
              status_bar_visible: layout_prefs.status_bar,
-@@ -20748,6 +20751,17 @@ impl App {
+@@ -14178,11 +14181,10 @@ impl App {
+         // inside is filled in one pass. The welcome content then renders
+         // into `block.inner(outer_area)` so a tall recents list can never
+         // paint over the border rows.
+-        let outer_block = ratatui::widgets::Block::default()
+-            .borders(ratatui::widgets::Borders::ALL)
+-            .border_style(Style::default().fg(Color::DarkGray))
+-            .style(bg);
+-        let area = outer_block.inner(outer_area);
++        // Borderless welcome (croft-tmux-monokai patch): fill the pane but draw
++        // no box outline; every croft pane is borderless now.
++        let outer_block = ratatui::widgets::Block::default().style(bg);
++        let area = outer_area;
+         frame.render_widget(outer_block, outer_area);
+         if area.width == 0 || area.height == 0 {
+             return;
+@@ -14190,9 +14192,9 @@ impl App {
+         // Layout-control icons at the welcome screen's top-right, inside the
+         // border row — same controls as the editor tab strip (placement A).
+         let icon_row = Rect {
+-            x: outer_area.x + 1,
++            x: outer_area.x,
+             y: outer_area.y,
+-            width: outer_area.width.saturating_sub(2),
++            width: outer_area.width,
+             height: 1,
+         };
+         self.paint_layout_icons(frame, icon_row);
+@@ -20748,6 +20750,17 @@ impl App {
          let plain = !key.modifiers.contains(KeyModifiers::ALT);
          let shifted = key.modifiers.contains(KeyModifiers::SHIFT);
          match key.code {
@@ -32,7 +60,7 @@ index d085add..2fd3864 100644
              // Cmd+K N in the editor: leave a sticky note on this line (#367).
              // In a terminal the same chord keeps its meaning (below).
              KeyCode::Char(c)
-@@ -21257,6 +21271,24 @@ impl App {
+@@ -21257,6 +21270,24 @@ impl App {
      /// built-in defaults call their app methods directly, so a command-level
      /// recorder would miss most of what a user does.
      fn handle_key(&mut self, key: KeyEvent) -> Result<()> {
@@ -57,7 +85,7 @@ index d085add..2fd3864 100644
          // Esc dismisses an open ssh-pane offer (#364) without being consumed:
          // the offer is a status-bar hint, not a modal, so whatever Esc meant
          // to the focused pane still happens.
-@@ -46791,6 +46823,82 @@ impl App {
+@@ -46791,6 +46822,82 @@ impl App {
                  }
              }
              Cmd::ReopenClosedEditor => self.reopen_closed_tab(),
@@ -140,7 +168,7 @@ index d085add..2fd3864 100644
              Cmd::SplitEditor => self.split_editor(),
              Cmd::QuickOpen => self.open_file_finder(),
              Cmd::TakeTheTour => self.start_demo(),
-@@ -62655,6 +62763,23 @@ fn is_cmd_alt_shift_letter(key: KeyEvent, letter: char) -> bool {
+@@ -62655,6 +62762,23 @@ fn is_cmd_alt_shift_letter(key: KeyEvent, letter: char) -> bool {
      has_shift && has_alt && has_cmd_or_ctrl
  }
  
@@ -402,7 +430,7 @@ index d9028d0..ff11c1c 100644
              Command::QuickOpen => "quick_open",
              Command::TakeTheTour => "help_take_the_tour",
 diff --git a/src/widgets/editor.rs b/src/widgets/editor.rs
-index 4061416..d7670f7 100644
+index 4061416..848a193 100644
 --- a/src/widgets/editor.rs
 +++ b/src/widgets/editor.rs
 @@ -8095,6 +8095,129 @@ impl Editor {
@@ -535,7 +563,33 @@ index 4061416..d7670f7 100644
      pub fn select_all(&mut self) {
          if self.lines.is_empty() {
              self.selection = None;
-@@ -16093,6 +16216,25 @@ impl EditorTabs {
+@@ -13043,22 +13166,9 @@ fn build_line_spans<'a>(line: &'a str, spans: &[HiSpan]) -> Vec<Span<'a>> {
+ impl Widget for &mut Editor {
+     fn render(self, area: Rect, buf: &mut Buffer) {
+         self.clamp_to_symbol_view();
+-        let block_style = if self.focused {
+-            Style::default().fg(self.theme.ui(Color::Rgb(0x4e, 0x9a, 0xff)))
+-        } else {
+-            Style::default().fg(Color::DarkGray)
+-        };
+-        let block = Block::default()
+-            .borders(Borders::ALL)
+-            .border_style(block_style);
+-        let mut inner = block.inner(area);
+-        block.render(area, buf);
+-        // Black theme: replace the solid focus border with the orange→green
+-        // gradient that matches the welcome activity box. The editor has no
+-        // title, so nothing needs re-stamping over the gradient top edge.
+-        if self.focused && self.focus_gradient {
+-            crate::gradient::paint_gradient_box(buf, area);
+-        }
++        // Borderless editor (croft-tmux-monokai patch): no box outline or focus
++        // gradient, so the full area is code.
++        let mut inner = area;
+         self.last_area = area;
+         self.last_inner = inner;
+         self.last_scrollbar = Rect::default();
+@@ -16093,6 +16203,25 @@ impl EditorTabs {
          }
      }
  
@@ -561,3 +615,80 @@ index 4061416..d7670f7 100644
      /// VS Code "preview tab" semantics: open `path` in the single
      /// replaceable preview slot. If the file is already in some tab, just
      /// switch to it. Otherwise reuse the existing preview slot, or create a
+diff --git a/src/widgets/file_tree.rs b/src/widgets/file_tree.rs
+index 02ab485..05e92ca 100644
+--- a/src/widgets/file_tree.rs
++++ b/src/widgets/file_tree.rs
+@@ -1471,42 +1471,9 @@ pub fn create_folder_in(parent: &Path, name: &str) -> std::io::Result<PathBuf> {
+ 
+ impl Widget for &mut FileTree {
+     fn render(self, area: Rect, buf: &mut Buffer) {
+-        let block_style = if self.focused {
+-            Style::default().fg(self.theme.ui(Color::Rgb(0x4e, 0x9a, 0xff)))
+-        } else {
+-            Style::default().fg(Color::DarkGray)
+-        };
+-        // Black theme: chipless brand header (panelTitle.activeForeground);
+-        // Croft Dark keeps the historical white-on-navy chip.
+-        let title = if self.focus_gradient {
+-            Span::styled(
+-                " EXPLORER ",
+-                Style::default()
+-                    .fg(crate::gradient::rgb_color(crate::gradient::PANEL_TITLE_FG))
+-                    .add_modifier(Modifier::BOLD),
+-            )
+-        } else {
+-            Span::styled(
+-                " EXPLORER ",
+-                Style::default()
+-                    .fg(self.theme.ui(Color::White))
+-                    .bg(self.theme.ui(Color::Rgb(0x1e, 0x3a, 0x6e)))
+-                    .add_modifier(Modifier::BOLD),
+-            )
+-        };
+-        let block = Block::default()
+-            .borders(Borders::ALL)
+-            .border_style(block_style)
+-            .title(title.clone());
+-        let inner = block.inner(area);
+-        block.render(area, buf);
+-        // Black theme: replace the solid focus border with the orange→green
+-        // gradient (matching the welcome activity box), then re-stamp the
+-        // title the gradient top edge just overwrote.
+-        if self.focused && self.focus_gradient {
+-            crate::gradient::paint_gradient_box(buf, area);
+-            buf.set_span(area.x + 1, area.y, &title, title.width() as u16);
+-        }
++        // Borderless sidebar (croft-tmux-monokai patch): no box outline and no
++        // EXPLORER title row, so the full area is tree content.
++        let inner = area;
+         // The New File / New Folder / Refresh / Collapse toolbar is painted
+         // later, on the root folder row. The "Views and More Actions" (⋯)
+         // button sits here on the EXPLORER title line, mirroring VS Code's
+@@ -1521,24 +1488,8 @@ impl Widget for &mut FileTree {
+         self.last_scrollbar = Rect::default();
+         self.sticky_rows.clear();
+ 
+-        // Paint the ⋯ button at the right end of the title border row. It is
+-        // always available (not focus-gated) so the view-toggle menu is one
+-        // click away even when the tree is unfocused, like VS Code. It wears
+-        // the shared header-action pill — a space-padded `" ⋯ "` inset one cell
+-        // from the rounded corner — so it matches the terminal `+` button
+-        // exactly instead of jamming a naked glyph against the corner.
+-        if area.width > 12
+-            && let Some(rect) = crate::widgets::header_pill::render_action(
+-                buf,
+-                area.x + area.width - 1,
+-                area.y,
+-                crate::widgets::header_pill::MORE_LABEL,
+-                self.theme,
+-                self.hover_pointer,
+-            )
+-        {
+-            self.header_views_btn = rect;
+-        }
++        // The EXPLORER title (and its ⋯ views button) is removed with the
++        // border; the view toggles stay reachable from the palette/settings.
+ 
+         self.last_inner = inner;
+ 
