@@ -62,7 +62,9 @@ case "$branch" in main|master) echo "stop: on $branch, branch first"; exit 1;; e
 ```
 
 Then run `pnpm typecheck`, `pnpm lint`, and `pnpm test` (or the repo's scripts)
-before finishing, and open a PR.
+before finishing, and open the PR as a draft per `github-prs`
+(`gh pr create --draft`, then open it with `gh pr view <url> --web`). Do not
+mark it ready or merge it unless the user explicitly asks.
 
 ## Rules
 
