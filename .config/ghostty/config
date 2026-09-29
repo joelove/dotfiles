@@ -115,6 +115,12 @@ keybind = super+n=csi:110;9u
 # `croft` key table so croft receives true Cmd while genuine Alt chords stay
 # Alt (the promotion patch skips them); Cmd+L has no Alt collision, so it is
 # forwarded normally.
+#
+# Ghostty's defaults send `ESC b` / `ESC f` for Alt+Left/Right; croft reads
+# those as Alt+B/Alt+F and the Cmd promotion turns them into Cmd+B (sidebar)
+# and Cmd+F (find). Forward the real Alt+Left/Right so croft's word motion runs.
+keybind = alt+arrow_left=csi:1;3D
+keybind = alt+arrow_right=csi:1;3C
 keybind = super+left=text:\x02\x161
 keybind = super+right=text:\x02\x162
 keybind = super+up=text:\x02\x163
