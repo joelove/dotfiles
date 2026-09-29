@@ -4,6 +4,7 @@
 [
   { "key": "mod+,", "command": "open_settings" },
   { "key": "mod+n", "command": "new_file" },
+  { "key": "cmd+t", "command": "quick_open" },
   { "key": "cmd+left", "command": "cursor_line_start" },
   { "key": "cmd+right", "command": "cursor_line_end" },
   { "key": "cmd+shift+left", "command": "cursor_line_start_select" },

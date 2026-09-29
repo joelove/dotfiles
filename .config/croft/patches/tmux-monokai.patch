@@ -430,7 +430,7 @@ index d9028d0..ff11c1c 100644
              Command::QuickOpen => "quick_open",
              Command::TakeTheTour => "help_take_the_tour",
 diff --git a/src/widgets/editor.rs b/src/widgets/editor.rs
-index 4061416..848a193 100644
+index 4061416..3ef5c72 100644
 --- a/src/widgets/editor.rs
 +++ b/src/widgets/editor.rs
 @@ -8095,6 +8095,129 @@ impl Editor {
@@ -615,6 +615,32 @@ index 4061416..848a193 100644
      /// VS Code "preview tab" semantics: open `path` in the single
      /// replaceable preview slot. If the file is already in some tab, just
      /// switch to it. Otherwise reuse the existing preview slot, or create a
+@@ -16521,11 +16650,14 @@ impl Widget for &mut EditorTabs {
+             }
+             return;
+         }
+-        let strip_h: u16 = 1;
++        // Tabless editor (croft-tmux-monokai patch): zero-height tab strip so
++        // the editor body gets the whole pane. Files are switched with Go to
++        // File (and Cmd+T is rebound to it), so the strip is not needed.
++        let strip_h: u16 = 0;
+         let strip = Rect {
+             x: area.x,
+             y: area.y,
+-            width: area.width,
++            width: 0,
+             height: strip_h,
+         };
+         let mut body = Rect {
+@@ -16553,7 +16685,7 @@ impl Widget for &mut EditorTabs {
+             buf[(x, strip.y)].set_symbol(" ");
+         }
+ 
+-        self.tab_strip_y = strip.y;
++        self.tab_strip_y = if strip_h > 0 { strip.y } else { u16::MAX };
+         self.tab_screen_ranges.clear();
+         self.tab_close_x.clear();
+         let mut cursor_x = strip.x;
 diff --git a/src/widgets/file_tree.rs b/src/widgets/file_tree.rs
 index 02ab485..05e92ca 100644
 --- a/src/widgets/file_tree.rs

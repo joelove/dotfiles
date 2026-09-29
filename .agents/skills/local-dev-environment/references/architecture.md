@@ -169,8 +169,9 @@ this file is the reference for changing or debugging anything.
   key table re-injects their raw CSI-u when croft is focused (see tmux above).
   tmux cannot tell Cmd from Alt apart, so croft's genuine Alt chords fold onto
   their Cmd counterparts.
-- `keybindings.json` binds `Cmd+,` to `open_settings` and `Cmd+N` to the patched
-  `new_file` command, which opens a new untitled tab (VS Code behaviour).
+- `keybindings.json` binds `Cmd+,` to `open_settings`, `Cmd+N` to the patched
+  `new_file` command (a new untitled tab), and `Cmd+T` to `quick_open` (Go to
+  File), overriding croft's new-terminal binding.
 - Sublime/Atom parity: the patch adds `cursor_*`, `select_word`, `delete_*` and
   `expand_selection_to_line` commands; `keybindings.json` binds line and word
   move/select, `Ctrl+Shift+A/E/W`, `Cmd+Up/Down` (+Shift), and
@@ -179,10 +180,11 @@ this file is the reference for changing or debugging anything.
   `App::handle_key` skips the Alt-to-Super promotion for the Alt chords croft
   owns (`alt_is_croft_chord`), so both meanings survive.
 - focus-editor-group moved from `Cmd+Alt+Left/Right` to `Cmd+K Cmd+Left/Right`.
-- Borderless chrome: the fork removes the box borders around the sidebar, the
-  editor, and the welcome pane, plus the sidebar `EXPLORER` title (and its `⋯`
-  views button), so those rows and columns are content. View toggles stay in the
-  command palette and settings.
+- Borderless, tabless chrome: the fork removes the box borders around the
+  sidebar, editor, and welcome pane, the sidebar `EXPLORER` title (and its `⋯`
+  views button), and the editor tab strip, so those rows and columns are
+  content. Files are switched with Go to File; `Cmd+T` is rebound to it. View
+  toggles stay in the command palette and settings.
 - croft runs inside tmux, which blocks its inline-image protocol, so it uses
   the image-less fallback: activity-bar/file icons render as Nerd Font glyphs
   and previews as a metadata line. `suppress_terminal_warning: true` silences
