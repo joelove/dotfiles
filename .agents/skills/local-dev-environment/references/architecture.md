@@ -252,7 +252,9 @@ this file is the reference for changing or debugging anything.
 - `.zshrc` (symlinked): oh-my-zsh + powerlevel10k, nvm/zoxide/fzf/pyenv, PATH
   additions, `EDITOR`/`GIT_EDITOR`/`GIT_SEQUENCE_EDITOR` = `croft edit --wait`,
   aliases `v`/`vim`/`code`/`c` -> croft, `cat` -> bat, git aliases, `pr`
-  helper.
+  helper. Also binds real `Alt+Left/Right` (`^[[1;3D`/`^[[1;3C`) to
+  `backward-word`/`forward-word`: Ghostty forwards the true chord (croft needs
+  it) and zsh has no default binding for that sequence.
 - `.zprofile`, `.zshenv` (sources `.automations.sh`), `.p10k.zsh`.
 - `.gitconfig`: identity plus `gh auth git-credential` helpers for github.com
   and gist.github.com.
