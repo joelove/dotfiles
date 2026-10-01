@@ -111,6 +111,14 @@ export EDITOR="croft edit --wait"
 export GIT_EDITOR="croft edit --wait"
 export GIT_SEQUENCE_EDITOR="croft edit --wait"
 
+# Silence Pi's startup update nags. PI_OFFLINE suppresses the package/extension
+# update notification ("pi update --extensions") and, via main(), the pi.dev
+# version check; PI_SKIP_VERSION_CHECK is the explicit switch for the latter. It
+# also skips the model-catalog refresh. Update on demand with
+# `PI_OFFLINE=0 pi update --extensions`.
+export PI_SKIP_VERSION_CHECK=1
+export PI_OFFLINE=1
+
 bold=$(tput bold)
 italic=$(tput sitm)
 normal=$(tput sgr0)
