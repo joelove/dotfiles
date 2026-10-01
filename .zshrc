@@ -40,6 +40,13 @@ if command -v fzf 1>/dev/null 2>&1; then
   bindkey "${terminfo[kcuu1]}" fzf-history-widget
 fi
 
+# Alt+Left/Right. Ghostty forwards the real chord as ESC[1;3D / ESC[1;3C
+# (croft needs the true Alt for word motion), but zsh has no default binding
+# for those, so bind them here. This keeps Alt+arrow word motion in the shell
+# while croft keeps its own handling.
+bindkey '^[[1;3D' backward-word
+bindkey '^[[1;3C' forward-word
+
 # Use pyenv for Python version
 if command -v pyenv 1>/dev/null 2>&1; then
   eval "$(pyenv init -)"
