@@ -118,10 +118,11 @@ this file is the reference for changing or debugging anything.
   `pane_current_command=croft`: when croft is focused they re-inject the raw
   CSI-u with `send-keys -H` so croft wins the chord, otherwise they run the
   iTerm-like pane action (`Cmd+D` and `Cmd+Shift+D` split, `Cmd+W` kill,
-  `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows` focus). Slots `1-8` and `f` inject the
-  raw chord for the non-pane colliding Cmd chords (`Cmd+Left/Right/Up/Down`,
-  `Cmd+Shift+Left/Right/Up/Down`, `Cmd+Delete`), and `b` injects `Cmd+Backspace`
-  or falls back to `C-u` (Ghostty's old `text:\x15`). A key table, not a global
+  `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows` focus). Slots `1-8` and `f` inject the raw chord for the non-pane colliding Cmd chords
+  (`Cmd+Left/Right/Up/Down`, `Cmd+Shift+Left/Right/Up/Down`, `Cmd+Delete`),
+  except `1`/`2` (`Cmd+Left/Right`), which fall back to `C-a`/`C-e` (line
+  start/end) in a shell pane, and `b` injects `Cmd+Backspace` or falls back to
+  `C-u` (Ghostty's old `text:\x15`). A key table, not a global
   `M-` binding, so genuine Alt chords are untouched.
 - Prefix is default `C-b`. `prefix r` sources the config. `C-w` is the default
   `kill-pane`; croft closes its own editor tab with `Cmd+W` (a croft chord, not
@@ -255,9 +256,13 @@ this file is the reference for changing or debugging anything.
 - `.zshrc` (symlinked): oh-my-zsh + powerlevel10k, nvm/zoxide/fzf/pyenv, PATH
   additions, `EDITOR`/`GIT_EDITOR`/`GIT_SEQUENCE_EDITOR` = `croft edit --wait`,
   aliases `v`/`vim`/`code`/`c` -> croft, `cat` -> bat, git aliases, `pr`
-  helper. Exports `PI_SKIP_VERSION_CHECK=1` and `PI_OFFLINE=1` to silence Pi's
-  startup version and package/extension update notifications (update on demand
-  with `PI_OFFLINE=0 pi update --extensions`).
+  aliases `v`/`vim`/`code`/`c` -> croft, `cat` -> bat, git aliases, `pr`
+  helper. Also binds real `Alt+Left/Right` (`^[[1;3D`/`^[[1;3C`) to
+  `backward-word`/`forward-word`: Ghostty forwards the true chord (croft needs
+  it) and zsh has no default binding for that sequence. Exports
+  `PI_SKIP_VERSION_CHECK=1` and `PI_OFFLINE=1` to silence Pi's startup version
+  and package/extension update notifications (update on demand with
+  `PI_OFFLINE=0 pi update --extensions`).
 - `.zprofile`, `.zshenv` (sources `.automations.sh`), `.p10k.zsh`.
 - `.gitconfig`: identity plus `gh auth git-credential` helpers for github.com
   and gist.github.com.
