@@ -167,6 +167,10 @@ this file is the reference for changing or debugging anything.
   yaml-language-server, json/html/css, bash, ty/ruff) into `~/.croft/servers`,
   and uses `rust-analyzer`/`taplo`/`clangd` from PATH when present.
 - Vim mode is a per-session toggle on `Cmd+E` (not config-persisted).
+- Cursor: the fork sets the host caret to `SteadyBlock` (DECSCUSR 2) and blinks
+  it in software (530ms half-period, VS Code's rate), so the caret is a flashing
+  square matching the tmux `blinking-block` terminals instead of the upstream
+  steady bar.
 - Cmd chords reach croft via the managed Ghostty block (see Ghostty above); tmux
   `extended-keys` carries the CSI-u sequences. tmux has no Super modifier and
   maps the CSI-u super bit onto Meta, so inside tmux most Cmd chords arrive as
@@ -251,7 +255,9 @@ this file is the reference for changing or debugging anything.
 - `.zshrc` (symlinked): oh-my-zsh + powerlevel10k, nvm/zoxide/fzf/pyenv, PATH
   additions, `EDITOR`/`GIT_EDITOR`/`GIT_SEQUENCE_EDITOR` = `croft edit --wait`,
   aliases `v`/`vim`/`code`/`c` -> croft, `cat` -> bat, git aliases, `pr`
-  helper.
+  helper. Exports `PI_SKIP_VERSION_CHECK=1` and `PI_OFFLINE=1` to silence Pi's
+  startup version and package/extension update notifications (update on demand
+  with `PI_OFFLINE=0 pi update --extensions`).
 - `.zprofile`, `.zshenv` (sources `.automations.sh`), `.p10k.zsh`.
 - `.gitconfig`: identity plus `gh auth git-credential` helpers for github.com
   and gist.github.com.
