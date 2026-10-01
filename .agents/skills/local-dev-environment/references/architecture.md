@@ -118,10 +118,11 @@ this file is the reference for changing or debugging anything.
   `pane_current_command=croft`: when croft is focused they re-inject the raw
   CSI-u with `send-keys -H` so croft wins the chord, otherwise they run the
   iTerm-like pane action (`Cmd+D` and `Cmd+Shift+D` split, `Cmd+W` kill,
-  `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows` focus). Slots `1-8` and `f` inject the
-  raw chord for the non-pane colliding Cmd chords (`Cmd+Left/Right/Up/Down`,
-  `Cmd+Shift+Left/Right/Up/Down`, `Cmd+Delete`), and `b` injects `Cmd+Backspace`
-  or falls back to `C-u` (Ghostty's old `text:\x15`). A key table, not a global
+  `Cmd+Shift+Enter` zoom, `Cmd+Alt+arrows` focus). Slots `1-8` and `f` inject the raw chord for the non-pane colliding Cmd chords
+  (`Cmd+Left/Right/Up/Down`, `Cmd+Shift+Left/Right/Up/Down`, `Cmd+Delete`),
+  except `1`/`2` (`Cmd+Left/Right`), which fall back to `C-a`/`C-e` (line
+  start/end) in a shell pane, and `b` injects `Cmd+Backspace` or falls back to
+  `C-u` (Ghostty's old `text:\x15`). A key table, not a global
   `M-` binding, so genuine Alt chords are untouched.
 - Prefix is default `C-b`. `prefix r` sources the config. `C-w` is the default
   `kill-pane`; croft closes its own editor tab with `Cmd+W` (a croft chord, not
