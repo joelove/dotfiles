@@ -23,7 +23,7 @@ pi has no separate goal object: the objective lives in this conversation, and pi
 
 1. Restate the objective clearly, including every explicit deliverable or required evidence you will verify against the repo.
 2. Perform the first concrete unit of work immediately in this turn; do not stop after planning or restating.
-3. If the next work is meaningfully multi-step, track it with `plan_task` when Plan/Build is active, or keep a short visible checklist. Do not treat a plan update as a substitute for doing the work. Plan lifecycle tools (`plan_task`, `plan_reconcile`, `plan_complete`, `plan_finish`) are pi harness tools: call them directly, never through the `mcp` gateway. See the global `AGENTS.md` "Plan tools" section.
+3. If the next work is meaningfully multi-step, track it with `plan_task` when Plan/Build is active, or keep a short visible checklist. Do not treat a plan update as a substitute for doing the work. Plan lifecycle tools (`plan_task`, `plan_complete`, `plan_finish`) are pi harness tools: call them directly, never through the `mcp` gateway. See the global `AGENTS.md` "Plan tools" section.
 
 ## Continuation
 
