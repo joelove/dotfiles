@@ -15,11 +15,35 @@ in Linear.
 2. **Plan confirmed**: create top-level issues and sub-issues.
 3. **Working**: update the issue state and post progress comments.
 4. **Open PR (draft)**: once local checks pass, create the PR as a draft per
-   `github-prs` and open it in the browser. Keep the issue In Review while the
-   PR is open, and leave the PR draft until the user explicitly asks to promote
-   or merge it.
-5. **Completion**: after the PR merges, close issues; close the project when its
-   last issue is done.
+   `github-prs` and open it in the browser. Set the issue In Review while the PR
+   is open, and leave the PR draft until the user explicitly asks to promote or
+   merge it.
+5. **Completion**: after the PR merges, confirm the native GitHub integration
+   moved the issue to Done. Check the issue rather than re-closing it; if it is
+   still open, run the reconciliation and close it manually. Close the project
+   when its last issue is done.
+
+## Auto-close on PR merge
+
+The workspace GitHub integration closes linked issues on merge, so closing is not
+an agent step. Configure or verify it in Linear at
+Settings to Team to Workflows & automations to Pull request and commit
+automations:
+
+- **On PR or commit merge** to a completed status (Done). This is what closes the
+  issue when a linked PR merges.
+- **On PR review request or activity** to In Review, so the issue tracks the open
+  PR. "Ready to merge" also needs this set before it fires.
+- Optional branch rules: map `main` to Done and other targets to no action.
+
+A PR links to an issue through the issue id in its branch name or title, or a
+magic word plus id in its description. The closing words are close, fix, resolve,
+complete, implement, and "linear issue"; the non-closing words are ref, part of,
+contributes to, toward, and updates. The branch id alone is a link, so keep the
+`CAN-XXXX` id in every PR for the issue and add `Closes CAN-XXXX` to the body.
+
+Missed closes are rare (a dropped webhook). Reconcile from GitHub, where the
+merged PR is the source of truth: see references/tracking.md.
 
 ## Accessing Linear
 

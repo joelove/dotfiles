@@ -56,3 +56,49 @@ their own estimate setting.
 - If the user cannot see estimates after a create, the usual cause is the team
   toggle or the view not showing the Estimate column (Display -> Estimate), not
   a missing API field.
+
+## Reconcile missed closes
+
+The GitHub integration closes issues on merge, so closing is not an agent step.
+When it misses one (a dropped webhook, or a PR that never linked), find it from
+GitHub, where the merged PR is the source of truth.
+
+1. List merged PRs in the window and collect every `CAN-XXXX` id from the branch,
+   title, and body. Run from the workspace root:
+
+       for repo in candela-eval candela-orchestrator candela-cms candela-ui \
+                   candela-materials candela-infra candela-qa; do
+         gh pr list --repo Candela-Ed/$repo --state merged --limit 200 \
+           --json number,title,headRefName,mergedAt,body \
+           --jq '.[] | [.mergedAt, "'$repo'", (.number|tostring), .headRefName, .title, (.body // "")] | @tsv'
+       done | grep -E '2026-09-2[3-9]' | grep -oiE 'can-[0-9]+' | tr 'a-z' 'A-Z' | sort -u
+
+2. For each id, read the issue with the Linear MCP `get_issue`. For the gateway
+   the issue JSON is in `data.content[0].text`. If `statusType` is `completed` or
+   `canceled`, leave it.
+
+3. For each remaining id, confirm the merged PR is the primary link: the id is in
+   the branch or title, or the body has a `Closes CAN-XXXX` line. A follow-up
+   mention in a body is not a close. Close a genuine miss with `save_issue`
+   (`id`, `state: "Done"`).
+
+4. Also scan the window's merged PRs with no `can-` id in any case (chore and
+   release PRs often have none). If one finished an open issue, close that issue
+   and note the PR in a comment.
+
+Expected result: no genuine misses. An id a PR body merely mentions without
+linking (no id in the branch or title, no `Closes` line) stays as it is. In the
+current workspace the last seven days flag only follow-ups (CAN-1104, CAN-1187,
+CAN-1188, CAN-1207) and the duplicate CAN-1129; every linked merged PR already
+closed its issue.
+
+### Auto-close settings
+
+In Linear: Settings to Team to Workflows & automations to Pull request and commit
+automations. Set "On PR or commit merge" to Done, and optionally "On PR review
+request or activity" to In Review.
+
+Magic words for the PR description: closing are close, fix, resolve, complete,
+implement, and "linear issue"; non-closing are ref, part of, contributes to,
+toward, and updates. The issue id in the branch name or PR title links the PR on
+its own, and the merge automation still applies, so keep the id in every PR.
