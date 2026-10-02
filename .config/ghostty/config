@@ -218,3 +218,19 @@ keybind = cmd+7=csi:55;9u
 keybind = cmd+8=csi:56;9u
 keybind = cmd+9=csi:57;9u
 # <<< croft keybindings (managed by `croft setup-ghostty`) <<<
+
+# Pi transcript chords. Route Cmd+F / Cmd+T through tmux's `croft` key table
+# (slots g / t, see .tmux.conf) so the raw super+f / super+t reach the focused
+# pane. tmux drops the direct CSI-u for panes that did not enable extkeys, which
+# is why these mirror the Cmd+Up/Down handling. Keep these lines after the
+# managed croft block so they win: a later keybind overrides an earlier one.
+keybind = cmd+f=text:\x02\x16g
+keybind = cmd+t=text:\x02\x16t
+
+# Pi transcript chords. Route Cmd+F / Cmd+T through tmux's `croft` key table
+# (slots g / t, see .tmux.conf) so the raw super+f / super+t reach the focused
+# pane. tmux drops the direct CSI-u for panes that did not enable extkeys, which
+# is why these mirror the Cmd+Up/Down handling. Keep these lines after the
+# managed croft block so they win: a later keybind overrides an earlier one.
+keybind = cmd+f=text:\x02\x16g
+keybind = cmd+t=text:\x02\x16t
