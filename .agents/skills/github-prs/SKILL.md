@@ -24,6 +24,23 @@ For an explicit review ask, drop `--draft`:
 
     gh pr create --base <base> --head <branch> --title <title> --body <body>
 
+## Link the Linear issue
+
+Every PR names the Linear issue it belongs to. The branch name or the issue id in
+the title is what links the PR, and the team's "On PR or commit merge" automation
+moves a linked issue when the PR merges (Done in this workspace).
+
+- Keep the `CAN-XXXX` id in the branch name and the title. The branch id alone
+  links the PR, so a later body edit cannot unlink it.
+- Put `Closes CAN-XXXX` in the PR body as well. It states the intent and closes
+  the issue even if the branch or title loses the id.
+- List each issue on its own line when a PR closes more than one.
+- A multi-repo feature closes on the first linked PR that merges. If the issue
+  should stay open until the last PR, keep the id out of the earlier branches and
+  titles and use `Refs CAN-XXXX` in their bodies.
+- Set the issue In Review while the PR is open, and confirm Done after the merge.
+  See linear-project-tracking.
+
 ## Draft is the resting state
 
 A draft PR is where shipping normally ends. Leave it there.
@@ -70,6 +87,9 @@ removed with Neovim.)
 
 ## Notes
 
+- Keep the branch as a series of small, focused commits rather than one big
+  commit for the whole issue. A squash merge collapses them on the base branch,
+  but reviewers read the branch history while the PR is open.
 - croft's native `croft pr <n>` opens a PR review tab (files, checks, viewed
   marks) inside the running editor pane. It is an in-editor option a human can
   use; it is not wired into this browser flow.
