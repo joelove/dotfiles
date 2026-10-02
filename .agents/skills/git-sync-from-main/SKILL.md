@@ -51,6 +51,21 @@ git rev-parse --abbrev-ref HEAD
 git merge-base --is-ancestor origin/main HEAD && echo "based-on-main"
 ```
 
+## Commit granularity
+
+Commit in many small, self-contained steps as the work progresses, never as
+one large commit at the end of a plan or issue.
+
+- One logical change per commit: a single fix, feature slice, or refactor.
+- Separate mechanical changes (renames, formatting, moving files) from
+  behavior changes, so each diff is easy to review.
+- Keep each commit buildable where practical; run the narrowest check that
+  covers the change before committing it.
+- Write a focused, imperative message for the step it contains.
+- Do not bundle unrelated edits into one commit, even within the same issue.
+- The issue branch ends up as a sequence of small commits, so a reviewer can
+  read the work one step at a time.
+
 ## Gate before every commit and push
 
 Run this in the same command as the commit or push, so a stale branch after a
@@ -71,6 +86,8 @@ mark it ready or merge it unless the user explicitly asks.
 - Do not invent a branch name; use `gitBranchName`.
 - Do not start work on `main`; do not override the git-guard hook.
 - Do not `git checkout main` inside `worktrees/`.
+- Do not squash a plan or issue into one big commit; commit small steps as you
+  go, per Commit granularity above.
 - Do not force-push. Do not push unless the user asks or a PR step requires it.
 - Do not update git config.
 - If branch, dirty-tree, rebase, or `already used by worktree` handling is
