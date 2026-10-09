@@ -11,6 +11,8 @@ prSections:
       repo:Candela-Ed/candela-orchestrator
       repo:Candela-Ed/candela-infra
       repo:Candela-Ed/candela-cms
+      repo:Candela-Ed/candela-qa
+      repo:Candela-Ed/candela-ui
 
 # Map GitHub repos to local checkouts so checkout/diff work from the TUI.
 repoPaths:
@@ -19,6 +21,8 @@ repoPaths:
   Candela-Ed/candela-orchestrator: /Users/joelove/Projects/candela/candela-orchestrator
   Candela-Ed/candela-infra: /Users/joelove/Projects/candela/candela-infra
   Candela-Ed/candela-cms: /Users/joelove/Projects/candela/candela-cms
+  Candela-Ed/candela-qa: /Users/joelove/Projects/candela/candela-qa
+  Candela-Ed/candela-ui: /Users/joelove/Projects/candela/candela-ui
 
 defaults:
   view: prs
