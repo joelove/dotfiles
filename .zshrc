@@ -106,10 +106,11 @@ export PATH="/opt/homebrew/opt/postgresql@17/bin:${PATH}"
 # Add Cargo to PATH
 export PATH="$HOME/.cargo/bin:$PATH"
 
-# Set default editors (croft; `edit --wait` opens in the croft hosting the pane)
-export EDITOR="croft edit --wait"
-export GIT_EDITOR="croft edit --wait"
-export GIT_SEQUENCE_EDITOR="croft edit --wait"
+# Set default editors. croft-edit raises the dev-workspace editor tab and then
+# runs `croft edit --wait`, so edits from git/lumen/pi land in the visible croft.
+export EDITOR="croft-edit"
+export GIT_EDITOR="croft-edit"
+export GIT_SEQUENCE_EDITOR="croft-edit"
 
 # Silence Pi's startup update nags. PI_OFFLINE suppresses the package/extension
 # update notification ("pi update --extensions") and, via main(), the pi.dev

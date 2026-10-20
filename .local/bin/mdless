@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# mdcat picks different behaviour from argv[0]. Same binary, mdless mode:
+# paginate the rendered markdown.
+exec -a mdless mdcat "$@"

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+#
+# dev-docs - markdown tree browser for the dev-workspace swap pane.
+#
+# Runs in the docs tab. Loops the mdpick fzf picker: selecting a file renders
+# it with mdcat, and quitting mdcat returns straight to the picker. mdpick
+# exits non-zero only when it cannot run (e.g. no markdown files), at which
+# point we drop into a login shell so the pane stays alive in docs mode.
+#
+set -uo pipefail
+
+# Follow the terminal palette for fenced code as well as structure.
+export BAT_THEME="${BAT_THEME:-ansi}"
+
+while mdpick; do :; done
+
+exec "${SHELL:-/bin/zsh}" -l

@@ -1,0 +1,10 @@
+# mdcat configuration (maintained BIRSAx2 fork, installed via Homebrew).
+#
+# The built-in dark/light themes already use anstyle AnsiColor, so the whole
+# render follows the terminal palette (Ghostty monokai) without RGB overrides.
+# dev-docs also sets BAT_THEME=ansi so fenced code highlighting matches.
+[defaults]
+margin = true
+smart_punctuation = true
+emoji = true
+full_width = true

@@ -134,19 +134,19 @@ keybind = super+delete=text:\x02\x16f
 keybind = super+l=csi:108;9u
 
 # ---------------------------------------------------------------------------
-# croft tab switcher
+# dev-workspace swap-pane tabs
 # ---------------------------------------------------------------------------
-# Ctrl+Tab / Ctrl+Shift+Tab used to cycle Ghostty windows here. The dev-workspace
-# keybinding (skhd cmd+alt+tab -> company-workspace open) already covers window
-# switching, so these now open croft's Go to Tab picker (croft hides the tab
-# strip). Sent as tmux prefix + C-v + slot, like the Cmd pane chords: tmux's
-# `croft` key table injects the raw CSI-u into the pane, which survives the hop
-# where a bare `csi:` sequence does not. Slots p / P; see .tmux.conf.
+# Ctrl+Tab / Ctrl+Shift+Tab cycle the editor/review/docs swap pane from any view
+# (including croft). Sent as tmux prefix + C-v + slot, like the Cmd pane chords:
+# tmux's `croft` key table slots p / P run `dev-workspace swap`. Croft's own Go
+# to Tab moved to Ctrl+Alt+Tab / Ctrl+Alt+Shift+Tab (slots a / A). See .tmux.conf.
 #
 # NOTE: `croft setup-ghostty` does not emit these (it only forwards Cmd chords),
 # so re-running it is safe here.
 keybind = ctrl+tab=text:\x02\x16p
 keybind = ctrl+shift+tab=text:\x02\x16P
+keybind = ctrl+alt+tab=text:\x02\x16a
+keybind = ctrl+alt+shift+tab=text:\x02\x16A
 
 # ---------------------------------------------------------------------------
 # Quit
