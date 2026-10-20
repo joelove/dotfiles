@@ -62,16 +62,34 @@ outside dotfiles too: `~/Projects/croft` (`origin` = `joelove/croft`, branch
   clobbered.
 - croft's Cmd chords need the `croft setup-ghostty` managed Ghostty block plus
   tmux `extended-keys on` with `csi-u`; verify with `croft keys` in the pane.
-- Ctrl+Tab is routed through tmux's `croft` key table (Ghostty sends the
-  prefix + C-v + `p` / `P`; see `.tmux.conf` and `.config/ghostty/config`),
-  because a bare `csi:` sequence from Ghostty does NOT survive the tmux hop.
-  It opens croft's Go to Tab picker. `croft setup-ghostty` does NOT emit
-  `ctrl+tab` (it only forwards Cmd chords), so those Ghostty lines survive a
-  re-run, but re-sourcing `.tmux.conf` is what installs the `p` / `P` binds.
+- Ctrl+Tab / Ctrl+Shift+Tab cycle the dev-workspace swap pane, routed through
+  tmux's `croft` key table (Ghostty sends prefix + C-v + `p` / `P`; see
+  `.tmux.conf` and `.config/ghostty/config`), because a bare `csi:` sequence from
+  Ghostty does NOT survive the tmux hop. Croft's Go to Tab is now Ctrl+Alt+Tab /
+  Ctrl+Alt+Shift+Tab (slots `a` / `A`). `croft setup-ghostty` does NOT emit these
+  (it only forwards Cmd chords), so those Ghostty lines survive a re-run, but
+  re-sourcing `.tmux.conf` installs the `p` / `P` and `a` / `A` binds.
+- The swap pane keeps croft, lumen and mdcat alive: the non-visible modes sit in
+  a detached `_pool` window (`DEV_SWAP_POOL_WINDOW`) and `tmux swap-pane` moves
+  them into the editor window's top-left slot. resurrect drops pane options, so
+  `rebuild_swap` reruns after a restore; a dead pool pane is respawned from its
+  `@dev_swap_cmd`.
 - `CROFT_VIEW_SOCK` is published per tmux session, so it only resolves inside
   the editor session that hosts croft; the agent session next door has no croft
   to reach.
-- gh-dash reads config at launch; its keys are stock (`o` opens the browser).
+- gh-dash reads config at launch; `o` opens the browser and `l` runs
+  `dev-workspace open-review` to load the selected PR into the lumen swap tab.
+- lumen is the `joelove/lumen` fork (branch `personal`): upstream has no ANSI
+  theme, so the fork adds `ansi` / `Theme::ansi()` (16 slots). Rebuild with
+  `cargo install --path ~/Projects/lumen --locked`. mdcat is Homebrew's
+  `BIRSAx2/mdcat` fork; `mdpick`/`mdless` are `exec -a` argv[0] wrappers.
+  The review tab defaults to `repo-review <config>`, an fzf picker over that
+  profile's gh-dash `repoPaths`; the docs tab loops `mdpick` so quitting mdcat
+  returns to the picker.
+- `.zshenv` exports a UTF-8 locale (`LANG`/`LC_CTYPE=en_US.UTF-8`) and
+  `.tmux.conf` seeds the same in tmux's global env. macOS/launchd and Ghostty
+  leave the locale unset, and without it `less` (the pager mdcat's `mdpick` and
+  `mdless` use) renders multibyte glyphs as `<XX>` instead of box drawing.
 - croft's `config.json` must be strict JSON; a `//` comment made 0.1.942 fall
   back to defaults. croft rewrites the file expanded on any UI toggle.
 - tmux has no Super: it maps the Cmd (CSI-u super) bit to Meta, so croft sees

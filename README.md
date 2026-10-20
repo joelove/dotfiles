@@ -17,6 +17,7 @@ brew install jq
 brew install fzf
 brew install zoxide
 brew install bat
+brew install mdcat
 brew instal ripgrep
 brew install 1password-cli
 brew install postgresql@17
@@ -34,6 +35,10 @@ brew install koekeishiya/formulae/yabai
 # croft: the personal fork (joelove/croft, branch personal)
 git clone --branch personal https://github.com/joelove/croft.git ~/Projects/croft
 (cd ~/Projects/croft && cargo install --path . --locked)
+
+# lumen: the personal fork (joelove/lumen, branch personal) with an ANSI theme
+git clone --branch personal https://github.com/joelove/lumen.git ~/Projects/lumen
+(cd ~/Projects/lumen && cargo install --path . --locked)
 ```
 
 ### Configure
@@ -43,6 +48,9 @@ git clone --branch personal https://github.com/joelove/croft.git ~/Projects/crof
 - [Ghostty](https://ghostty.org) (config symlinked from `.config/ghostty`)
 - [tmux](https://github.com/tmux/tmux) with tpm plugins (see `.tmux.conf`)
 - [croft](https://docs.croft.software) VS Code-style terminal editor (built from the `joelove/croft` fork branch `personal`; config symlinked from `.config/croft`; run `croft setup-ghostty` once for the Cmd chords)
+- [lumen](https://github.com/jnsahaj/lumen) PR diff/review TUI (built from the `joelove/lumen` fork branch `personal`, which adds the `ansi` theme so it matches the terminal palette; config symlinked from `.config/lumen`)
+- [mdcat](https://github.com/BIRSAx2/mdcat) markdown renderer, `brew install mdcat` (config symlinked from `.config/mdcat`; `mdpick`/`mdless` wrappers in `.local/bin`)
+- `repo-review` review-tab picker: fzf over a profile's gh-dash `repoPaths`, then `lumen diff` in the chosen repo (symlinked from `.local/bin`)
 - `dev-workspace` tmux/Ghostty workspace engine with per-project profiles (symlinked from `.local/bin` and `.config/dev-workspace`); needs `tmux`, `jq`, `yabai`
 
 ### Symlinks
@@ -63,8 +71,15 @@ ln -s ~/Projects/dotfiles/.config/ghostty ~/.config/ghostty
 ln -s ~/Projects/dotfiles/.config/croft ~/.config/croft
 ln -s ~/Projects/dotfiles/.config/gh-dash ~/.config/gh-dash
 ln -s ~/Projects/dotfiles/.config/dev-workspace ~/.config/dev-workspace
+ln -s ~/Projects/dotfiles/.config/lumen ~/.config/lumen
+ln -s ~/Projects/dotfiles/.config/mdcat ~/.config/mdcat
 mkdir -p ~/.local/bin
 ln -s ~/Projects/dotfiles/.local/bin/dev-workspace ~/.local/bin/dev-workspace
+ln -s ~/Projects/dotfiles/.local/bin/croft-edit ~/.local/bin/croft-edit
+ln -s ~/Projects/dotfiles/.local/bin/dev-docs ~/.local/bin/dev-docs
+ln -s ~/Projects/dotfiles/.local/bin/repo-review ~/.local/bin/repo-review
+ln -s ~/Projects/dotfiles/.local/bin/mdpick ~/.local/bin/mdpick
+ln -s ~/Projects/dotfiles/.local/bin/mdless ~/.local/bin/mdless
 ln -s ~/Projects/dotfiles/.local/bin/running-actions ~/.local/bin/running-actions
 ln -s ~/Projects/dotfiles/.local/bin/audit-agent-context.mjs ~/.local/bin/audit-agent-context
 # All public skills live in dotfiles; pi discovers ~/.agents/skills natively, so

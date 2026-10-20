@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# mdcat picks different behaviour from argv[0]. Same binary, mdpick mode:
+# fuzzy-find a markdown file below the cwd (requires fzf) and render it.
+exec -a mdpick mdcat "$@"
