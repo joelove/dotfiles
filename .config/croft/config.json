@@ -15,12 +15,12 @@
   "disable_secret_redaction": false,
   "disabled_extensions": [],
   "explorer_views": {
-    "agent_lane": false,
+    "agent_lane": true,
     "dependencies": true,
     "folders": true,
     "open_editors": false,
     "outline": false,
-    "timeline": false
+    "timeline": true
   },
   "fleet_groups": {},
   "format_on_save": true,

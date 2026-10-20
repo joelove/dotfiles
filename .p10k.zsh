@@ -1849,6 +1849,16 @@
   # really need it.
   typeset -g POWERLEVEL9K_DISABLE_HOT_RELOAD=true
 
+  # Transient prompt (what previous commands look like in the scrollback).
+  # Powerlevel10k calls this hook when a command line is accepted, right before
+  # it swaps the full prompt for the transient one. Collapse previous commands
+  # to a blank line followed by a plain green dollar sign; the live prompt keeps
+  # its full layout (see POWERLEVEL9K_LEFT_PROMPT_ELEMENTS and
+  # POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS above).
+  function p10k-on-post-prompt() {
+    _p9k_transient_prompt=$'\n%b%k%s%u%F{2}$%f '
+  }
+
   # If p10k is already loaded, reload configuration.
   # This works even with POWERLEVEL9K_DISABLE_HOT_RELOAD=true.
   (( ! $+functions[p10k] )) || p10k reload
