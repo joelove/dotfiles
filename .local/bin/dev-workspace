@@ -26,6 +26,9 @@
 #                         it in the croft hosting the editor session (Cmd+O)
 #   normalize-editor [--all]   re-pin the pane sizes and review-pane tag
 #   post-restore [--all]       resurrect hook: restart the agent and normalize
+#   restart [--session NAME] [--all]
+#                         reset a workspace: kill and rebuild its sessions,
+#                         then reopen the Ghostty windows
 #   list                  list profiles
 #   print-config          print the resolved profile fields
 #
@@ -779,6 +782,77 @@ open_windows() {
   fi
 }
 
+# Resolve the profile that owns tmux session $1 (a workspace's agent or editor
+# session). Prints the profile name, or nothing when none matches.
+profile_for_session() {
+  local current="$1" name
+  for name in "$DEFAULT_PROFILE" $(all_profiles); do
+    load_profile "$name"
+    if [ "$DEV_AGENT_SESSION" = "$current" ] || [ "$DEV_EDITOR_SESSION" = "$current" ]; then
+      printf '%s' "$name"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Reset one workspace (both sessions of the loaded profile): kill the sessions,
+# then rebuild and reopen each Ghostty window. A keepalive session stays up
+# across the kill so the tmux server (and this background script) survives when
+# the last real session goes away.
+restart_profile() {
+  local keepalive="__dev_workspace_restart__"
+  have "$keepalive" || "$TMUX_BIN" new-session -d -s "$keepalive" -c "$DEV_ROOT" 2>/dev/null || true
+  if have "$DEV_EDITOR_SESSION"; then
+    "$TMUX_BIN" kill-session -t "$DEV_EDITOR_SESSION" 2>/dev/null || true
+  fi
+  if have "$DEV_AGENT_SESSION"; then
+    "$TMUX_BIN" kill-session -t "$DEV_AGENT_SESSION" 2>/dev/null || true
+  fi
+  sleep 0.3
+  open_windows
+  if have "$DEV_EDITOR_SESSION"; then
+    "$TMUX_BIN" kill-session -t "$keepalive" 2>/dev/null || true
+  fi
+}
+
+# Reset the current workspace (prefix R) or every profile (--all). The binding
+# passes `--session '#{session_name}'` so the profile is resolved from the pane
+# the key was pressed in; without a match the default profile is used.
+restart() {
+  local session="" all=0 name resolved=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      --all)     all=1; shift ;;
+      *)         shift ;;
+    esac
+  done
+  if [ "$all" = "1" ]; then
+    local -a names=("$DEFAULT_PROFILE")
+    for name in $(all_profiles); do
+      [ "$name" = "$DEFAULT_PROFILE" ] && continue
+      names+=("$name")
+    done
+    for name in "${names[@]}"; do
+      PROFILE="$name"
+      load_profile "$name"
+      restart_profile
+    done
+    return 0
+  fi
+  if [ -n "$session" ]; then
+    resolved="$(profile_for_session "$session" || true)"
+  fi
+  if [ -n "$resolved" ]; then
+    PROFILE="$resolved"
+    load_profile "$resolved"
+  else
+    load_profile "$PROFILE"
+  fi
+  restart_profile
+}
+
 # Called by tmux-resurrect after a manual restore.
 post_restore() {
   sleep 1.5
@@ -808,7 +882,7 @@ if [ "$#" -eq 0 ]; then
   REST=()
 else
   case "$1" in
-    open|build|ensure|attach|attach-only|review-pane|normalize-editor|post-restore|swap|open-review|open-file|list|print-config)
+    open|build|ensure|attach|attach-only|review-pane|normalize-editor|post-restore|restart|swap|open-review|open-file|list|print-config)
       PROFILE="$DEFAULT_PROFILE"
       CMD="$1"
       REST=("${@:2}")
@@ -847,6 +921,7 @@ case "$CMD" in
       post_restore
     fi
     ;;
+  restart)     restart ${REST[@]+"${REST[@]}"} ;;
   list)
     printf '%s (default)\n' "$DEFAULT_PROFILE"
     all_profiles
