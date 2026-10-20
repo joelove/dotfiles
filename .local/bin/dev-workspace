@@ -27,10 +27,10 @@
 #   normalize-editor [--all]   re-pin the pane sizes and review-pane tag
 #   post-restore [--all]       resurrect hook: restart the agent and normalize
 #   restart [--session NAME] [--all] [--editor-only]
-#                         reset a workspace: kill its sessions and rebuild
-#                         the profile's default layout, then reopen the
-#                         Ghostty windows. --editor-only spares the agent
-#                         session (and its live conversations)
+#                         reset a workspace in place: rebuild each session
+#                         under its existing Ghostty window, then re-pin the
+#                         layout. --editor-only spares the agent session
+#                         (and its live conversations)
 #   list                  list profiles
 #   print-config          print the resolved profile fields
 #
@@ -798,27 +798,59 @@ profile_for_session() {
   return 1
 }
 
+# Rebuild one session without detaching its clients: build the fresh layout
+# under a temporary name, move the attached tmux clients across, then put it
+# back under the real name and drop the old session. The client is handed over
+# before the old session dies, so the Ghostty surface stays put: a reset reads
+# as the same window rebuilding, not a stranded "session ended" window plus a
+# fresh one. `$2` is the builder to run (agent|editor).
+reset_session_in_place() {
+  local real="$1" builder="$2" tmp var fn saved tty i
+  case "$builder" in
+    agent)  var=DEV_AGENT_SESSION; fn=build_agent ;;
+    editor) var=DEV_EDITOR_SESSION; fn=build_editor ;;
+    *)      return 1 ;;
+  esac
+  if ! have "$real"; then
+    "$fn"
+    return 0
+  fi
+  tmp="__dev_reset_$$_${RANDOM}"
+  saved="${!var}"
+  printf -v "$var" '%s' "$tmp"
+  "$TMUX_BIN" kill-session -t "$tmp" 2>/dev/null || true
+  if ! "$fn" || ! have "$tmp"; then
+    printf -v "$var" '%s' "$saved"
+    return 1
+  fi
+  printf -v "$var" '%s' "$saved"
+  # Hand every attached client to the fresh session before the old one goes, and
+  # wait until none are left on the old name so none see it die.
+  while IFS= read -r tty; do
+    [ -n "$tty" ] || continue
+    "$TMUX_BIN" switch-client -c "$tty" -t "$tmp" 2>/dev/null || true
+  done < <("$TMUX_BIN" list-clients -t "$real" -F '#{client_tty}' 2>/dev/null || true)
+  i=0
+  while [ "$i" -lt 40 ]; do
+    [ -z "$("$TMUX_BIN" list-clients -t "$real" -F '#{client_tty}' 2>/dev/null)" ] && break
+    sleep 0.05
+    i=$((i + 1))
+  done
+  "$TMUX_BIN" kill-session -t "$real" 2>/dev/null || true
+  "$TMUX_BIN" rename-session -t "$tmp" "$real" 2>/dev/null || true
+}
+
 # Reset one workspace (both sessions of the loaded profile, or just the editor
-# with RESTART_EDITOR_ONLY=1): kill the sessions, then rebuild the profile's
-# default layout and reopen each Ghostty window. The rebuild skips the resurrect
-# save on purpose: a reset must restore gh-dash/review and every bottom shell
-# even when the save is stale or was written from a broken layout. A keepalive
-# session stays up across the kill so the tmux server (and this background
-# script) survives when the last real session goes away.
+# with RESTART_EDITOR_ONLY=1). Each session is rebuilt in place so its Ghostty
+# window is reused, and the resurrect save is skipped on purpose: a reset must
+# restore gh-dash/review and every bottom shell even when the save is stale or
+# was written from a broken layout.
 restart_profile() {
-  local keepalive="__dev_workspace_restart__"
-  have "$keepalive" || "$TMUX_BIN" new-session -d -s "$keepalive" -c "$DEV_ROOT" 2>/dev/null || true
-  if have "$DEV_EDITOR_SESSION"; then
-    "$TMUX_BIN" kill-session -t "$DEV_EDITOR_SESSION" 2>/dev/null || true
+  reset_session_in_place "$DEV_EDITOR_SESSION" editor
+  if [ "${RESTART_EDITOR_ONLY:-0}" != "1" ]; then
+    reset_session_in_place "$DEV_AGENT_SESSION" agent
   fi
-  if [ "${RESTART_EDITOR_ONLY:-0}" != "1" ] && have "$DEV_AGENT_SESSION"; then
-    "$TMUX_BIN" kill-session -t "$DEV_AGENT_SESSION" 2>/dev/null || true
-  fi
-  sleep 0.3
   DEV_NO_RESTORE=1 open_windows
-  if have "$DEV_EDITOR_SESSION"; then
-    "$TMUX_BIN" kill-session -t "$keepalive" 2>/dev/null || true
-  fi
 }
 
 # Reset the current workspace (prefix R) or every profile (--all). The binding
