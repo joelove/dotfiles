@@ -36,16 +36,19 @@ Config map, reload/debug, and pitfalls:
 - croft is a soft fork: changes live on `joelove/croft` branch `personal`, not
   as a patch in dotfiles. Edit in `~/Projects/croft`, commit, push, then
   `cargo install --path . --locked`.
-- Ctrl+Tab / Ctrl+Shift+Tab open croft's **Go to Tab** picker (`next_tab` /
-  `previous_tab` in croft's `keybindings.json`), showing the open tabs since the
-  fork hides the tab strip. Repeated chords walk the list. Ghostty sends them
-  through tmux's `croft` key table (prefix + C-v + `p` / `P`) because a bare
-  CSI-u sequence does not survive the tmux hop. Window switching is the skhd
-  `cmd+alt+tab` binding, not Ghostty's window cycle.
+- The leftmost top pane of the editor window is a **swap pane** cycling editor
+  (croft), review (lumen) and docs (mdcat). The hidden modes live in a detached
+  `_pool` window and are swapped in with `tmux swap-pane`, so nothing restarts.
+  Ctrl+Tab / Ctrl+Shift+Tab cycle it from any view (Ghostty sends prefix + C-v +
+  `p` / `P` to tmux's `croft` key table). `prefix Tab` cycles too; `prefix
+  1|2|3` select editor/review/docs. Croft's **Go to Tab** moved to Ctrl+Alt+Tab
+  / Ctrl+Alt+Shift+Tab. Window switching is the skhd `cmd+alt+tab` binding.
 - `croft view` / `croft edit --wait` reach the hosting croft from any tmux pane
   in its session: croft publishes `CROFT_VIEW_SOCK` into the tmux session
   environment at startup and clears it on exit, and the client falls back to
-  `tmux show-environment` when its own env var is absent.
+  `tmux show-environment` when its own env var is absent. `$EDITOR`,
+  `GIT_EDITOR` and `GIT_SEQUENCE_EDITOR` point at the `croft-edit` wrapper,
+  which raises the editor tab (`dev-workspace swap editor`) first.
 - Workspaces are data: a profile (`~/.config/dev-workspace/<name>.conf`) sets
   directories, commands, and sizes; the engine has no project-specific code.
 - The editor layout is pinned. `build_editor` creates it and `normalize_editor`
@@ -54,7 +57,8 @@ Config map, reload/debug, and pitfalls:
 - tmux-resurrect restores panes but not pane options or pinned sizes, so
   `normalize_editor` re-applies them; global hooks call `dev-workspace ... --all`.
 - Palette stays consistent: Ghostty monokai, tmux-nova `#2a2a2a` borders, croft
-  `monokai-terminal` (its 16-entry `ansi` array is the Ghostty palette).
+  `monokai-terminal` (its 16-entry `ansi` array is the Ghostty palette), lumen's
+  forked `ansi` theme, and mdcat's anstyle ANSI colours.
 - croft has no ANSI-passthrough mode; a theme is RGB hex, so any Ghostty palette
   change must be mirrored into the croft theme's `ansi` array.
 - Never commit secrets. `mcp.json`'s GitHub token is `!gh auth token`.

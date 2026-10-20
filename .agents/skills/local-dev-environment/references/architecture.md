@@ -22,15 +22,23 @@ this file is the reference for changing or debugging anything.
   which a self-sizing sub-command can override), `DEV_TERM_DIRS` (one pane at
   root; relative paths resolve against root), `DEV_TERM_CMDS` (commands parallel
   to `DEV_TERM_DIRS`; empty entries leave a plain shell, default all empty),
-  `DEV_GH_COLS` (76), `DEV_BOTTOM_LINES` (14).
+  `DEV_GH_COLS` (76), `DEV_BOTTOM_LINES` (14), `DEV_SWAP_DEFAULT` (`editor`),
+  `DEV_SWAP_REVIEW_CMD` (`lumen diff`; the candela profile uses
+  `repo-review .../candela.yml` instead), `DEV_SWAP_DOCS_CMD` (`dev-docs`),
+  `DEV_SWAP_POOL_WINDOW` (`_pool`).
 - A workspace is two sessions in two Ghostty windows: the agent view
   (`DEV_AGENT_SESSION`, `DEV_AGENT_PANES` panes running `DEV_AGENT_CMD`) and the
   editor view (`DEV_EDITOR_SESSION`: editor pane, optional review pane with an
   optional `DEV_REVIEW_SUB_CMD` pane stacked directly below it, bottom row of
-  `DEV_TERM_DIRS`). Window names are `agent` / `editor`.
+  `DEV_TERM_DIRS`). Window names are `agent` / `editor`. The editor window also
+  holds a detached `_pool` window (hidden from the status bar) with the
+  non-visible swap-pane modes.
 - Commands: `open` (default), `build`, `ensure`, `attach [session]`,
   `attach-only [session]`, `review-pane` (idempotently relaunch the review
-  command in its pane), `normalize-editor [--all]`, `post-restore [--all]`,
+  command in its pane), `swap [next|prev|editor|review|docs] [--session NAME]`
+  (cycle/select the swappable pane tab; see below), `open-review
+  [--session NAME] [--path DIR] [--repo O/R] --pr N` (load a PR into the lumen
+  tab and raise it), `normalize-editor [--all]`, `post-restore [--all]`,
   `list`, `print-config`.
 - `open`: `ensure`, then focus if all sessions have clients, else create only
   the missing Ghostty windows in one instance (fresh launch uses
@@ -53,7 +61,9 @@ this file is the reference for changing or debugging anything.
   arguments, which is why the review pane is started this way. It also
   restarts the `DEV_REVIEW_SUB_CMD` pane below the review pane and any non-empty
   `DEV_TERM_CMDS` in the bottom row, left to right; pane options
-  (`@dev_review_sub_started`, `@dev_term_started`) stop a second restart.
+  (`@dev_review_sub_started`, `@dev_term_started`) stop a second restart. The
+  editor-window lookups target `session:editor` explicitly, so the detached
+  `_pool` window never shadows them.
 - A project wrapper is one line: `exec dev-workspace <profile> "$@"`. Profiles
   can pin session names (e.g. to preserve an existing resurrect save), point
   `DEV_REVIEW_CMD` at a project-specific `gh dash --config` kept under
@@ -71,7 +81,9 @@ this file is the reference for changing or debugging anything.
   unfocused (built-in renderer behaviour, not a setting).
 - `unfocused-split-opacity = 0.85`, `split-divider-color = #2a2a2a`.
 - `shell-integration-features = no-cursor,no-sudo,title,no-ssh-env,no-ssh-terminfo,path`.
-- `ctrl+tab` / `ctrl+shift+tab` cycle Ghostty windows (not tabs).
+- `ctrl+tab` / `ctrl+shift+tab` and `ctrl+alt+tab` / `ctrl+alt+shift+tab` are
+  forwarded as `text:` `C-b C-v <slot>` (`p`/`P`/`a`/`A`); tmux's `croft` key
+  table cycles the dev-workspace swap pane or re-injects croft's Go to Tab.
 - croft's Cmd chords: `croft setup-ghostty` appends a marker-fenced managed
   `keybind` block (re-run it to update; do not hand-edit inside) that re-emits
   croft's chords as CSI-u. The colliding chords are the exception: Ghostty sends
@@ -97,7 +109,8 @@ this file is the reference for changing or debugging anything.
   (dev-workspace drives restore); no `@resurrect-processes` entries (croft and
   the review command have arguments resurrect cannot restore); the post-restore
   hook runs `/Users/joelove/.local/bin/dev-workspace post-restore --all`, which
-  starts the agent and the per-profile editor/review commands from their shells.
+  starts the agent and the per-profile editor/review commands from their shells
+  and rebuilds the swap pool (`rebuild_swap`).
 - `default-shell /bin/zsh`.
 - terminal-features: `*:RGB` (truecolor), `xterm*:extkeys` (modified keys like
   Shift+Enter), `xterm*:hyperlinks` (OSC 8).
@@ -122,7 +135,11 @@ this file is the reference for changing or debugging anything.
   (`Cmd+Left/Right/Up/Down`, `Cmd+Shift+Left/Right/Up/Down`, `Cmd+Delete`),
   except `1`/`2` (`Cmd+Left/Right`), which fall back to `C-a`/`C-e` (line
   start/end) in a shell pane, and `b` injects `Cmd+Backspace` or falls back to
-  `C-u` (Ghostty's old `text:\x15`). A key table, not a global
+  `C-u` (Ghostty's old `text:\x15`). Slots `p`/`P` run `dev-workspace swap
+  next|prev` unconditionally (Ctrl+Tab/Ctrl+Shift+Tab cycle the swap pane from
+  any view), and `a`/`A` inject `Ctrl+Alt+Tab`/`Ctrl+Alt+Shift+Tab` for croft's
+  Go to Tab. The prefix table also binds `Tab` (swap next) and `1`/`2`/`3`
+  (editor/review/docs) so the tabs are reachable without `C-v`. A key table, not a global
   `M-` binding, so genuine Alt chords are untouched.
 - Prefix is default `C-b`. `prefix r` sources the config. `C-w` is the default
   `kill-pane`; croft closes its own editor tab with `Cmd+W` (a croft chord, not
@@ -146,7 +163,8 @@ this file is the reference for changing or debugging anything.
 - Launch: the editor pane runs `croft` with its cwd at `DEV_EDITOR_DIR`, so it
   opens that folder. `croft <file>` opens a file; `croft pr <n>` opens a native
   PR review tab; `croft edit --wait` opens a file in the croft hosting the pane
-  (what `EDITOR`/`GIT_EDITOR` use).
+  (what `EDITOR`/`GIT_EDITOR` use; `.zshrc` points those at the `croft-edit`
+  wrapper, which raises the editor tab first and strips any `+line` argument).
 - Config: `config.json` in the same directory; `theme: "monokai-terminal"`,
   `format_on_save: true`, `suppress_terminal_warning: true`. Keep it **strict
   JSON**: 0.1.942 loaded defaults when the file had `//` comments (despite the
@@ -177,12 +195,16 @@ this file is the reference for changing or debugging anything.
   maps the CSI-u super bit onto Meta, so inside tmux most Cmd chords arrive as
   Alt; the fork promotes Alt back to Super in `App::handle_key` on macOS
   (guarded by `$TMUX`) except for the Alt chords croft owns (`alt_is_croft_chord`:
-  arrows, up/down, backspace/delete), which stay Alt. The colliding Cmd chords
+  arrows, up/down, backspace/delete, and `Tab`/`BackTab` so Ctrl+Alt+Tab reaches
+  the keymap as itself), which stay Alt. The colliding Cmd chords
   skip the promotion entirely because the `croft` key table re-injects their raw
   CSI-u when croft is focused (see tmux above).
 - `keybindings.json` binds `Cmd+,` to `open_settings`, `Cmd+N` to the patched
   `new_file` command (a new untitled tab), and `Cmd+T` to `quick_open` (Go to
-  File), overriding croft's new-terminal binding.
+  File), overriding croft's new-terminal binding. Go to Tab
+  (`next_tab`/`previous_tab`) moved from `Ctrl+Tab`/`Ctrl+Shift+Tab` to
+  `Ctrl+Alt+Tab`/`Ctrl+Alt+Shift+Tab` so the swap pane owns the plain Ctrl
+  chords.
 - Sublime/Atom parity: the patch adds `cursor_*`, `select_word`, `delete_*` and
   `expand_selection_to_line` commands; `keybindings.json` binds line and word
   move/select, `Ctrl+Shift+A/E/W`, `Cmd+Up/Down` (+Shift), and
@@ -201,6 +223,62 @@ this file is the reference for changing or debugging anything.
   and previews as a metadata line. `suppress_terminal_warning: true` silences
   the startup "switch terminal" nudge.
 
+## Swap pane (editor / review / docs)
+
+- The leftmost top pane of the editor window is a swap slot. The other two modes
+  stay alive in a detached `_pool` window (`DEV_SWAP_POOL_WINDOW`, hidden from
+  the status bar); switching uses `tmux swap-pane` so croft keeps its socket and
+  state.
+- Pane options: `@dev_swap=1`, `@dev_swap_mode=editor|review|docs`,
+  `@dev_swap_cmd=<command>` (respawn), `@dev_swap_visible=1` on the shown pane.
+  The editor window's `window-status-format` is replaced per-window with the
+  three tab labels (active highlighted), so no Ghostty or tmux geometry changes.
+- `dev-workspace swap next|prev|editor|review|docs [--session NAME]`: `swap_to`
+  swaps the target pane into the visible slot; `swap_cycle` orders editor ->
+  review -> docs. `open-review --pr N` respawns the review pane with
+  `lumen diff --pr N` (plus `--origin`/`cd` from `--repo`/`--path`) and raises
+  it, and leaves `@dev_swap_cmd` at the review default so quitting the PR
+  returns to the repo picker. Both work from any app in the session because they
+  resolve the session from `display-message -p '#S'` when `--session` is absent.
+- Build: `build_editor` calls `build_swap_pool` after the panes exist. The pool
+  window sets `remain-on-exit on`; `swap_to` respawns a dead pane from its
+  `@dev_swap_cmd`. `rebuild_swap` (called from the restore paths) kills any
+  restored pool and rebuilds it against the current editor pane.
+- Keys: Ghostty forwards Ctrl+Tab / Ctrl+Shift+Tab as `C-b C-v p/P`; the tmux
+  `croft` slots run the swap. `prefix Tab` cycles; `prefix 1|2|3` select
+  editor/review/docs. Croft's Go to Tab is Ctrl+Alt+Tab / Ctrl+Alt+Shift+Tab.
+
+## lumen
+
+- Repo path: `~/Projects/dotfiles/.config/lumen/lumen.config.json`, symlinked to
+  `~/.config/lumen`.
+- Built from the personal fork `joelove/lumen` branch `personal` (upstream
+  `jnsahaj/lumen`, MIT) into `~/.cargo/bin/lumen` with
+  `cargo install --path . --locked`. The fork adds `ThemePreset::Ansi` /
+  `Theme::ansi()`, mapping syntax, diff and UI colours to the 16 ANSI slots;
+  `from_str`/`from_preset` accept `ansi` (aliases `terminal`,
+  `monokai-terminal`).
+- Config: `{"theme": "ansi"}`. lumen authenticates with the `gh` CLI
+  (`gh auth token`), so it sees the same repos; `lumen diff --pr N` reviews PR N
+  and `--origin owner/repo` sets the repo. `e` opens `$EDITOR`, now `croft-edit`
+  (it raises the editor tab and strips lumen's `+line` argument).
+
+## mdcat
+
+- Homebrew's `mdcat` formula is the maintained `BIRSAx2/mdcat` fork (MPL-2.0),
+  not the archived `swsnr/mdcat`. Config at
+  `~/Projects/dotfiles/.config/mdcat/config.toml`, symlinked to
+  `~/.config/mdcat`.
+- The built-in dark/light themes use `anstyle` AnsiColor, so the render follows
+  the Ghostty monokai palette; `dev-docs` also sets `BAT_THEME=ansi` for fenced
+  code. The config sets `margin`, `smart_punctuation`, `emoji`, `full_width`.
+- `mdpick` and `mdless` are argv[0] personality switches on the same binary;
+  `.local/bin/mdpick` and `.local/bin/mdless` are one-line `exec -a` wrappers.
+  `dev-docs` loops `mdpick` (fzf over markdown below the cwd) in the docs tab
+  with no intermediate prompt, so quitting mdcat returns to the picker;
+  `repo-review` does the same over a profile's gh-dash `repoPaths` for the
+  review tab, opening `lumen diff` in the chosen repo.
+
 ## gh-dash
 
 - Repo path: `~/Projects/dotfiles/.config/gh-dash/`, symlinked to
@@ -210,9 +288,10 @@ this file is the reference for changing or debugging anything.
 - A project profile can keep its own gh-dash config in
   `.config/dev-workspace/<name>.yml` and set
   `DEV_REVIEW_CMD="gh dash --config ~/.config/dev-workspace/<name>.yml"`.
-- Both configs use gh-dash's stock keys (`o` opens the PR in the browser), with
-  the same `defaults` and preview settings; the old `o`-to-nvim diff binding is
-  gone with octo.nvim.
+- Both configs use gh-dash's stock keys (`o` opens the PR in the browser) plus a
+  custom `l` that runs `dev-workspace open-review --path {{.RepoPath}} --repo
+  {{.RepoName}} --pr {{.PrNumber}}` to load the selected PR into the lumen swap
+  tab; the old `o`-to-nvim diff binding is gone with octo.nvim.
 - Both configs set `theme.ui` to `sectionsShowCount: false` and
   `table.compact/showSeparator: false` for a denser list. gh-dash's own section
   title and separator header cannot be hidden (no config for it).
@@ -254,7 +333,7 @@ this file is the reference for changing or debugging anything.
 ## zsh and git
 
 - `.zshrc` (symlinked): oh-my-zsh + powerlevel10k, nvm/zoxide/fzf/pyenv, PATH
-  additions, `EDITOR`/`GIT_EDITOR`/`GIT_SEQUENCE_EDITOR` = `croft edit --wait`,
+  additions, `EDITOR`/`GIT_EDITOR`/`GIT_SEQUENCE_EDITOR` = `croft-edit`,
   aliases `v`/`vim`/`code`/`c` -> croft, `cat` -> bat, git aliases, `pr`
   aliases `v`/`vim`/`code`/`c` -> croft, `cat` -> bat, git aliases, `pr`
   helper. Also binds real `Alt+Left/Right` (`^[[1;3D`/`^[[1;3C`) to
@@ -263,7 +342,9 @@ this file is the reference for changing or debugging anything.
   `PI_SKIP_VERSION_CHECK=1` and `PI_OFFLINE=1` to silence Pi's startup version
   and package/extension update notifications (update on demand with
   `PI_OFFLINE=0 pi update --extensions`).
-- `.zprofile`, `.zshenv` (sources `.automations.sh`), `.p10k.zsh`.
+- `.zprofile`, `.zshenv` (sources `.automations.sh`; exports a UTF-8
+  `LANG`/`LC_CTYPE` when unset, without which `less` escapes multibyte glyphs as
+  `<XX>`), `.p10k.zsh`.
 - `.gitconfig`: identity plus `gh auth git-credential` helpers for github.com
   and gist.github.com.
 
