@@ -41,3 +41,9 @@ theme:
       showSeparator: false
 
 # Stock gh-dash keys: `o` opens the PR in the browser, `enter` views it.
+# `l` loads the selected PR into the lumen review tab of the dev-workspace swap
+# pane (see `.local/bin/dev-workspace open-review`); `o` still opens the browser.
+keybindings:
+  prs:
+    - key: l
+      command: /Users/joelove/.local/bin/dev-workspace open-review --path "{{.RepoPath}}" --repo "{{.RepoName}}" --pr "{{.PrNumber}}"
