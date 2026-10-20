@@ -5,7 +5,7 @@
 # Font
 # ---------------------------------------------------------------------------
 # iTerm2 "Normal Font" was: MesloLGS-NF-Regular 15
-font-family = MesloLGS NF
+font-family = MesloLGS-NF-Regular
 font-size = 15
 
 # iTerm2 "Vertical Spacing" = 1.28 (28% extra height).
@@ -134,13 +134,19 @@ keybind = super+delete=text:\x02\x16f
 keybind = super+l=csi:108;9u
 
 # ---------------------------------------------------------------------------
-# Window cycling
+# croft tab switcher
 # ---------------------------------------------------------------------------
-# Cycle between Ghostty windows (not tabs). This overrides the default
-# ctrl+tab=next_tab / ctrl+shift+tab=previous_tab; tabs are still reachable via
-# super+[ / super+], and the tab overview.
-keybind = ctrl+tab=goto_window:next
-keybind = ctrl+shift+tab=goto_window:previous
+# Ctrl+Tab / Ctrl+Shift+Tab used to cycle Ghostty windows here. The dev-workspace
+# keybinding (skhd cmd+alt+tab -> candela-workspace open) already covers window
+# switching, so these now open croft's Go to Tab picker (croft hides the tab
+# strip). Sent as tmux prefix + C-v + slot, like the Cmd pane chords: tmux's
+# `croft` key table injects the raw CSI-u into the pane, which survives the hop
+# where a bare `csi:` sequence does not. Slots p / P; see .tmux.conf.
+#
+# NOTE: `croft setup-ghostty` does not emit these (it only forwards Cmd chords),
+# so re-running it is safe here.
+keybind = ctrl+tab=text:\x02\x16p
+keybind = ctrl+shift+tab=text:\x02\x16P
 
 # ---------------------------------------------------------------------------
 # Quit

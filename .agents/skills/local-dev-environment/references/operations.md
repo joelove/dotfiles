@@ -62,6 +62,15 @@ outside dotfiles too: `~/Projects/croft` (`origin` = `joelove/croft`, branch
   clobbered.
 - croft's Cmd chords need the `croft setup-ghostty` managed Ghostty block plus
   tmux `extended-keys on` with `csi-u`; verify with `croft keys` in the pane.
+- Ctrl+Tab is routed through tmux's `croft` key table (Ghostty sends the
+  prefix + C-v + `p` / `P`; see `.tmux.conf` and `.config/ghostty/config`),
+  because a bare `csi:` sequence from Ghostty does NOT survive the tmux hop.
+  It opens croft's Go to Tab picker. `croft setup-ghostty` does NOT emit
+  `ctrl+tab` (it only forwards Cmd chords), so those Ghostty lines survive a
+  re-run, but re-sourcing `.tmux.conf` is what installs the `p` / `P` binds.
+- `CROFT_VIEW_SOCK` is published per tmux session, so it only resolves inside
+  the editor session that hosts croft; the agent session next door has no croft
+  to reach.
 - gh-dash reads config at launch; its keys are stock (`o` opens the browser).
 - croft's `config.json` must be strict JSON; a `//` comment made 0.1.942 fall
   back to defaults. croft rewrites the file expanded on any UI toggle.

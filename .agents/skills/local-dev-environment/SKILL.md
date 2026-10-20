@@ -36,6 +36,16 @@ Config map, reload/debug, and pitfalls:
 - croft is a soft fork: changes live on `joelove/croft` branch `personal`, not
   as a patch in dotfiles. Edit in `~/Projects/croft`, commit, push, then
   `cargo install --path . --locked`.
+- Ctrl+Tab / Ctrl+Shift+Tab open croft's **Go to Tab** picker (`next_tab` /
+  `previous_tab` in croft's `keybindings.json`), showing the open tabs since the
+  fork hides the tab strip. Repeated chords walk the list. Ghostty sends them
+  through tmux's `croft` key table (prefix + C-v + `p` / `P`) because a bare
+  CSI-u sequence does not survive the tmux hop. Window switching is the skhd
+  `cmd+alt+tab` binding, not Ghostty's window cycle.
+- `croft view` / `croft edit --wait` reach the hosting croft from any tmux pane
+  in its session: croft publishes `CROFT_VIEW_SOCK` into the tmux session
+  environment at startup and clears it on exit, and the client falls back to
+  `tmux show-environment` when its own env var is absent.
 - Workspaces are data: a profile (`~/.config/dev-workspace/<name>.conf`) sets
   directories, commands, and sizes; the engine has no project-specific code.
 - The editor layout is pinned. `build_editor` creates it and `normalize_editor`
