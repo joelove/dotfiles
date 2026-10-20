@@ -88,6 +88,9 @@ keybind = super+shift+d=text:\x02\x16D
 keybind = super+w=text:\x02\x16w
 # zoom / unzoom pane
 keybind = super+shift+enter=text:\x02\x16e
+# Cmd+Enter stays Ghostty's toggle_fullscreen. Croft's insert-line-below is
+# Ctrl+Enter, which Ghostty delivers natively through the kitty keyboard
+# protocol, so no forwarder or tmux slot is needed.
 # move pane focus
 keybind = super+alt+arrow_left=text:\x02\x16h
 keybind = super+alt+arrow_right=text:\x02\x16l
@@ -166,7 +169,6 @@ keybind = cmd+alt+c=csi:99;11u
 keybind = cmd+alt+m=csi:109;11u
 keybind = cmd+alt+f=csi:102;11u
 keybind = cmd+alt+enter=csi:13;11u
-keybind = cmd+enter=csi:13;9u
 keybind = cmd+/=csi:47;9u
 keybind = cmd+.=csi:46;9u
 keybind = cmd+shift+/=csi:63;10u
