@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+#
+# repo-review - review-tab default when no PR is loaded.
+#
+# Reads the `repoPaths` map from a gh-dash config, lets you fzf-pick one of the
+# local checkouts (with a git status/log preview), and opens `lumen diff` in it.
+# Picking again after lumen exits; Esc drops to a login shell so the swap pane
+# stays alive.
+#
+# Usage: repo-review <gh-dash-config.yml>
+#
+set -uo pipefail
+
+config="${1:-}"
+export BAT_THEME="${BAT_THEME:-ansi}"
+
+repos() {
+  [ -f "$config" ] || return 0
+  python3 - "$config" <<'PY'
+import sys
+try:
+    import yaml
+    with open(sys.argv[1]) as fh:
+        data = yaml.safe_load(fh) or {}
+except Exception:
+    sys.exit(0)
+for name, path in (data.get("repoPaths") or {}).items():
+    if isinstance(path, str) and path:
+        sys.stdout.write("{}\t{}\n".format(name, path))
+PY
+}
+
+if [ ! -f "$config" ]; then
+  printf 'repo-review: config not found: %s\n' "${config:-<none>}" >&2
+  exec "${SHELL:-/bin/zsh}" -l
+fi
+
+while true; do
+  sel=$(repos | fzf \
+    --prompt='repo-review> ' \
+    --delimiter='\t' \
+    --with-nth=1 \
+    --preview='git -C "{2}" status -sb 2>/dev/null; echo; git -C "{2}" log --oneline -5 2>/dev/null' \
+    --preview-window='right:60%,border-left' || true)
+  [ -n "$sel" ] || break
+  dir=$(printf '%s' "$sel" | cut -f2)
+  if [ ! -d "$dir" ]; then
+    printf 'repo-review: not a directory: %s\n' "$dir" >&2
+    sleep 1
+    continue
+  fi
+  ( cd "$dir" && exec lumen diff ) || true
+done
+
+exec "${SHELL:-/bin/zsh}" -l

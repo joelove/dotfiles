@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#
+# croft-edit - the $EDITOR / git editor entry point.
+#
+# When the dev-workspace swap pane exists, raise the editor (croft) tab first so
+# the file is visible in the hosting croft, then open it with croft edit --wait.
+# Some callers (lumen's `e`) pass a leading +<line>; croft has no line goto, so
+# drop it rather than treating it as a path.
+#
+set -uo pipefail
+
+args=()
+for a in "$@"; do
+  case "$a" in
+    +[0-9]*) ;;
+    *) args+=("$a") ;;
+  esac
+done
+
+if command -v dev-workspace >/dev/null 2>&1; then
+  dev-workspace swap editor >/dev/null 2>&1 || true
+fi
+
+exec croft edit --wait ${args[@]+"${args[@]}"}
