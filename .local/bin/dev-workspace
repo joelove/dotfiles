@@ -27,8 +27,9 @@
 #   normalize-editor [--all]   re-pin the pane sizes and review-pane tag
 #   post-restore [--all]       resurrect hook: restart the agent and normalize
 #   restart [--session NAME] [--all]
-#                         reset a workspace: kill and rebuild its sessions,
-#                         then reopen the Ghostty windows
+#                         reset a workspace: kill its sessions and rebuild
+#                         the profile's default layout, then reopen the
+#                         Ghostty windows
 #   list                  list profiles
 #   print-config          print the resolved profile fields
 #
@@ -665,7 +666,7 @@ ensure_unlocked() {
   local missing=0
   if [ -n "$DEV_AGENT_CMD" ] && ! have "$DEV_AGENT_SESSION"; then missing=1; fi
   if ! have "$DEV_EDITOR_SESSION"; then missing=1; fi
-  if [ "$missing" = "1" ] && [ -n "$(latest_save)" ]; then
+  if [ "$missing" = "1" ] && [ -z "${DEV_NO_RESTORE:-}" ] && [ -n "$(latest_save)" ]; then
     # Keep the server alive while restoring from scratch.
     local tmp="__dev_workspace_${DEV_NAME}_tmp__"
     if ! have "$tmp"; then
@@ -797,9 +798,12 @@ profile_for_session() {
 }
 
 # Reset one workspace (both sessions of the loaded profile): kill the sessions,
-# then rebuild and reopen each Ghostty window. A keepalive session stays up
-# across the kill so the tmux server (and this background script) survives when
-# the last real session goes away.
+# then rebuild the profile's default layout and reopen each Ghostty window. The
+# rebuild skips the resurrect save on purpose: a reset must restore gh-dash/
+# review and every bottom shell even when the save is stale or was written from
+# a broken layout. A keepalive session stays up across the kill so the tmux
+# server (and this background script) survives when the last real session goes
+# away.
 restart_profile() {
   local keepalive="__dev_workspace_restart__"
   have "$keepalive" || "$TMUX_BIN" new-session -d -s "$keepalive" -c "$DEV_ROOT" 2>/dev/null || true
@@ -810,7 +814,7 @@ restart_profile() {
     "$TMUX_BIN" kill-session -t "$DEV_AGENT_SESSION" 2>/dev/null || true
   fi
   sleep 0.3
-  open_windows
+  DEV_NO_RESTORE=1 open_windows
   if have "$DEV_EDITOR_SESSION"; then
     "$TMUX_BIN" kill-session -t "$keepalive" 2>/dev/null || true
   fi

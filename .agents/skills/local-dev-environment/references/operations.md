@@ -45,10 +45,12 @@ outside dotfiles too: `~/Projects/croft` (`origin` = `joelove/croft`, branch
 - A shell variable named `TMUX` shadows tmux's socket env; `dev-workspace` uses
   `TMUX_BIN`.
 - `prefix R` resets the workspace whose agent or editor session the invoking
-  pane belongs to: it kills both sessions and rebuilds them, so it restarts
-  croft, the agents and the shells (losing their state). The binding runs the
-  script with `run-shell -b` so it survives the session kill. Use `prefix r`
-  for a config-only reload when no restart is wanted.
+  pane belongs to: it kills both sessions and rebuilds them from the profile's
+  default layout, not the resurrect save, so gh-dash/review and every bottom
+  shell come back even when the save is stale. That restarts croft, the agents
+  and the shells (losing their state). The binding runs the script with
+  `run-shell -b` so it survives the session kill. Use `prefix r` for a
+  config-only reload when no restart is wanted.
 - `extended-keys` / `terminal-features` changes only take effect on a new client
   attach (restart or re-attach tmux).
 - resurrect restores the saved (often old) layout and drops pane options;
