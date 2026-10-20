@@ -8,7 +8,10 @@
 # at ~/Projects. Wrappers are thin: `exec dev-workspace <name> "$@"`.
 #
 # Usage:
-#   dev-workspace [<profile>] <command> [args]
+#   dev-workspace [--root DIR] [<profile>] <command> [args]
+#
+#   --root DIR  root the (default) workspace at DIR instead of ~/Projects;
+#               used by the `ws DIR` launcher for an ad-hoc workspace
 #
 # Commands:
 #   open (default)        ensure sessions and open/focus the Ghostty windows
@@ -63,6 +66,11 @@ reset_profile() {
 }
 
 apply_defaults() {
+  # An explicit --root overrides the profile/default root; everything below
+  # (DEV_NAME, dirs, session names) derives from DEV_ROOT.
+  if [ -n "${ROOT_OVERRIDE:-}" ]; then
+    DEV_ROOT="$ROOT_OVERRIDE"
+  fi
   DEV_ROOT="${DEV_ROOT:-$HOME/Projects}"
   case "$DEV_ROOT" in "~"*) DEV_ROOT="$HOME${DEV_ROOT#\~}" ;; esac
   DEV_NAME="${DEV_NAME:-$(basename "$DEV_ROOT" | tr '[:upper:]' '[:lower:]')}"
@@ -196,7 +204,14 @@ build_editor() {
   build_swap_pool "$top"
 }
 
-build() { build_agent; build_editor; }
+build() {
+  build_agent
+  build_editor
+  # Tag each session with its root so `restart` can recover an ad-hoc --root
+  # workspace. Only consulted when no profile matches the session.
+  "$TMUX_BIN" set-option -t "$DEV_AGENT_SESSION" @dev_root "$DEV_ROOT" 2>/dev/null || true
+  "$TMUX_BIN" set-option -t "$DEV_EDITOR_SESSION" @dev_root "$DEV_ROOT" 2>/dev/null || true
+}
 
 # --- ensure -----------------------------------------------------------------
 
@@ -795,6 +810,15 @@ profile_for_session() {
       return 0
     fi
   done
+  # Ad-hoc --root workspace: no profile matches, but the session carries its
+  # root tag, so treat it as the default profile. `restart` reads the tag
+  # itself (this function runs in a subshell under command substitution).
+  local root
+  root=$("$TMUX_BIN" show-options -t "$current" -qv @dev_root 2>/dev/null || true)
+  if [ -n "$root" ]; then
+    printf '%s' "$DEFAULT_PROFILE"
+    return 0
+  fi
   return 1
 }
 
@@ -885,6 +909,15 @@ restart() {
   fi
   if [ -n "$resolved" ]; then
     PROFILE="$resolved"
+    # Recover the root this session was built with (an ad-hoc --root workspace
+    # or the profile's own root) so the in-place rebuild uses the same layout.
+    if [ -n "$session" ]; then
+      local session_root
+      session_root=$("$TMUX_BIN" show-options -t "$session" -qv @dev_root 2>/dev/null || true)
+      if [ -n "$session_root" ]; then
+        ROOT_OVERRIDE="$session_root"
+      fi
+    fi
     load_profile "$resolved"
   else
     load_profile "$PROFILE"
@@ -914,6 +947,18 @@ post_restore_all() {
 }
 
 # --- dispatch ---------------------------------------------------------------
+
+# Global --root, parsed before the profile/subcommand. Used by the `ws DIR`
+# launcher to root an ad-hoc workspace at any directory.
+ROOT_OVERRIDE=""
+while [ "${1:-}" = "--root" ]; do
+  if [ -z "${2:-}" ]; then
+    echo "usage: dev-workspace --root <dir> [<command>]" >&2
+    exit 1
+  fi
+  ROOT_OVERRIDE="$2"
+  shift 2
+done
 
 if [ "$#" -eq 0 ]; then
   PROFILE="$DEFAULT_PROFILE"

@@ -339,6 +339,27 @@ alias tma='tmux attach'
 alias tmd='tmux detach'
 alias tml='tmux list-panes -a -F "#{pane_tty} #{session_name}"'
 
+# workspace
+# Launch a dev-workspace in new Ghostty windows (focus the existing windows
+# when already open). `ws` is the default ~/Projects workspace; `ws DIR` roots
+# the same layout at DIR; `cws` is the candela workspace.
+ws() {
+  local root
+  if [[ -n "${1:-}" ]]; then
+    root="$(cd "$1" 2>/dev/null && pwd -P)" || {
+      print -u2 "ws: no such directory: $1"
+      return 1
+    }
+    dev-workspace --root "$root" open
+  else
+    dev-workspace open
+  fi
+}
+
+cws() {
+  candela-workspace open
+}
+
 # terraform
 # alias tf='terraform'
 # alias tfi='terraform init'
