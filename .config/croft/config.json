@@ -20,7 +20,7 @@
     "folders": true,
     "open_editors": false,
     "outline": false,
-    "timeline": true
+    "timeline": false
   },
   "fleet_groups": {},
   "format_on_save": true,
