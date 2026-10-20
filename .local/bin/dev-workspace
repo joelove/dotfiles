@@ -26,10 +26,11 @@
 #                         it in the croft hosting the editor session (Cmd+O)
 #   normalize-editor [--all]   re-pin the pane sizes and review-pane tag
 #   post-restore [--all]       resurrect hook: restart the agent and normalize
-#   restart [--session NAME] [--all]
+#   restart [--session NAME] [--all] [--editor-only]
 #                         reset a workspace: kill its sessions and rebuild
 #                         the profile's default layout, then reopen the
-#                         Ghostty windows
+#                         Ghostty windows. --editor-only spares the agent
+#                         session (and its live conversations)
 #   list                  list profiles
 #   print-config          print the resolved profile fields
 #
@@ -797,20 +798,20 @@ profile_for_session() {
   return 1
 }
 
-# Reset one workspace (both sessions of the loaded profile): kill the sessions,
-# then rebuild the profile's default layout and reopen each Ghostty window. The
-# rebuild skips the resurrect save on purpose: a reset must restore gh-dash/
-# review and every bottom shell even when the save is stale or was written from
-# a broken layout. A keepalive session stays up across the kill so the tmux
-# server (and this background script) survives when the last real session goes
-# away.
+# Reset one workspace (both sessions of the loaded profile, or just the editor
+# with RESTART_EDITOR_ONLY=1): kill the sessions, then rebuild the profile's
+# default layout and reopen each Ghostty window. The rebuild skips the resurrect
+# save on purpose: a reset must restore gh-dash/review and every bottom shell
+# even when the save is stale or was written from a broken layout. A keepalive
+# session stays up across the kill so the tmux server (and this background
+# script) survives when the last real session goes away.
 restart_profile() {
   local keepalive="__dev_workspace_restart__"
   have "$keepalive" || "$TMUX_BIN" new-session -d -s "$keepalive" -c "$DEV_ROOT" 2>/dev/null || true
   if have "$DEV_EDITOR_SESSION"; then
     "$TMUX_BIN" kill-session -t "$DEV_EDITOR_SESSION" 2>/dev/null || true
   fi
-  if have "$DEV_AGENT_SESSION"; then
+  if [ "${RESTART_EDITOR_ONLY:-0}" != "1" ] && have "$DEV_AGENT_SESSION"; then
     "$TMUX_BIN" kill-session -t "$DEV_AGENT_SESSION" 2>/dev/null || true
   fi
   sleep 0.3
@@ -824,14 +825,16 @@ restart_profile() {
 # passes `--session '#{session_name}'` so the profile is resolved from the pane
 # the key was pressed in; without a match the default profile is used.
 restart() {
-  local session="" all=0 name resolved=""
+  local session="" all=0 editor_only=0 name resolved=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --session) session="${2:-}"; shift 2 ;;
-      --all)     all=1; shift ;;
-      *)         shift ;;
+      --session)     session="${2:-}"; shift 2 ;;
+      --all)         all=1; shift ;;
+      --editor-only) editor_only=1; shift ;;
+      *)             shift ;;
     esac
   done
+  RESTART_EDITOR_ONLY="$editor_only"
   if [ "$all" = "1" ]; then
     local -a names=("$DEFAULT_PROFILE")
     for name in $(all_profiles); do

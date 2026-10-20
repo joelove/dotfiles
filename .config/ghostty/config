@@ -232,6 +232,13 @@ keybind = cmd+n=csi:110;9u
 keybind = cmd+t=csi:116;9u
 # <<< croft keybindings (managed by `croft setup-ghostty`) <<<
 
+# Cmd+Ctrl+R resets the current dev-workspace (same as prefix R): one chord
+# instead of the tmux prefix, for picking up a build or config change. Sent as
+# tmux prefix + R; the binding in .tmux.conf resolves the profile from the
+# invoking session and runs `dev-workspace restart`. Deliberately off croft's
+# own Cmd chords (`cmd+shift+r` is croft's), so nothing forwards it.
+keybind = super+ctrl+r=text:\x02R
+
 # Open-file picker: Cmd+O routes through tmux's `croft` key table (slot o) so
 # dev-workspace can run the fzf picker over ~/Projects in a popup. Keep after
 # the managed block so it wins over any managed Cmd+O line.
