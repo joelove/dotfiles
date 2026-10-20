@@ -17,6 +17,10 @@
 #   attach [session]      ensure, then attach (default: editor session)
 #   attach-only [session] attach without touching sessions or layout
 #   review-pane           (re)launch the review pane command only if it is closed
+#   swap [mode] [--session NAME]   cycle/select the swappable pane tab
+#                         (next|prev|editor|review|docs; default next)
+#   open-review [--session NAME] [--path DIR] [--repo O/R] --pr N
+#                         load PR N into the lumen review tab and raise it
 #   normalize-editor [--all]   re-pin the pane sizes and review-pane tag
 #   post-restore [--all]       resurrect hook: restart the agent and normalize
 #   list                  list profiles
@@ -46,7 +50,8 @@ have_client() { "$TMUX_BIN" list-clients -t "$1" -F '#{client_tty}' 2>/dev/null 
 reset_profile() {
   unset DEV_NAME DEV_ROOT DEV_AGENT_DIR DEV_AGENT_CMD DEV_AGENT_PANES DEV_AGENT_SESSION \
     DEV_EDITOR_DIR DEV_EDITOR_CMD DEV_EDITOR_SESSION DEV_REVIEW_CMD DEV_REVIEW_SUB_CMD \
-    DEV_REVIEW_SUB_LINES DEV_GH_COLS DEV_BOTTOM_LINES DEV_TERM_DIRS DEV_TERM_PATHS DEV_TERM_CMDS
+    DEV_REVIEW_SUB_LINES DEV_GH_COLS DEV_BOTTOM_LINES DEV_TERM_DIRS DEV_TERM_PATHS DEV_TERM_CMDS \
+    DEV_SWAP_DEFAULT DEV_SWAP_REVIEW_CMD DEV_SWAP_DOCS_CMD DEV_SWAP_POOL_WINDOW
 }
 
 apply_defaults() {
@@ -65,6 +70,13 @@ apply_defaults() {
   DEV_REVIEW_SUB_LINES="${DEV_REVIEW_SUB_LINES:-5}"
   DEV_GH_COLS="${DEV_GH_COLS:-76}"
   DEV_BOTTOM_LINES="${DEV_BOTTOM_LINES:-14}"
+  # Swappable pane: the leftmost top pane cycles through editor (croft),
+  # review (lumen) and docs (mdpick/mdcat). The non-visible modes live in a
+  # detached pool window so they stay alive across switches.
+  DEV_SWAP_DEFAULT="${DEV_SWAP_DEFAULT:-editor}"
+  DEV_SWAP_REVIEW_CMD="${DEV_SWAP_REVIEW_CMD:-lumen diff}"
+  DEV_SWAP_DOCS_CMD="${DEV_SWAP_DOCS_CMD:-dev-docs}"
+  DEV_SWAP_POOL_WINDOW="${DEV_SWAP_POOL_WINDOW:-_pool}"
   declare -p DEV_TERM_DIRS >/dev/null 2>&1 || DEV_TERM_DIRS=("$DEV_ROOT")
   DEV_TERM_PATHS=()
   local d
@@ -170,6 +182,10 @@ build_editor() {
       j=$((j + 1))
     done
   fi
+
+  # Swap pane: the leftmost top pane is the visible slot (croft by default);
+  # the other modes live in a detached pool window so they stay alive.
+  build_swap_pool "$top"
 }
 
 build() { build_agent; build_editor; }
@@ -225,7 +241,7 @@ send_if_shell() {
 start_views_in_shells() {
   have "$DEV_EDITOR_SESSION" || return 0
   local panes top_min top_sorted editor review
-  panes=$("$TMUX_BIN" list-panes -t "$DEV_EDITOR_SESSION" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
+  panes=$("$TMUX_BIN" list-panes -t "${DEV_EDITOR_SESSION}:editor" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
   [ -n "$panes" ] || return 0
   top_min=$(printf '%s\n' "$panes" | awk '{ print $2 }' | sort -n | head -n1)
   top_sorted=$(printf '%s\n' "$panes" | awk -v t="$top_min" '$2 == t { print $3, $1 }' | sort -n)
@@ -280,7 +296,7 @@ ensure_review_pane() {
   [ -n "$DEV_REVIEW_CMD" ] || return 0
   have "$DEV_EDITOR_SESSION" || return 0
   local panes top_min top_sorted editor review recreated=0
-  panes=$("$TMUX_BIN" list-panes -t "$DEV_EDITOR_SESSION" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
+  panes=$("$TMUX_BIN" list-panes -t "${DEV_EDITOR_SESSION}:editor" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
   [ -n "$panes" ] || return 0
   top_min=$(printf '%s\n' "$panes" | awk '{ print $2 }' | sort -n | head -n1)
   top_sorted=$(printf '%s\n' "$panes" | awk -v t="$top_min" '$2 == t { print $3, $1 }' | sort -n)
@@ -307,7 +323,7 @@ ensure_review_pane() {
 normalize_editor() {
   have "$DEV_EDITOR_SESSION" || return 0
   local panes top_min bot_max top_sorted editor review bottom review_left review_sub
-  panes=$("$TMUX_BIN" list-panes -t "$DEV_EDITOR_SESSION" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
+  panes=$("$TMUX_BIN" list-panes -t "${DEV_EDITOR_SESSION}:editor" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
   [ -n "$panes" ] || return 0
 
   top_min=$(printf '%s\n' "$panes" | awk '{ print $2 }' | sort -n | head -n1)
@@ -351,6 +367,207 @@ normalize_editor_all_debounced() {
   normalize_editor_all
 }
 
+# --- swap pane tabs ---------------------------------------------------------
+#
+# The leftmost top pane of the editor window is a swap slot; the other modes
+# live in a detached pool window in the same session so they stay alive. Pane
+# options: @dev_swap=1 on every mode pane, @dev_swap_mode=editor|review|docs,
+# @dev_swap_cmd=<command> (for respawn), @dev_swap_visible=1 on the one shown.
+
+swap_status_format() {
+  local active="$1" out="" name label i=0 sep
+  # tmux-nova separators/colours so the tabs match the rest of the status bar:
+  # the active tab is an orange angled segment, inactive tabs blend into the
+  # black bar. sep is U+E0B8, the same glyph as @nova-nerdfonts-left (octal so
+  # this works on bash 3.2).
+  sep=$(printf '\356\202\270')
+  for name in editor review docs; do
+    case "$name" in
+      editor) label=edit ;;
+      review) label=review ;;
+      docs)   label=docs ;;
+    esac
+    i=$((i + 1))
+    if [ "$name" = "$active" ]; then
+      out="${out}#[fg=#000000,bg=#ffa827]${sep}#[fg=#000000]#[bg=#ffa827] ${i} ${label} #[fg=#ffa827,bg=#000000]${sep}"
+    else
+      out="${out}#[fg=#cfcfc2,bg=#000000] ${i} ${label} "
+    fi
+  done
+  printf '%s' "$out"
+}
+
+set_swap_status() {
+  local active="$1" session="$2" fmt
+  fmt="$(swap_status_format "$active")"
+  "$TMUX_BIN" set-window-option -t "${session}:editor" window-status-format "$fmt" 2>/dev/null || true
+  "$TMUX_BIN" set-window-option -t "${session}:editor" window-status-current-format "$fmt" 2>/dev/null || true
+  "$TMUX_BIN" refresh-client -S 2>/dev/null || true
+}
+
+hide_pool_window() {
+  local session="$1"
+  local win="${session}:${DEV_SWAP_POOL_WINDOW}"
+  "$TMUX_BIN" set-window-option -t "$win" window-status-format '' 2>/dev/null || true
+  "$TMUX_BIN" set-window-option -t "$win" window-status-current-format '' 2>/dev/null || true
+}
+
+swap_pane_option() {
+  # swap_pane_option <pane> <mode> <cmd> <visible 0|1>
+  local pane="$1" mode="$2" cmd="$3" vis="${4:-0}"
+  "$TMUX_BIN" set-option -p -t "$pane" @dev_swap 1 2>/dev/null || true
+  "$TMUX_BIN" set-option -p -t "$pane" @dev_swap_mode "$mode" 2>/dev/null || true
+  "$TMUX_BIN" set-option -p -t "$pane" @dev_swap_cmd "$cmd" 2>/dev/null || true
+  if [ "$vis" = "1" ]; then
+    "$TMUX_BIN" set-option -p -t "$pane" @dev_swap_visible 1 2>/dev/null || true
+  else
+    "$TMUX_BIN" set-option -p -u -t "$pane" @dev_swap_visible 2>/dev/null || true
+  fi
+}
+
+build_swap_pool() {
+  # $1 is the visible editor pane, already running DEV_EDITOR_CMD.
+  have "$DEV_EDITOR_SESSION" || return 0
+  local slot="$1" pool review docs
+  swap_pane_option "$slot" editor "$DEV_EDITOR_CMD" 1
+
+  pool=$("$TMUX_BIN" new-window -d -t "$DEV_EDITOR_SESSION" -n "$DEV_SWAP_POOL_WINDOW" \
+    -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}' 2>/dev/null) || return 0
+  # Keep quit apps as dead panes instead of letting tmux close them, so the tab
+  # layout survives and swap_to can respawn them.
+  "$TMUX_BIN" set-window-option -t "${DEV_EDITOR_SESSION}:${DEV_SWAP_POOL_WINDOW}" remain-on-exit on 2>/dev/null || true
+  review="$pool"
+  docs=$("$TMUX_BIN" split-window -h -t "$review" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}' 2>/dev/null) || docs=""
+  "$TMUX_BIN" send-keys -t "$review" "$DEV_SWAP_REVIEW_CMD" Enter 2>/dev/null || true
+  swap_pane_option "$review" review "$DEV_SWAP_REVIEW_CMD" 0
+  if [ -n "$docs" ]; then
+    "$TMUX_BIN" send-keys -t "$docs" "$DEV_SWAP_DOCS_CMD" Enter 2>/dev/null || true
+    swap_pane_option "$docs" docs "$DEV_SWAP_DOCS_CMD" 0
+  fi
+  hide_pool_window "$DEV_EDITOR_SESSION"
+  set_swap_status editor "$DEV_EDITOR_SESSION"
+  if [ "$DEV_SWAP_DEFAULT" != "editor" ]; then
+    swap_to "$DEV_SWAP_DEFAULT" "$DEV_EDITOR_SESSION" || true
+  fi
+}
+
+swap_respawn_if_dead() {
+  local pane="$1" cmd
+  [ "$("$TMUX_BIN" display-message -p -t "$pane" '#{pane_dead}' 2>/dev/null || echo 0)" = "1" ] || return 0
+  cmd=$("$TMUX_BIN" show-options -p -t "$pane" -qv @dev_swap_cmd 2>/dev/null || true)
+  [ -n "$cmd" ] || return 0
+  "$TMUX_BIN" respawn-pane -k -t "$pane" "$cmd" 2>/dev/null || true
+}
+
+swap_to() {
+  local mode="$1" session="${2:-}" target visible
+  [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
+  [ -n "$session" ] || return 0
+  target=$("$TMUX_BIN" list-panes -s -t "$session" -F '#{pane_id} #{@dev_swap_mode}' 2>/dev/null \
+    | awk -v m="$mode" '$2 == m { print $1; exit }')
+  [ -n "$target" ] || { printf 'dev-workspace: no swap pane for %s\n' "$mode" >&2; return 1; }
+  swap_respawn_if_dead "$target"
+  visible=$("$TMUX_BIN" list-panes -s -t "$session" -F '#{pane_id} #{@dev_swap_visible}' 2>/dev/null \
+    | awk '$2 == 1 { print $1; exit }')
+  if [ "$target" = "$visible" ]; then
+    set_swap_status "$mode" "$session"
+    "$TMUX_BIN" select-pane -t "$target" 2>/dev/null || true
+    return 0
+  fi
+  [ -n "$visible" ] || { printf 'dev-workspace: no visible swap pane\n' >&2; return 1; }
+  "$TMUX_BIN" swap-pane -s "$target" -t "$visible" 2>/dev/null || return 1
+  "$TMUX_BIN" set-option -p -u -t "$visible" @dev_swap_visible 2>/dev/null || true
+  "$TMUX_BIN" set-option -p -t "$target" @dev_swap_visible 1 2>/dev/null || true
+  "$TMUX_BIN" select-window -t "${session}:editor" 2>/dev/null || true
+  "$TMUX_BIN" select-pane -t "$target" 2>/dev/null || true
+  set_swap_status "$mode" "$session"
+}
+
+swap_cycle() {
+  local dir="$1" session="${2:-}" active next prev
+  [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
+  [ -n "$session" ] || return 0
+  active=$("$TMUX_BIN" list-panes -s -t "$session" -F '#{@dev_swap_mode} #{@dev_swap_visible}' 2>/dev/null \
+    | awk '$2 == 1 { print $1; exit }')
+  case "$active" in
+    editor) next=review; prev=docs ;;
+    review) next=docs;   prev=editor ;;
+    docs)   next=editor; prev=review ;;
+    *)      next=review; prev=docs ;;
+  esac
+  if [ "$dir" = "prev" ]; then swap_to "$prev" "$session"; else swap_to "$next" "$session"; fi
+}
+
+swap_cmd() {
+  local mode="${1:-next}" session=""
+  shift 2>/dev/null || true
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      *)         shift ;;
+    esac
+  done
+  case "$mode" in
+    next|prev) swap_cycle "$mode" "$session" ;;
+    editor|review|docs) swap_to "$mode" "$session" ;;
+    *) echo "usage: dev-workspace swap [next|prev|editor|review|docs] [--session NAME]" >&2; return 1 ;;
+  esac
+}
+
+open_review() {
+  local session="" path="" repo="" pr=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      --path)    path="${2:-}"; shift 2 ;;
+      --repo)    repo="${2:-}"; shift 2 ;;
+      --pr)      pr="${2:-}"; shift 2 ;;
+      *)         shift ;;
+    esac
+  done
+  [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
+  [ -n "$session" ] || return 0
+  [ -n "$pr" ] || { echo "dev-workspace open-review: --pr is required" >&2; return 1; }
+  local review cmd
+  review=$("$TMUX_BIN" list-panes -s -t "$session" -F '#{pane_id} #{@dev_swap_mode}' 2>/dev/null \
+    | awk '$2 == "review" { print $1; exit }')
+  [ -n "$review" ] || { echo "dev-workspace open-review: no review pane" >&2; return 1; }
+  cmd="lumen diff --pr $pr"
+  if [ -n "$repo" ]; then
+    cmd="$cmd --origin $repo"
+  fi
+  if [ -n "$path" ] && [ -d "$path" ]; then
+    cmd="cd $(printf '%q' "$path") && $cmd"
+  fi
+  # Leave @dev_swap_cmd at the review default (the repo picker) so quitting the
+  # PR returns to the picker instead of reloading the PR.
+  "$TMUX_BIN" respawn-pane -k -t "$review" "$cmd" 2>/dev/null || return 1
+  swap_to review "$session"
+}
+
+rebuild_swap() {
+  have "$DEV_EDITOR_SESSION" || return 0
+  local win="${DEV_EDITOR_SESSION}:editor"
+  local panes top_min slot
+  panes=$("$TMUX_BIN" list-panes -t "$win" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
+  [ -n "$panes" ] || return 0
+  top_min=$(printf '%s\n' "$panes" | awk '{ print $2 }' | sort -n | head -n1)
+  slot=$(printf '%s\n' "$panes" | awk -v t="$top_min" '$2 == t { print $3, $1 }' | sort -n | head -n1 | awk '{ print $2 }')
+  [ -n "$slot" ] || return 0
+  # Idempotent: if the slot is already a swap pane and the pool exists, leave
+  # everything (and its live processes) alone. This lets `ensure` heal older
+  # workspaces built before the swap pane existed without restarting on every
+  # open.
+  if [ "$("$TMUX_BIN" show-options -p -t "$slot" -qv @dev_swap 2>/dev/null || true)" = "1" ] \
+    && "$TMUX_BIN" list-windows -t "$DEV_EDITOR_SESSION" -F '#{window_name}' 2>/dev/null | grep -qx "$DEV_SWAP_POOL_WINDOW"; then
+    return 0
+  fi
+  if "$TMUX_BIN" list-windows -t "$DEV_EDITOR_SESSION" -F '#{window_name}' 2>/dev/null | grep -qx "$DEV_SWAP_POOL_WINDOW"; then
+    "$TMUX_BIN" kill-window -t "${DEV_EDITOR_SESSION}:${DEV_SWAP_POOL_WINDOW}" 2>/dev/null || true
+  fi
+  build_swap_pool "$slot"
+}
+
 ensure_unlocked() {
   "$TMUX_BIN" start-server 2>/dev/null || true
   local missing=0
@@ -371,9 +588,11 @@ ensure_unlocked() {
     sleep 1
     start_agent_in_shells
     start_views_in_shells
+    rebuild_swap
   fi
   build
   normalize_editor
+  rebuild_swap
 }
 
 ensure() {
@@ -477,6 +696,7 @@ post_restore() {
   start_agent_in_shells
   start_views_in_shells
   normalize_editor
+  rebuild_swap
 }
 
 post_restore_all() {
@@ -487,6 +707,7 @@ post_restore_all() {
     start_agent_in_shells
     start_views_in_shells
     normalize_editor
+    rebuild_swap
   done
 }
 
@@ -498,7 +719,7 @@ if [ "$#" -eq 0 ]; then
   REST=()
 else
   case "$1" in
-    open|build|ensure|attach|attach-only|review-pane|normalize-editor|post-restore|list|print-config)
+    open|build|ensure|attach|attach-only|review-pane|normalize-editor|post-restore|swap|open-review|list|print-config)
       PROFILE="$DEFAULT_PROFILE"
       CMD="$1"
       REST=("${@:2}")
@@ -520,6 +741,8 @@ case "$CMD" in
   attach)      attach "${REST[0]:-}" ;;
   attach-only) attach_only "${REST[0]:-}" ;;
   review-pane) ensure_review_pane ;;
+  swap)        swap_cmd ${REST[@]+"${REST[@]}"} ;;
+  open-review) open_review ${REST[@]+"${REST[@]}"} ;;
   normalize-editor)
     if [ "${REST[0]:-}" = "--all" ]; then
       normalize_editor_all_debounced
@@ -555,6 +778,10 @@ case "$CMD" in
     printf 'DEV_TERM_CMDS=%s\n' "${DEV_TERM_CMDS[*]}"
     printf 'DEV_GH_COLS=%s\n' "$DEV_GH_COLS"
     printf 'DEV_BOTTOM_LINES=%s\n' "$DEV_BOTTOM_LINES"
+    printf 'DEV_SWAP_DEFAULT=%s\n' "$DEV_SWAP_DEFAULT"
+    printf 'DEV_SWAP_REVIEW_CMD=%s\n' "$DEV_SWAP_REVIEW_CMD"
+    printf 'DEV_SWAP_DOCS_CMD=%s\n' "$DEV_SWAP_DOCS_CMD"
+    printf 'DEV_SWAP_POOL_WINDOW=%s\n' "$DEV_SWAP_POOL_WINDOW"
     ;;
   *)
     echo "usage: dev-workspace [<profile>] <command>" >&2
