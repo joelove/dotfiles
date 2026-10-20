@@ -21,8 +21,16 @@
 #                         (next|prev|editor|review|docs; default next)
 #   open-review [--session NAME] [--path DIR] [--repo O/R] --pr N
 #                         load PR N into the lumen review tab and raise it
+#   open-file [--session NAME] [--root DIR]
+#                         fzf a file under ~/Projects in a tmux popup and open
+#                         it in the croft hosting the editor session (Cmd+O)
 #   normalize-editor [--all]   re-pin the pane sizes and review-pane tag
 #   post-restore [--all]       resurrect hook: restart the agent and normalize
+#   restart [--session NAME] [--all] [--editor-only]
+#                         reset a workspace in place: rebuild each session
+#                         under its existing Ghostty window, then re-pin the
+#                         layout. --editor-only spares the agent session
+#                         (and its live conversations)
 #   list                  list profiles
 #   print-config          print the resolved profile fields
 #
@@ -487,6 +495,11 @@ swap_cycle() {
   local dir="$1" session="${2:-}" active next prev
   [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
   [ -n "$session" ] || return 0
+  # A session with no swap pane (the agent view next door) has nothing to
+  # cycle: Ctrl+Tab there is a no-op, not a "no swap pane for review" error.
+  if ! "$TMUX_BIN" list-panes -s -t "$session" -F '#{@dev_swap}' 2>/dev/null | grep -qx 1; then
+    return 0
+  fi
   active=$("$TMUX_BIN" list-panes -s -t "$session" -F '#{@dev_swap_mode} #{@dev_swap_visible}' 2>/dev/null \
     | awk '$2 == 1 { print $1; exit }')
   case "$active" in
@@ -545,6 +558,87 @@ open_review() {
   swap_to review "$session"
 }
 
+# --- open-file picker -------------------------------------------------------
+#
+# Cmd+O from any pane: fzf a file under ~/Projects in a tmux popup, then hand
+# the absolute path to the croft hosting the editor session through the
+# CROFT_VIEW_SOCK it publishes. The popup gives fzf a tty; the outer command
+# resolves the socket so the picker works from the agent session too.
+
+find_croft_session() {
+  local current="$1" s name
+  # Prefer the editor session of the profile that owns the invoking pane, so
+  # two open workspaces do not open the file in each other's croft.
+  if [ -n "$current" ]; then
+    for name in $(all_profiles) "$DEFAULT_PROFILE"; do
+      load_profile "$name"
+      if [ "$DEV_AGENT_SESSION" = "$current" ] || [ "$DEV_EDITOR_SESSION" = "$current" ]; then
+        printf '%s' "$DEV_EDITOR_SESSION"; return 0
+      fi
+    done
+  fi
+  # Otherwise take the session that owns a swappable croft editor pane.
+  s=$("$TMUX_BIN" list-panes -a -F '#{session_name} #{@dev_swap}' 2>/dev/null \
+    | awk '$2 == 1 { print $1; exit }')
+  [ -n "$s" ] && { printf '%s' "$s"; return 0; }
+  # Fall back to a session that published CROFT_VIEW_SOCK.
+  for s in $("$TMUX_BIN" list-sessions -F '#{session_name}' 2>/dev/null); do
+    if "$TMUX_BIN" show-environment -t "$s" CROFT_VIEW_SOCK >/dev/null 2>&1; then
+      printf '%s' "$s"; return 0
+    fi
+  done
+  printf '%s' "$current"
+}
+
+open_file_pick() {
+  local root="$1" sel
+  [ -d "$root" ] || return 0
+  sel=$(
+    if command -v rg >/dev/null 2>&1; then
+      rg --files --hidden -g '!.git' -g '!node_modules' -g '!target' "$root" 2>/dev/null
+    elif command -v fd >/dev/null 2>&1; then
+      fd --type f --hidden --exclude .git --exclude node_modules --exclude target . "$root" 2>/dev/null
+    else
+      find "$root" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' 2>/dev/null
+    fi \
+    | fzf \
+      --prompt='open> ' \
+      --reverse \
+      --no-multi \
+      --preview='bat --style=numbers --color=always --line-range=:300 -- {} 2>/dev/null || sed -n "1,300p" {}' \
+      --preview-window='right:60%,border-left' || true
+  )
+  [ -n "$sel" ] || return 0
+  if [ -n "${CROFT_VIEW_SOCK:-}" ]; then
+    croft edit "$sel" >/dev/null 2>&1 || true
+  fi
+}
+
+open_file() {
+  local session="" root="" pick=0 editor sock
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      --root)    root="${2:-}"; shift 2 ;;
+      --pick)    pick=1; shift ;;
+      *)         shift ;;
+    esac
+  done
+  [ -n "$root" ] || root="${DEV_ROOT:-$HOME/Projects}"
+  if [ "$pick" = 1 ]; then
+    open_file_pick "$root"
+    return $?
+  fi
+  editor=$(find_croft_session "$session")
+  [ -n "$editor" ] || return 0
+  sock=$("$TMUX_BIN" show-environment -t "$editor" CROFT_VIEW_SOCK 2>/dev/null \
+    | sed -n 's/^CROFT_VIEW_SOCK=//p')
+  [ -n "$sock" ] || return 0
+  "$TMUX_BIN" display-popup -E -w 90% -h 80% -T ' open file ' \
+    "CROFT_VIEW_SOCK='$sock' '$DEV_SELF' open-file --pick --root '$root'" 2>/dev/null || true
+  swap_to editor "$editor" >/dev/null 2>&1 || true
+}
+
 rebuild_swap() {
   have "$DEV_EDITOR_SESSION" || return 0
   local win="${DEV_EDITOR_SESSION}:editor"
@@ -573,7 +667,7 @@ ensure_unlocked() {
   local missing=0
   if [ -n "$DEV_AGENT_CMD" ] && ! have "$DEV_AGENT_SESSION"; then missing=1; fi
   if ! have "$DEV_EDITOR_SESSION"; then missing=1; fi
-  if [ "$missing" = "1" ] && [ -n "$(latest_save)" ]; then
+  if [ "$missing" = "1" ] && [ -z "${DEV_NO_RESTORE:-}" ] && [ -n "$(latest_save)" ]; then
     # Keep the server alive while restoring from scratch.
     local tmp="__dev_workspace_${DEV_NAME}_tmp__"
     if ! have "$tmp"; then
@@ -690,6 +784,114 @@ open_windows() {
   fi
 }
 
+# Resolve the profile that owns tmux session $1 (a workspace's agent or editor
+# session). Prints the profile name, or nothing when none matches.
+profile_for_session() {
+  local current="$1" name
+  for name in "$DEFAULT_PROFILE" $(all_profiles); do
+    load_profile "$name"
+    if [ "$DEV_AGENT_SESSION" = "$current" ] || [ "$DEV_EDITOR_SESSION" = "$current" ]; then
+      printf '%s' "$name"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Rebuild one session without detaching its clients: build the fresh layout
+# under a temporary name, move the attached tmux clients across, then put it
+# back under the real name and drop the old session. The client is handed over
+# before the old session dies, so the Ghostty surface stays put: a reset reads
+# as the same window rebuilding, not a stranded "session ended" window plus a
+# fresh one. `$2` is the builder to run (agent|editor).
+reset_session_in_place() {
+  local real="$1" builder="$2" tmp var fn saved tty i
+  case "$builder" in
+    agent)  var=DEV_AGENT_SESSION; fn=build_agent ;;
+    editor) var=DEV_EDITOR_SESSION; fn=build_editor ;;
+    *)      return 1 ;;
+  esac
+  if ! have "$real"; then
+    "$fn"
+    return 0
+  fi
+  tmp="__dev_reset_$$_${RANDOM}"
+  saved="${!var}"
+  printf -v "$var" '%s' "$tmp"
+  "$TMUX_BIN" kill-session -t "$tmp" 2>/dev/null || true
+  if ! "$fn" || ! have "$tmp"; then
+    printf -v "$var" '%s' "$saved"
+    return 1
+  fi
+  printf -v "$var" '%s' "$saved"
+  # Hand every attached client to the fresh session before the old one goes, and
+  # wait until none are left on the old name so none see it die.
+  while IFS= read -r tty; do
+    [ -n "$tty" ] || continue
+    "$TMUX_BIN" switch-client -c "$tty" -t "$tmp" 2>/dev/null || true
+  done < <("$TMUX_BIN" list-clients -t "$real" -F '#{client_tty}' 2>/dev/null || true)
+  i=0
+  while [ "$i" -lt 40 ]; do
+    [ -z "$("$TMUX_BIN" list-clients -t "$real" -F '#{client_tty}' 2>/dev/null)" ] && break
+    sleep 0.05
+    i=$((i + 1))
+  done
+  "$TMUX_BIN" kill-session -t "$real" 2>/dev/null || true
+  "$TMUX_BIN" rename-session -t "$tmp" "$real" 2>/dev/null || true
+}
+
+# Reset one workspace (both sessions of the loaded profile, or just the editor
+# with RESTART_EDITOR_ONLY=1). Each session is rebuilt in place so its Ghostty
+# window is reused, and the resurrect save is skipped on purpose: a reset must
+# restore gh-dash/review and every bottom shell even when the save is stale or
+# was written from a broken layout.
+restart_profile() {
+  reset_session_in_place "$DEV_EDITOR_SESSION" editor
+  if [ "${RESTART_EDITOR_ONLY:-0}" != "1" ]; then
+    reset_session_in_place "$DEV_AGENT_SESSION" agent
+  fi
+  DEV_NO_RESTORE=1 open_windows
+}
+
+# Reset the current workspace (prefix R) or every profile (--all). The binding
+# passes `--session '#{session_name}'` so the profile is resolved from the pane
+# the key was pressed in; without a match the default profile is used.
+restart() {
+  local session="" all=0 editor_only=0 name resolved=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session)     session="${2:-}"; shift 2 ;;
+      --all)         all=1; shift ;;
+      --editor-only) editor_only=1; shift ;;
+      *)             shift ;;
+    esac
+  done
+  RESTART_EDITOR_ONLY="$editor_only"
+  if [ "$all" = "1" ]; then
+    local -a names=("$DEFAULT_PROFILE")
+    for name in $(all_profiles); do
+      [ "$name" = "$DEFAULT_PROFILE" ] && continue
+      names+=("$name")
+    done
+    for name in "${names[@]}"; do
+      PROFILE="$name"
+      load_profile "$name"
+      restart_profile
+    done
+    return 0
+  fi
+  if [ -n "$session" ]; then
+    resolved="$(profile_for_session "$session" || true)"
+  fi
+  if [ -n "$resolved" ]; then
+    PROFILE="$resolved"
+    load_profile "$resolved"
+  else
+    load_profile "$PROFILE"
+  fi
+  restart_profile
+}
+
 # Called by tmux-resurrect after a manual restore.
 post_restore() {
   sleep 1.5
@@ -719,7 +921,7 @@ if [ "$#" -eq 0 ]; then
   REST=()
 else
   case "$1" in
-    open|build|ensure|attach|attach-only|review-pane|normalize-editor|post-restore|swap|open-review|list|print-config)
+    open|build|ensure|attach|attach-only|review-pane|normalize-editor|post-restore|restart|swap|open-review|open-file|list|print-config)
       PROFILE="$DEFAULT_PROFILE"
       CMD="$1"
       REST=("${@:2}")
@@ -743,6 +945,7 @@ case "$CMD" in
   review-pane) ensure_review_pane ;;
   swap)        swap_cmd ${REST[@]+"${REST[@]}"} ;;
   open-review) open_review ${REST[@]+"${REST[@]}"} ;;
+  open-file)   open_file ${REST[@]+"${REST[@]}"} ;;
   normalize-editor)
     if [ "${REST[0]:-}" = "--all" ]; then
       normalize_editor_all_debounced
@@ -757,6 +960,7 @@ case "$CMD" in
       post_restore
     fi
     ;;
+  restart)     restart ${REST[@]+"${REST[@]}"} ;;
   list)
     printf '%s (default)\n' "$DEFAULT_PROFILE"
     all_profiles
