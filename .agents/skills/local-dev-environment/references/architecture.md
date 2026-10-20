@@ -9,9 +9,17 @@ this file is the reference for changing or debugging anything.
   `~/.local/bin/dev-workspace`. It sets its own `PATH`, uses a `TMUX_BIN`
   variable (never `TMUX`), guards tmux queries with no server, and computes
   `DEV_SELF` from `BASH_SOURCE` so Ghostty windows can re-invoke it.
-- Invocation: `dev-workspace [<profile>] <cmd>`. A leading known subcommand
-  selects the default `projects` profile; otherwise the first argument is the
-  profile name. Profiles are sourced bash at `~/.config/dev-workspace/<name>.conf`.
+- Invocation: `dev-workspace [--root DIR] [<profile>] <cmd>`. A leading known
+  subcommand selects the default `projects` profile; otherwise the first
+  argument is the profile name. Profiles are sourced bash at
+  `~/.config/dev-workspace/<name>.conf`.
+- `--root DIR`: a global option parsed before the profile/subcommand. It forces
+  `DEV_ROOT` (and therefore `DEV_NAME`, the dirs and session names) to DIR, so
+  an ad-hoc workspace gets the default `projects` layout rooted anywhere. The
+  `ws DIR` shell function uses it. `build` tags both sessions with `@dev_root`;
+  `profile_for_session` falls back to that tag (returning the default profile)
+  and `restart` reloads with the recovered root, so `prefix R` resets the
+  ad-hoc workspace in place. Only consulted when no profile matches.
 - Profile fields and defaults: `DEV_NAME` (basename of root, lowercased),
   `DEV_ROOT` (`~/Projects`), `DEV_AGENT_DIR` (root), `DEV_AGENT_CMD` (`pi`; empty
   skips the agent session), `DEV_AGENT_PANES` (2), `DEV_AGENT_SESSION`
@@ -336,7 +344,10 @@ this file is the reference for changing or debugging anything.
   additions, `EDITOR`/`GIT_EDITOR`/`GIT_SEQUENCE_EDITOR` = `croft-edit`,
   aliases `v`/`vim`/`code`/`c` -> croft, `cat` -> bat, git aliases, `pr`
   aliases `v`/`vim`/`code`/`c` -> croft, `cat` -> bat, git aliases, `pr`
-  helper. Also binds real `Alt+Left/Right` (`^[[1;3D`/`^[[1;3C`) to
+  helper, and workspace launchers `ws` (default `~/Projects`; `ws DIR` roots the
+  same layout at DIR) and `cws` (candela), both `open` in new Ghostty windows
+  and focus the existing windows when already open. Also binds real
+  `Alt+Left/Right` (`^[[1;3D`/`^[[1;3C`) to
   `backward-word`/`forward-word`: Ghostty forwards the true chord (croft needs
   it) and zsh has no default binding for that sequence. Exports
   `PI_SKIP_VERSION_CHECK=1` and `PI_OFFLINE=1` to silence Pi's startup version

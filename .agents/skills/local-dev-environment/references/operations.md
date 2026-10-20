@@ -18,7 +18,7 @@
 | `.config/croft/keybindings.json` | croft chords: settings, `new_file`, Go to File, and the Sublime/Atom move/select/delete set |
 | `.agents/skills/*/SKILL.md` | agent skills |
 | `.skhdrc` / `.automations.sh` / `.yabairc` | hotkeys, yabai sizing/space helpers, signals |
-| `.zshrc` / `.zprofile` / `.zshenv` / `.p10k.zsh` | shell, aliases (`v`/`vim`/`code`/`c` -> croft), PATH, `EDITOR`/`GIT_EDITOR` (`croft edit --wait`) |
+| `.zshrc` / `.zprofile` / `.zshenv` / `.p10k.zsh` | shell, aliases (`v`/`vim`/`code`/`c` -> croft), workspace launchers (`ws`/`cws`), PATH, `EDITOR`/`GIT_EDITOR` (`croft edit --wait`) |
 | `.gitconfig` | git identity + gh credential helper |
 | `.config/karabiner/`, `qmk/` | keyboard remaps and QMK keymaps |
 
