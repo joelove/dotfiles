@@ -21,6 +21,9 @@
 #                         (next|prev|editor|review|docs; default next)
 #   open-review [--session NAME] [--path DIR] [--repo O/R] --pr N
 #                         load PR N into the lumen review tab and raise it
+#   open-file [--session NAME] [--root DIR]
+#                         fzf a file under ~/Projects in a tmux popup and open
+#                         it in the croft hosting the editor session (Cmd+O)
 #   normalize-editor [--all]   re-pin the pane sizes and review-pane tag
 #   post-restore [--all]       resurrect hook: restart the agent and normalize
 #   list                  list profiles
@@ -487,6 +490,11 @@ swap_cycle() {
   local dir="$1" session="${2:-}" active next prev
   [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
   [ -n "$session" ] || return 0
+  # A session with no swap pane (the agent view next door) has nothing to
+  # cycle: Ctrl+Tab there is a no-op, not a "no swap pane for review" error.
+  if ! "$TMUX_BIN" list-panes -s -t "$session" -F '#{@dev_swap}' 2>/dev/null | grep -qx 1; then
+    return 0
+  fi
   active=$("$TMUX_BIN" list-panes -s -t "$session" -F '#{@dev_swap_mode} #{@dev_swap_visible}' 2>/dev/null \
     | awk '$2 == 1 { print $1; exit }')
   case "$active" in
@@ -543,6 +551,87 @@ open_review() {
   # PR returns to the picker instead of reloading the PR.
   "$TMUX_BIN" respawn-pane -k -t "$review" "$cmd" 2>/dev/null || return 1
   swap_to review "$session"
+}
+
+# --- open-file picker -------------------------------------------------------
+#
+# Cmd+O from any pane: fzf a file under ~/Projects in a tmux popup, then hand
+# the absolute path to the croft hosting the editor session through the
+# CROFT_VIEW_SOCK it publishes. The popup gives fzf a tty; the outer command
+# resolves the socket so the picker works from the agent session too.
+
+find_croft_session() {
+  local current="$1" s name
+  # Prefer the editor session of the profile that owns the invoking pane, so
+  # two open workspaces do not open the file in each other's croft.
+  if [ -n "$current" ]; then
+    for name in $(all_profiles) "$DEFAULT_PROFILE"; do
+      load_profile "$name"
+      if [ "$DEV_AGENT_SESSION" = "$current" ] || [ "$DEV_EDITOR_SESSION" = "$current" ]; then
+        printf '%s' "$DEV_EDITOR_SESSION"; return 0
+      fi
+    done
+  fi
+  # Otherwise take the session that owns a swappable croft editor pane.
+  s=$("$TMUX_BIN" list-panes -a -F '#{session_name} #{@dev_swap}' 2>/dev/null \
+    | awk '$2 == 1 { print $1; exit }')
+  [ -n "$s" ] && { printf '%s' "$s"; return 0; }
+  # Fall back to a session that published CROFT_VIEW_SOCK.
+  for s in $("$TMUX_BIN" list-sessions -F '#{session_name}' 2>/dev/null); do
+    if "$TMUX_BIN" show-environment -t "$s" CROFT_VIEW_SOCK >/dev/null 2>&1; then
+      printf '%s' "$s"; return 0
+    fi
+  done
+  printf '%s' "$current"
+}
+
+open_file_pick() {
+  local root="$1" sel
+  [ -d "$root" ] || return 0
+  sel=$(
+    if command -v rg >/dev/null 2>&1; then
+      rg --files --hidden -g '!.git' -g '!node_modules' -g '!target' "$root" 2>/dev/null
+    elif command -v fd >/dev/null 2>&1; then
+      fd --type f --hidden --exclude .git --exclude node_modules --exclude target . "$root" 2>/dev/null
+    else
+      find "$root" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' 2>/dev/null
+    fi \
+    | fzf \
+      --prompt='open> ' \
+      --reverse \
+      --no-multi \
+      --preview='bat --style=numbers --color=always --line-range=:300 -- {} 2>/dev/null || sed -n "1,300p" {}' \
+      --preview-window='right:60%,border-left' || true
+  )
+  [ -n "$sel" ] || return 0
+  if [ -n "${CROFT_VIEW_SOCK:-}" ]; then
+    croft edit "$sel" >/dev/null 2>&1 || true
+  fi
+}
+
+open_file() {
+  local session="" root="" pick=0 editor sock
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      --root)    root="${2:-}"; shift 2 ;;
+      --pick)    pick=1; shift ;;
+      *)         shift ;;
+    esac
+  done
+  [ -n "$root" ] || root="${DEV_ROOT:-$HOME/Projects}"
+  if [ "$pick" = 1 ]; then
+    open_file_pick "$root"
+    return $?
+  fi
+  editor=$(find_croft_session "$session")
+  [ -n "$editor" ] || return 0
+  sock=$("$TMUX_BIN" show-environment -t "$editor" CROFT_VIEW_SOCK 2>/dev/null \
+    | sed -n 's/^CROFT_VIEW_SOCK=//p')
+  [ -n "$sock" ] || return 0
+  "$TMUX_BIN" display-popup -E -w 90% -h 80% -T ' open file ' \
+    "CROFT_VIEW_SOCK='$sock' '$DEV_SELF' open-file --pick --root '$root'" 2>/dev/null || true
+  swap_to editor "$editor" >/dev/null 2>&1 || true
 }
 
 rebuild_swap() {
@@ -719,7 +808,7 @@ if [ "$#" -eq 0 ]; then
   REST=()
 else
   case "$1" in
-    open|build|ensure|attach|attach-only|review-pane|normalize-editor|post-restore|swap|open-review|list|print-config)
+    open|build|ensure|attach|attach-only|review-pane|normalize-editor|post-restore|swap|open-review|open-file|list|print-config)
       PROFILE="$DEFAULT_PROFILE"
       CMD="$1"
       REST=("${@:2}")
@@ -743,6 +832,7 @@ case "$CMD" in
   review-pane) ensure_review_pane ;;
   swap)        swap_cmd ${REST[@]+"${REST[@]}"} ;;
   open-review) open_review ${REST[@]+"${REST[@]}"} ;;
+  open-file)   open_file ${REST[@]+"${REST[@]}"} ;;
   normalize-editor)
     if [ "${REST[0]:-}" = "--all" ]; then
       normalize_editor_all_debounced

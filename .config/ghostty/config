@@ -156,6 +156,7 @@ keybind = ctrl+alt+shift+tab=text:\x02\x16A
 # default "process is running, close anyway?" prompt.
 confirm-close-surface = false
 
+
 # >>> croft keybindings (managed by `croft setup-ghostty`) >>>
 keybind = cmd+shift+f=csi:70;10u
 keybind = cmd+f=csi:102;9u
@@ -165,6 +166,7 @@ keybind = cmd+alt+c=csi:99;11u
 keybind = cmd+alt+m=csi:109;11u
 keybind = cmd+alt+f=csi:102;11u
 keybind = cmd+alt+enter=csi:13;11u
+keybind = cmd+enter=csi:13;9u
 keybind = cmd+/=csi:47;9u
 keybind = cmd+.=csi:46;9u
 keybind = cmd+shift+/=csi:63;10u
@@ -177,7 +179,6 @@ keybind = cmd+shift+z=csi:90;10u
 keybind = cmd+g=csi:103;9u
 keybind = cmd+k=csi:107;9u
 keybind = cmd+y=csi:121;9u
-keybind = cmd+o=csi:111;9u
 keybind = cmd+e=csi:101;9u
 keybind = cmd+p=csi:112;9u
 keybind = cmd+b=csi:98;9u
@@ -223,15 +224,16 @@ keybind = cmd+6=csi:54;9u
 keybind = cmd+7=csi:55;9u
 keybind = cmd+8=csi:56;9u
 keybind = cmd+9=csi:57;9u
+keybind = cmd+,=csi:44;9u
+keybind = cmd+l=csi:108;9u
+keybind = cmd+n=csi:110;9u
+keybind = cmd+t=csi:116;9u
 # <<< croft keybindings (managed by `croft setup-ghostty`) <<<
 
-# Pi transcript chords. Route Cmd+F / Cmd+T through tmux's `croft` key table
-# (slots g / t, see .tmux.conf) so the raw super+f / super+t reach the focused
-# pane. tmux drops the direct CSI-u for panes that did not enable extkeys, which
-# is why these mirror the Cmd+Up/Down handling. Keep these lines after the
-# managed croft block so they win: a later keybind overrides an earlier one.
-keybind = cmd+f=text:\x02\x16g
-keybind = cmd+t=text:\x02\x16t
+# Open-file picker: Cmd+O routes through tmux's `croft` key table (slot o) so
+# dev-workspace can run the fzf picker over ~/Projects in a popup. Keep after
+# the managed block so it wins over any managed Cmd+O line.
+keybind = super+o=text:\x02\x16o
 
 # Pi transcript chords. Route Cmd+F / Cmd+T through tmux's `croft` key table
 # (slots g / t, see .tmux.conf) so the raw super+f / super+t reach the focused
