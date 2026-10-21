@@ -95,7 +95,9 @@ branch `personal`; `upstream` = `vitali87/croft`).
   `dev-workspace open-review` to load the selected PR into the lumen swap tab.
 - lumen is the `joelove/lumen` fork (branch `personal`): upstream has no ANSI
   theme, so the fork adds `ansi` / `Theme::ansi()` (16 slots). Rebuild with
-  `cargo install --path ~/Projects/lumen --locked`. mdcat is Homebrew's
+  `cargo install --path ~/Projects/lumen --locked`. The fork also binds Cmd+Up
+  to quit the diff viewer (back to the picker); tmux croft slot 3 forwards it
+  raw. mdcat is Homebrew's
   `BIRSAx2/mdcat` fork; `mdpick`/`mdless` are `exec -a` argv[0] wrappers.
   The review tab defaults to `repo-review <config>`, an fzf picker over that
   profile's gh-dash `repoPaths`; the docs tab loops `mdpick` so quitting mdcat
