@@ -82,7 +82,7 @@ this file is the reference for changing or debugging anything.
 
 - Repo path: `~/Projects/dotfiles/.config/ghostty/config`, symlinked to
   `~/.config/ghostty` (directory symlink).
-- Font: MesloLGS NF 15, `adjust-cell-height = 28%`.
+- Font: MesloLGS NF 14, `adjust-cell-height = 28%`.
 - Colors: black background, `#f8f8f2` foreground, monokai ANSI palette, cursor
   `#ffa827`, selection `#403d3d`.
 - `cursor-style = block`; Ghostty renders a hollow block when the surface is
