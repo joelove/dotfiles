@@ -1,0 +1,21 @@
+#!/bin/sh
+# git-guard: refuse direct commits on a protected branch.
+# Override deliberately with ALLOW_MAIN_COMMIT=1.
+branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")
+case "$branch" in
+  main|master) ;;
+  *) exit 0 ;;
+esac
+# The personal dotfiles repo commits to main by design.
+top=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+case "$top" in
+  "$HOME/Projects/dotfiles") exit 0 ;;
+esac
+if [ "${ALLOW_MAIN_COMMIT:-0}" = "1" ]; then
+  echo "git-guard: overriding the '$branch' commit block (ALLOW_MAIN_COMMIT=1)." >&2
+  exit 0
+fi
+echo "git-guard: refusing to commit directly on '$branch'." >&2
+echo "  Branch first: git checkout -b <gitBranchName> origin/main" >&2
+echo "  Deliberate override: ALLOW_MAIN_COMMIT=1 git commit ..." >&2
+exit 1
