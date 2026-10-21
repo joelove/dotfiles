@@ -22,10 +22,13 @@
 | `.gitconfig` | git identity + gh credential helper |
 | `.config/karabiner/`, `qmk/` | keyboard remaps and QMK keymaps |
 
-pi lives outside dotfiles: `~/.pi/agent/{settings.json,mcp.json,agents,extensions,themes}`;
-skills are discovered from `~/.agents/skills`. The patched croft source lives
-outside dotfiles too: `~/Projects/croft` (`origin` = `joelove/croft`, branch
-`personal`; `upstream` = `vitali87/croft`).
+pi config is tracked in dotfiles at
+`.pi/agent/{settings.json,mcp.json,AGENTS.md,agents,extensions,themes,skills}`
+and symlinked into `~/.pi/agent` by `setup-pi.sh`; runtime state (`auth.json`,
+`sessions/`, `npm/`, `plans/`, caches) stays in the real `~/.pi/agent` and is
+gitignored. Skills are discovered from `~/.agents/skills`. The patched croft
+source lives outside dotfiles: `~/Projects/croft` (`origin` = `joelove/croft`,
+branch `personal`; `upstream` = `vitali87/croft`).
 
 ## Reload / debug
 
