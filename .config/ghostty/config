@@ -238,6 +238,9 @@ keybind = cmd+t=csi:116;9u
 # invoking session and runs `dev-workspace restart`. Deliberately off croft's
 # own Cmd chords (`cmd+shift+r` is croft's), so nothing forwards it.
 keybind = super+ctrl+r=text:\x01R
+# cmd+ctrl+p attaches to the pi box over SSM: clear the line, type the
+# command, and press Enter into the focused shell.
+keybind = cmd+ctrl+p=text:\x15pi-box-attach\x0d
 
 # Open-file picker: Cmd+O routes through tmux's `croft` key table (slot o) so
 # dev-workspace can run the fzf picker over ~/Projects in a popup. Keep after
