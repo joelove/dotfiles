@@ -3,9 +3,12 @@
 # repo-review - review-tab default when no PR is loaded.
 #
 # Reads the `repoPaths` map from a gh-dash config, lets you fzf-pick one of the
-# local checkouts (with a git status/log preview), and opens `lumen diff` in it.
-# Picking again after lumen exits; Esc drops to a login shell so the swap pane
-# stays alive.
+# local checkouts (with a git status/log preview), then fzf-picks one of that
+# repo's git worktrees (primary checkout first, then linked worktrees under
+# `worktrees/`), and opens `lumen diff` there. Picking nothing at the worktree
+# prompt falls back to the repo's current branch. Picking again after lumen
+# exits; Esc at the repo prompt drops to a login shell so the swap pane stays
+# alive.
 #
 # Usage: repo-review <gh-dash-config.yml>
 #
@@ -30,6 +33,35 @@ for name, path in (data.get("repoPaths") or {}).items():
 PY
 }
 
+# TSV rows for the worktree picker: path <TAB> branch <TAB> note.
+# The primary checkout is emitted first because `git worktree list` does.
+worktrees() {
+  local dir="$1" line path="" branch="" note
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*)
+        path="${line#worktree }"
+        branch=""
+        ;;
+      "branch "*)
+        branch="${line#branch refs/heads/}"
+        ;;
+      "")
+        [ -n "$path" ] || continue
+        [ -n "$branch" ] || branch="(detached)"
+        if [ "$path" = "$dir" ]; then
+          note="current checkout"
+        else
+          note="worktrees/${path##*/}"
+        fi
+        printf '%s\t%s\t%s\n' "$path" "$branch" "$note"
+        path=""
+        branch=""
+        ;;
+    esac
+  done < <(git -C "$dir" worktree list --porcelain 2>/dev/null; printf '\n')
+}
+
 if [ ! -f "$config" ]; then
   printf 'repo-review: config not found: %s\n' "${config:-<none>}" >&2
   exec "${SHELL:-/bin/zsh}" -l
@@ -49,7 +81,23 @@ while true; do
     sleep 1
     continue
   fi
-  ( cd "$dir" && exec lumen diff ) || true
+
+  # Worktree picker: Esc keeps the primary checkout (the current branch).
+  wt=$(worktrees "$dir" | fzf \
+    --prompt="worktree ($(basename "$dir"))> " \
+    --delimiter='\t' \
+    --with-nth=2.. \
+    --preview='git -C {1} status -sb 2>/dev/null; echo; git -C {1} log --oneline -5 2>/dev/null' \
+    --preview-window='right:60%,border-left' || true)
+  workdir="$dir"
+  [ -n "$wt" ] && workdir=$(printf '%s' "$wt" | cut -f1)
+  if [ ! -d "$workdir" ]; then
+    printf 'repo-review: not a directory: %s\n' "$workdir" >&2
+    sleep 1
+    continue
+  fi
+
+  ( cd "$workdir" && exec lumen diff ) || true
 done
 
 exec "${SHELL:-/bin/zsh}" -l
