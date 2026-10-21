@@ -1,0 +1,22 @@
+#!/bin/sh
+# git-guard: refuse pushing to a protected branch.
+# Override deliberately with ALLOW_MAIN_PUSH=1.
+# Per-repo opt-out: set `git config --local guard.allowMainPush true`.
+remote="$1"
+if [ "${ALLOW_MAIN_PUSH:-0}" = "1" ]; then
+  exit 0
+fi
+if [ "$(git config --bool --get guard.allowMainPush 2>/dev/null)" = "true" ]; then
+  exit 0
+fi
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/master)
+      echo "git-guard: refusing to push '$remote_ref' to '$remote'." >&2
+      echo "  Open a pull request instead." >&2
+      echo "  Deliberate override: ALLOW_MAIN_PUSH=1 git push ..." >&2
+      exit 1
+      ;;
+  esac
+done
+exit 0

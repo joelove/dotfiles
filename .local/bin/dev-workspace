@@ -60,6 +60,7 @@ have_client() { "$TMUX_BIN" list-clients -t "$1" -F '#{client_tty}' 2>/dev/null 
 
 reset_profile() {
   unset DEV_NAME DEV_ROOT DEV_AGENT_DIR DEV_AGENT_CMD DEV_AGENT_PANES DEV_AGENT_SESSION \
+    DEV_AGENT_TARGET DEV_AGENT_REMOTE_CMD DEV_AGENT_REMOTE_SESSION DEV_AGENT_REMOTE_HOST \
     DEV_EDITOR_DIR DEV_EDITOR_CMD DEV_EDITOR_SESSION DEV_REVIEW_CMD DEV_REVIEW_SUB_CMD \
     DEV_REVIEW_SUB_LINES DEV_GH_COLS DEV_BOTTOM_LINES DEV_TERM_DIRS DEV_TERM_PATHS DEV_TERM_CMDS \
     DEV_SWAP_DEFAULT DEV_SWAP_REVIEW_CMD DEV_SWAP_DOCS_CMD DEV_SWAP_POOL_WINDOW
@@ -78,6 +79,15 @@ apply_defaults() {
   DEV_AGENT_CMD="${DEV_AGENT_CMD-pi}"
   DEV_AGENT_PANES="${DEV_AGENT_PANES:-2}"
   DEV_AGENT_SESSION="${DEV_AGENT_SESSION:-$DEV_NAME-agent}"
+  # local | remote. A remote agent view keeps a local tmux session whose panes
+  # each attach to the box's tmux over SSM; the editor session is always local.
+  DEV_AGENT_TARGET="${DEV_AGENT_TARGET:-local}"
+  DEV_AGENT_REMOTE_CMD="${DEV_AGENT_REMOTE_CMD:-remote-attach}"
+  DEV_AGENT_REMOTE_SESSION="${DEV_AGENT_REMOTE_SESSION:-company-pi}"
+  DEV_AGENT_REMOTE_HOST="${DEV_AGENT_REMOTE_HOST:-}"
+  if [ -n "${TARGET_OVERRIDE:-}" ]; then
+    DEV_AGENT_TARGET="$TARGET_OVERRIDE"
+  fi
   DEV_EDITOR_DIR="${DEV_EDITOR_DIR:-$DEV_ROOT}"
   DEV_EDITOR_CMD="${DEV_EDITOR_CMD:-croft}"
   DEV_EDITOR_SESSION="${DEV_EDITOR_SESSION:-$DEV_NAME-editor}"
@@ -132,8 +142,23 @@ all_profiles() {
 
 # --- session builders -------------------------------------------------------
 
+# The command each agent pane runs. A remote target wraps the box's session
+# over SSM with remote-attach; local runs the agent directly. The editor stays
+# local in both cases.
+agent_start_cmd() {
+  if [ "$DEV_AGENT_TARGET" = "remote" ]; then
+    if [ -n "$DEV_AGENT_REMOTE_HOST" ]; then
+      printf '%s -h %s %s' "$DEV_AGENT_REMOTE_CMD" "$DEV_AGENT_REMOTE_HOST" "$DEV_AGENT_REMOTE_SESSION"
+    else
+      printf '%s %s' "$DEV_AGENT_REMOTE_CMD" "$DEV_AGENT_REMOTE_SESSION"
+    fi
+  else
+    printf '%s' "$DEV_AGENT_CMD"
+  fi
+}
+
 build_agent() {
-  [ -n "$DEV_AGENT_CMD" ] || return 0
+  [ -n "$DEV_AGENT_CMD" ] || [ "$DEV_AGENT_TARGET" = "remote" ] || return 0
   have "$DEV_AGENT_SESSION" && return 0
   local pane i
   pane=$("$TMUX_BIN" new-session -d -s "$DEV_AGENT_SESSION" -n agent -c "$DEV_AGENT_DIR" -P -F '#{pane_id}')
@@ -145,7 +170,7 @@ build_agent() {
     i=$((i + 1))
   done
   while IFS= read -r pane; do
-    "$TMUX_BIN" send-keys -t "$pane" "$DEV_AGENT_CMD" Enter
+    "$TMUX_BIN" send-keys -t "$pane" "$(agent_start_cmd)" Enter
   done < <("$TMUX_BIN" list-panes -t "$DEV_AGENT_SESSION" -F '#{pane_id}')
 }
 
@@ -232,7 +257,7 @@ restore_from_save() {
 # marks a pane as already handled so ensure and the resurrect hook can both
 # call this without starting the agent twice.
 start_agent_in_shells() {
-  [ -n "$DEV_AGENT_CMD" ] || return 0
+  [ -n "$DEV_AGENT_CMD" ] || [ "$DEV_AGENT_TARGET" = "remote" ] || return 0
   have "$DEV_AGENT_SESSION" || return 0
   local pane cmd mark
   while IFS= read -r pane; do
@@ -242,7 +267,7 @@ start_agent_in_shells() {
     case "$cmd" in
       zsh|bash|sh|-zsh|-bash)
         "$TMUX_BIN" set-option -p -t "$pane" @dev_agent_started 1
-        "$TMUX_BIN" send-keys -t "$pane" "$DEV_AGENT_CMD" Enter
+        "$TMUX_BIN" send-keys -t "$pane" "$(agent_start_cmd)" Enter
         ;;
     esac
   done < <("$TMUX_BIN" list-panes -t "$DEV_AGENT_SESSION" -F '#{pane_id}' 2>/dev/null)
@@ -951,13 +976,29 @@ post_restore_all() {
 # Global --root, parsed before the profile/subcommand. Used by the `ws DIR`
 # launcher to root an ad-hoc workspace at any directory.
 ROOT_OVERRIDE=""
-while [ "${1:-}" = "--root" ]; do
-  if [ -z "${2:-}" ]; then
-    echo "usage: dev-workspace --root <dir> [<command>]" >&2
-    exit 1
-  fi
-  ROOT_OVERRIDE="$2"
-  shift 2
+TARGET_OVERRIDE=""
+while :; do
+  case "${1:-}" in
+    --root)
+      if [ -z "${2:-}" ]; then
+        echo "usage: dev-workspace --root <dir> [<command>]" >&2
+        exit 1
+      fi
+      ROOT_OVERRIDE="$2"
+      shift 2
+      ;;
+    --local)
+      TARGET_OVERRIDE=local
+      shift
+      ;;
+    --remote)
+      TARGET_OVERRIDE=remote
+      shift
+      ;;
+    *)
+      break
+      ;;
+  esac
 done
 
 if [ "$#" -eq 0 ]; then
@@ -1017,6 +1058,8 @@ case "$CMD" in
     printf 'DEV_AGENT_CMD=%s\n' "$DEV_AGENT_CMD"
     printf 'DEV_AGENT_PANES=%s\n' "$DEV_AGENT_PANES"
     printf 'DEV_AGENT_SESSION=%s\n' "$DEV_AGENT_SESSION"
+    printf 'DEV_AGENT_TARGET=%s\n' "$DEV_AGENT_TARGET"
+    printf 'DEV_AGENT_REMOTE_SESSION=%s\n' "$DEV_AGENT_REMOTE_SESSION"
     printf 'DEV_EDITOR_DIR=%s\n' "$DEV_EDITOR_DIR"
     printf 'DEV_EDITOR_CMD=%s\n' "$DEV_EDITOR_CMD"
     printf 'DEV_EDITOR_SESSION=%s\n' "$DEV_EDITOR_SESSION"

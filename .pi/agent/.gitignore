@@ -1,0 +1,11 @@
+# Runtime state that pi writes next to the config. The tracked config is
+# symlinked into ~/.pi/agent, so nothing here should be versioned.
+auth.json
+sessions/
+npm/
+plans/
+models-store.json
+mcp-cache.json
+crashes.json
+trust.json
+settings.json.bak-*

@@ -1,0 +1,7 @@
+{
+  "app.interrupt": ["escape", "ctrl+c"],
+  "tui.altScreen.search": "super+f",
+  "tui.altScreen.previousPrompt": "super+up",
+  "tui.altScreen.nextPrompt": "super+down",
+  "app.session.tree": "super+t"
+}

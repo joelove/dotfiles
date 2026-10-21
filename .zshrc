@@ -339,6 +339,9 @@ alias tma='tmux attach'
 alias tmd='tmux detach'
 alias tml='tmux list-panes -a -F "#{pane_tty} #{session_name}"'
 
+# dev-box: attach to the cloud pi tmux session over SSM (no port 22).
+alias pba='remote-attach'
+
 # workspace
 # Launch a dev-workspace in new Ghostty windows (focus the existing windows
 # when already open). `ws` is the default ~/Projects workspace; `ws DIR` roots
@@ -357,7 +360,11 @@ ws() {
 }
 
 cws() {
-  company-workspace open
+  if [ "$#" -gt 0 ]; then
+    dev-workspace "$@" company open
+  else
+    company-workspace open
+  fi
 }
 
 # terraform
