@@ -81,21 +81,21 @@ shell-integration-features = no-cursor,no-sudo,title,no-ssh-env,no-ssh-terminfo,
 # `cmd+alt+arrow_*` lines) after a re-run.
 #
 # split right (vertical divider)
-keybind = super+d=text:\x02\x16d
+keybind = super+d=text:\x01\x16d
 # split down
-keybind = super+shift+d=text:\x02\x16D
+keybind = super+shift+d=text:\x01\x16D
 # kill pane
-keybind = super+w=text:\x02\x16w
+keybind = super+w=text:\x01\x16w
 # zoom / unzoom pane
-keybind = super+shift+enter=text:\x02\x16e
+keybind = super+shift+enter=text:\x01\x16e
 # Cmd+Enter stays Ghostty's toggle_fullscreen. Croft's insert-line-below is
 # Ctrl+Enter, which Ghostty delivers natively through the kitty keyboard
 # protocol, so no forwarder or tmux slot is needed.
 # move pane focus
-keybind = super+alt+arrow_left=text:\x02\x16h
-keybind = super+alt+arrow_right=text:\x02\x16l
-keybind = super+alt+arrow_up=text:\x02\x16k
-keybind = super+alt+arrow_down=text:\x02\x16j
+keybind = super+alt+arrow_left=text:\x01\x16h
+keybind = super+alt+arrow_right=text:\x01\x16l
+keybind = super+alt+arrow_up=text:\x01\x16k
+keybind = super+alt+arrow_down=text:\x01\x16j
 
 # ---------------------------------------------------------------------------
 # croft settings
@@ -124,16 +124,16 @@ keybind = super+n=csi:110;9u
 # and Cmd+F (find). Forward the real Alt+Left/Right so croft's word motion runs.
 keybind = alt+arrow_left=csi:1;3D
 keybind = alt+arrow_right=csi:1;3C
-keybind = super+left=text:\x02\x161
-keybind = super+right=text:\x02\x162
-keybind = super+up=text:\x02\x163
-keybind = super+down=text:\x02\x164
-keybind = super+shift+left=text:\x02\x165
-keybind = super+shift+right=text:\x02\x166
-keybind = super+shift+up=text:\x02\x167
-keybind = super+shift+down=text:\x02\x168
-keybind = super+backspace=text:\x02\x16b
-keybind = super+delete=text:\x02\x16f
+keybind = super+left=text:\x01\x161
+keybind = super+right=text:\x01\x162
+keybind = super+up=text:\x01\x163
+keybind = super+down=text:\x01\x164
+keybind = super+shift+left=text:\x01\x165
+keybind = super+shift+right=text:\x01\x166
+keybind = super+shift+up=text:\x01\x167
+keybind = super+shift+down=text:\x01\x168
+keybind = super+backspace=text:\x01\x16b
+keybind = super+delete=text:\x01\x16f
 keybind = super+l=csi:108;9u
 
 # ---------------------------------------------------------------------------
@@ -146,10 +146,10 @@ keybind = super+l=csi:108;9u
 #
 # NOTE: `croft setup-ghostty` does not emit these (it only forwards Cmd chords),
 # so re-running it is safe here.
-keybind = ctrl+tab=text:\x02\x16p
-keybind = ctrl+shift+tab=text:\x02\x16P
-keybind = ctrl+alt+tab=text:\x02\x16a
-keybind = ctrl+alt+shift+tab=text:\x02\x16A
+keybind = ctrl+tab=text:\x01\x16p
+keybind = ctrl+shift+tab=text:\x01\x16P
+keybind = ctrl+alt+tab=text:\x01\x16a
+keybind = ctrl+alt+shift+tab=text:\x01\x16A
 
 # ---------------------------------------------------------------------------
 # Quit
@@ -237,17 +237,17 @@ keybind = cmd+t=csi:116;9u
 # tmux prefix + R; the binding in .tmux.conf resolves the profile from the
 # invoking session and runs `dev-workspace restart`. Deliberately off croft's
 # own Cmd chords (`cmd+shift+r` is croft's), so nothing forwards it.
-keybind = super+ctrl+r=text:\x02R
+keybind = super+ctrl+r=text:\x01R
 
 # Open-file picker: Cmd+O routes through tmux's `croft` key table (slot o) so
 # dev-workspace can run the fzf picker over ~/Projects in a popup. Keep after
 # the managed block so it wins over any managed Cmd+O line.
-keybind = super+o=text:\x02\x16o
+keybind = super+o=text:\x01\x16o
 
 # Pi transcript chords. Route Cmd+F / Cmd+T through tmux's `croft` key table
 # (slots g / t, see .tmux.conf) so the raw super+f / super+t reach the focused
 # pane. tmux drops the direct CSI-u for panes that did not enable extkeys, which
 # is why these mirror the Cmd+Up/Down handling. Keep these lines after the
 # managed croft block so they win: a later keybind overrides an earlier one.
-keybind = cmd+f=text:\x02\x16g
-keybind = cmd+t=text:\x02\x16t
+keybind = cmd+f=text:\x01\x16g
+keybind = cmd+t=text:\x01\x16t
