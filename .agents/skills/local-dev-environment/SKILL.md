@@ -62,7 +62,9 @@ Config map, reload/debug, and pitfalls:
 - croft has no ANSI-passthrough mode; a theme is RGB hex, so any Ghostty palette
   change must be mirrored into the croft theme's `ansi` array.
 - Never commit secrets. `mcp.json`'s GitHub token is `!gh auth token`.
-- pi lives outside dotfiles: `~/.pi/agent/{settings.json,mcp.json,agents,extensions,themes}`;
+- pi config is tracked in dotfiles at `.pi/agent` and symlinked into
+  `~/.pi/agent` by `setup-pi.sh`; runtime state (`auth.json`, `sessions/`,
+  `npm/`, `plans/`, caches) stays in the real `~/.pi/agent` and is gitignored.
   skills are discovered from `~/.agents/skills`.
 
 ## How to change safely

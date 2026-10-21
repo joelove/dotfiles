@@ -324,19 +324,30 @@ this file is the reference for changing or debugging anything.
 
 ## pi
 
-- `~/.pi/agent/settings.json`: theme `monokai`, `shellPath /bin/zsh`, default
-  provider openrouter, `deepseek/deepseek-v4.1-flash` with high thinking,
-  `tuiMode fullscreen`, cursor shown, packages `pi-mcp-adapter` and
-  `@janvitos/pi-plan-build`.
-- `~/.pi/agent/mcp.json`: `linear` (hosted MCP) and `github` (bearer token from
+## pi
+
+The tracked config lives in `dotfiles/.pi/agent` and `setup-pi.sh` symlinks it
+into `~/.pi/agent` on the Mac and the pi-box; runtime state stays real and
+gitignored.
+
+- `.pi/agent/settings.json`: theme `monokai`, default provider openrouter,
+  `deepseek/deepseek-v4.1-flash` with low thinking, `tuiMode fullscreen`,
+  cursor shown, `oauthCredentialStore encrypted-file`, packages
+  `npm:pi-mcp-adapter@2.37.0` and the local `../../Projects/pi-plan-build`.
+- `.pi/agent/mcp.json`: `linear` (hosted MCP) and `github` (bearer token from
   `!gh auth token`).
-- `~/.pi/agent/agents/`: `reviewer.md`, `security-reviewer.md`.
-- `~/.pi/agent/extensions/`: `native-cursor.ts`, `subagent/`.
-- `~/.pi/agent/keybindings.json`: interrupt on escape/ctrl+c.
-- `~/.pi/agent/themes/monokai.json`.
-- Skills: `~/.pi/agent/skills/<name>` are symlinks into `~/.agents/skills/<name>`
-  (the shared skills dir). Skill sources for this environment live in
-  `~/Projects/dotfiles/.agents/skills/`.
+- `.pi/agent/AGENTS.md` and `.pi/agent/agents/`: `reviewer.md`,
+  `security-reviewer.md`.
+- `.pi/agent/extensions/`: `native-cursor.ts`, `subagent/`.
+- `.pi/agent/keybindings.json`: interrupt on escape/ctrl+c.
+- `.pi/agent/themes/monokai.json`.
+- `.pi/agent/skills/design-polish` is tracked; shared skills are
+  `~/.agents/skills/<name>` symlinks built from `~/Projects/dotfiles/.agents/skills/`
+  and `~/Projects/agent-skills/`.
+
+`setup-pi.sh` also installs `.config/git/config` (portable
+`hooksPath = ~/.config/git/hooks`) and the git-guard hooks; `setup-linux.sh`
+adds the Linux `gh` credential helper for the pi-box.
 
 ## zsh and git
 
