@@ -6,7 +6,7 @@
 # ---------------------------------------------------------------------------
 # iTerm2 "Normal Font" was: MesloLGS-NF-Regular 15
 font-family = MesloLGS-NF-Regular
-font-size = 15
+font-size = 14
 
 # iTerm2 "Vertical Spacing" = 1.28 (28% extra height).
 # Remove/comment this line if you prefer the font's natural spacing.
