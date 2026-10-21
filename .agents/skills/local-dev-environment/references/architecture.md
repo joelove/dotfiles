@@ -285,7 +285,8 @@ this file is the reference for changing or debugging anything.
   `dev-docs` loops `mdpick` (fzf over markdown below the cwd) in the docs tab
   with no intermediate prompt, so quitting mdcat returns to the picker;
   `repo-review` does the same over a profile's gh-dash `repoPaths` for the
-  review tab, opening `lumen diff` in the chosen repo.
+  review tab, then fzf-picks one of that repo's git worktrees (the primary
+  checkout is the Esc default), opening `lumen diff` in the chosen directory.
 
 ## gh-dash
 

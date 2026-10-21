@@ -50,7 +50,7 @@ git clone --branch personal https://github.com/joelove/lumen.git ~/Projects/lume
 - [croft](https://docs.croft.software) VS Code-style terminal editor (built from the `joelove/croft` fork branch `personal`; config symlinked from `.config/croft`; run `croft setup-ghostty` once for the Cmd chords)
 - [lumen](https://github.com/jnsahaj/lumen) PR diff/review TUI (built from the `joelove/lumen` fork branch `personal`, which adds the `ansi` theme so it matches the terminal palette; config symlinked from `.config/lumen`)
 - [mdcat](https://github.com/BIRSAx2/mdcat) markdown renderer, `brew install mdcat` (config symlinked from `.config/mdcat`; `mdpick`/`mdless` wrappers in `.local/bin`)
-- `repo-review` review-tab picker: fzf over a profile's gh-dash `repoPaths`, then `lumen diff` in the chosen repo (symlinked from `.local/bin`)
+- `repo-review` review-tab picker: fzf over a profile's gh-dash `repoPaths`, then a per-repo worktree picker (primary checkout plus linked worktrees; Esc keeps the current branch), then `lumen diff` in the chosen directory (symlinked from `.local/bin`)
 - `dev-workspace` tmux/Ghostty workspace engine with per-project profiles (symlinked from `.local/bin` and `.config/dev-workspace`); needs `tmux`, `jq`, `yabai`. Shell launchers `ws [DIR]` (default `~/Projects`, or root the same layout at DIR) and `cws` (candela) open or focus the workspace windows
 
 ### Symlinks

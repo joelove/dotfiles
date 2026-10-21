@@ -98,8 +98,9 @@ branch `personal`; `upstream` = `vitali87/croft`).
   `cargo install --path ~/Projects/lumen --locked`. mdcat is Homebrew's
   `BIRSAx2/mdcat` fork; `mdpick`/`mdless` are `exec -a` argv[0] wrappers.
   The review tab defaults to `repo-review <config>`, an fzf picker over that
-  profile's gh-dash `repoPaths`; the docs tab loops `mdpick` so quitting mdcat
-  returns to the picker.
+  profile's gh-dash `repoPaths` followed by a per-repo worktree picker (Esc
+  keeps the primary checkout on its current branch); the docs tab loops `mdpick`
+  so quitting mdcat returns to the picker.
 - `.zshenv` exports a UTF-8 locale (`LANG`/`LC_CTYPE=en_US.UTF-8`) and
   `.tmux.conf` seeds the same in tmux's global env. macOS/launchd and Ghostty
   leave the locale unset, and without it `less` (the pager mdcat's `mdpick` and
