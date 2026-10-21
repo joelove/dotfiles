@@ -360,7 +360,11 @@ ws() {
 }
 
 cws() {
-  candela-workspace open
+  if [ "$#" -gt 0 ]; then
+    dev-workspace "$@" candela open
+  else
+    candela-workspace open
+  fi
 }
 
 # terraform
