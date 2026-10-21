@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+#
+# pi-box-attach - reach the pi box's tmux sessions from the Mac over AWS SSM.
+#
+# There is no port 22 on the box. Listing uses SSM Run Command and attaching
+# uses an SSM Session Manager interactive session, so the only requirement is
+# an authenticated AWS SSO profile and the session-manager-plugin.
+#
+# Usage:
+#   pi-box-attach [session]     attach, creating the session if it is missing
+#   pi-box-attach -l            list the box's tmux sessions
+#   pi-box-attach -p            pick a session with fzf, then attach
+#   pi-box-attach -n [session]  create the session detached, do not attach
+#   pi-box-attach -h NAME       instance tag Name (default candela-pi-box)
+#   pi-box-attach -t ID         instance id (skips the tag lookup)
+#
+# Environment:
+#   PI_BOX_INSTANCE_ID   instance id, same as -t
+#   PI_BOX_INSTANCE_NAME instance tag Name, same as -h
+#   PI_BOX_SESSION       default session, same as the positional argument
+set -euo pipefail
+
+REGION="${AWS_REGION:-eu-west-2}"
+INSTANCE_NAME="${PI_BOX_INSTANCE_NAME:-candela-pi-box}"
+SESSION="${PI_BOX_SESSION:-candela-pi}"
+LIST=0
+PICK=0
+DETACH=0
+
+usage() {
+  sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'
+  exit "${1:-0}"
+}
+
+while getopts ":l p n h:t:" opt 2>/dev/null; do
+  case "$opt" in
+    l) LIST=1 ;;
+    p) PICK=1 ;;
+    n) DETACH=1 ;;
+    h) INSTANCE_NAME="$OPTARG" ;;
+    t) PI_BOX_INSTANCE_ID="$OPTARG" ;;
+    ?) usage 2 ;;
+  esac
+done
+shift $((OPTIND - 1))
+[ "$#" -gt 0 ] && SESSION="$1"
+
+if ! command -v aws >/dev/null 2>&1; then
+  echo "pi-box-attach: aws CLI not found" >&2
+  exit 1
+fi
+
+resolve_instance() {
+  if [ -n "${PI_BOX_INSTANCE_ID:-}" ]; then
+    printf '%s' "$PI_BOX_INSTANCE_ID"
+    return
+  fi
+  local id
+  id="$(aws ec2 describe-instances \
+    --region "$REGION" \
+    --filters "Name=tag:Name,Values=${INSTANCE_NAME}" "Name=instance-state-name,Values=running" \
+    --query 'Reservations[].Instances[].InstanceId' \
+    --output text | head -1)"
+  if [ -z "$id" ] || [ "$id" = "None" ]; then
+    echo "pi-box-attach: no running instance tagged Name=${INSTANCE_NAME}" >&2
+    exit 1
+  fi
+  printf '%s' "$id"
+}
+
+# Run a shell script on the box and print its stdout. $1 is the script.
+remote_script() {
+  local id="$1" script="$2" cmd_id json
+  json="$(jq -Rn --arg s "$script" '[$s]')"
+  cmd_id="$(aws ssm send-command \
+    --region "$REGION" \
+    --instance-ids "$id" \
+    --document-name "AWS-RunShellScript" \
+    --parameters "{\"commands\": ${json}}" \
+    --query 'Command.CommandId' \
+    --output text)"
+  aws ssm wait command-executed --region "$REGION" --command-id "$cmd_id" --instance-id "$id" >/dev/null 2>&1 || true
+  aws ssm get-command-invocation \
+    --region "$REGION" \
+    --command-id "$cmd_id" \
+    --instance-id "$id" \
+    --query 'StandardOutputContent' \
+    --output text
+}
+
+tmux_as_user() {
+  printf 'sudo -u ec2-user -H tmux %s' "$1"
+}
+
+list_sessions() {
+  local id="$1"
+  remote_script "$id" "$(tmux_as_user "list-sessions -F '#{session_name}'")" 2>/dev/null || true
+}
+
+attach() {
+  local id="$1" session="$2" cmd
+  cmd="sudo -u ec2-user -H tmux new-session -A -s ${session} -c /home/ec2-user/Projects/candela 2>/dev/null || sudo -u ec2-user -H tmux new-session -A -s ${session}"
+  exec aws ssm start-session \
+    --region "$REGION" \
+    --target "$id" \
+    --document-name "AWS-StartInteractiveCommand" \
+    --parameters "{\"command\":[\"bash -lc '${cmd}'\"]}"
+}
+
+id="$(resolve_instance)"
+
+if [ "$LIST" = "1" ]; then
+  list_sessions "$id"
+  exit 0
+fi
+
+if [ "$PICK" = "1" ]; then
+  names="$(list_sessions "$id")"
+  if [ -n "$names" ]; then
+    chosen="$(printf '%s\n' "$names" | fzf --prompt 'pi box session> ' || true)"
+    [ -n "$chosen" ] && SESSION="$chosen"
+  fi
+fi
+
+if [ "$DETACH" = "1" ]; then
+  remote_script "$id" "$(tmux_as_user "new-session -d -A -s ${SESSION} -c /home/ec2-user/Projects/candela")"
+  exit 0
+fi
+
+attach "$id" "$SESSION"
