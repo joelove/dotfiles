@@ -77,21 +77,17 @@ apply_defaults() {
   DEV_NAME="${DEV_NAME:-$(basename "$DEV_ROOT" | tr '[:upper:]' '[:lower:]')}"
   DEV_AGENT_DIR="${DEV_AGENT_DIR:-$DEV_ROOT}"
   DEV_AGENT_CMD="${DEV_AGENT_CMD-pi}"
+  DEV_AGENT_PANES="${DEV_AGENT_PANES:-2}"
   DEV_AGENT_SESSION="${DEV_AGENT_SESSION:-$DEV_NAME-agent}"
-  # local | remote. A remote agent view keeps a local tmux session whose panes
-  # each attach to the box's tmux over SSM; the editor session is always local.
-  # A remote view defaults to one pane: the box owns its own pane layout, so a
-  # second local pane would attach a second client to the same box window and
-  # duplicate the view. A local view keeps the profile's pane count (default 2).
+  # local | remote. A remote agent view keeps a local tmux session in which
+  # pane 0 attaches to the box and the remaining panes run the local agent;
+  # the editor session is always local.
   DEV_AGENT_TARGET="${DEV_AGENT_TARGET:-local}"
   DEV_AGENT_REMOTE_CMD="${DEV_AGENT_REMOTE_CMD:-}"
   DEV_AGENT_REMOTE_SESSION="${DEV_AGENT_REMOTE_SESSION:-}"
   DEV_AGENT_REMOTE_HOST="${DEV_AGENT_REMOTE_HOST:-}"
   if [ -n "${TARGET_OVERRIDE:-}" ]; then
     DEV_AGENT_TARGET="$TARGET_OVERRIDE"
-  fi
-  if [ -z "${DEV_AGENT_PANES:-}" ]; then
-    if [ "$DEV_AGENT_TARGET" = "remote" ]; then DEV_AGENT_PANES=1; else DEV_AGENT_PANES=2; fi
   fi
   DEV_EDITOR_DIR="${DEV_EDITOR_DIR:-$DEV_ROOT}"
   DEV_EDITOR_CMD="${DEV_EDITOR_CMD:-croft}"
@@ -147,11 +143,12 @@ all_profiles() {
 
 # --- session builders -------------------------------------------------------
 
-# The command each agent pane runs. A remote target wraps the profile's remote
-# command (set in the private overlay) over a tunnel; local runs the agent
-# directly. The editor stays local in both cases.
-agent_start_cmd() {
-  if [ "$DEV_AGENT_TARGET" = "remote" ]; then
+# The command for agent pane N (0-based). A remote target attaches pane 0 to
+# the box and runs the local agent in every other pane, so the view is one
+# remote session plus local ones. A local target runs the agent in every pane.
+agent_pane_cmd() {
+  local index="$1"
+  if [ "$DEV_AGENT_TARGET" = "remote" ] && [ "$index" -eq 0 ]; then
     if [ -n "$DEV_AGENT_REMOTE_HOST" ]; then
       printf '%s -h %s %s' "$DEV_AGENT_REMOTE_CMD" "$DEV_AGENT_REMOTE_HOST" "$DEV_AGENT_REMOTE_SESSION"
     else
@@ -168,15 +165,14 @@ build_agent() {
   local pane i
   pane=$("$TMUX_BIN" new-session -d -s "$DEV_AGENT_SESSION" -n agent -c "$DEV_AGENT_DIR" -P -F '#{pane_id}')
   "$TMUX_BIN" set-option -p -t "$pane" @dev_agent_started 1
+  "$TMUX_BIN" send-keys -t "$pane" "$(agent_pane_cmd 0)" Enter
   i=1
   while [ "$i" -lt "$DEV_AGENT_PANES" ]; do
     pane=$("$TMUX_BIN" split-window -h -t "$pane" -c "$DEV_AGENT_DIR" -P -F '#{pane_id}')
     "$TMUX_BIN" set-option -p -t "$pane" @dev_agent_started 1
+    "$TMUX_BIN" send-keys -t "$pane" "$(agent_pane_cmd "$i")" Enter
     i=$((i + 1))
   done
-  while IFS= read -r pane; do
-    "$TMUX_BIN" send-keys -t "$pane" "$(agent_start_cmd)" Enter
-  done < <("$TMUX_BIN" list-panes -t "$DEV_AGENT_SESSION" -F '#{pane_id}')
 }
 
 build_editor() {
@@ -264,18 +260,18 @@ restore_from_save() {
 start_agent_in_shells() {
   [ -n "$DEV_AGENT_CMD" ] || [ "$DEV_AGENT_TARGET" = "remote" ] || return 0
   have "$DEV_AGENT_SESSION" || return 0
-  local pane cmd mark
-  while IFS= read -r pane; do
+  local pane index cmd mark
+  while IFS= read -r pane index; do
     mark=$("$TMUX_BIN" show-options -p -t "$pane" -qv @dev_agent_started 2>/dev/null || true)
     [ "$mark" = "1" ] && continue
     cmd=$("$TMUX_BIN" display-message -p -t "$pane" '#{pane_current_command}' 2>/dev/null || echo '')
     case "$cmd" in
       zsh|bash|sh|-zsh|-bash)
         "$TMUX_BIN" set-option -p -t "$pane" @dev_agent_started 1
-        "$TMUX_BIN" send-keys -t "$pane" "$(agent_start_cmd)" Enter
+        "$TMUX_BIN" send-keys -t "$pane" "$(agent_pane_cmd "$index")" Enter
         ;;
     esac
-  done < <("$TMUX_BIN" list-panes -t "$DEV_AGENT_SESSION" -F '#{pane_id}' 2>/dev/null)
+  done < <("$TMUX_BIN" list-panes -t "$DEV_AGENT_SESSION" -F '#{pane_id} #{pane_index}' 2>/dev/null)
 }
 
 # Send a command to a pane only if it is sitting at a plain shell.
