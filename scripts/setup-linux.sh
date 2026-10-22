@@ -10,10 +10,10 @@ sh "$DOTFILES/scripts/setup-pi.sh"
 
 if command -v gh >/dev/null 2>&1; then
   gh_path="$(command -v gh)"
-  git config --global credential.https://github.com.helper ""
-  git config --global --add credential.https://github.com.helper "!$gh_path auth git-credential"
-  git config --global credential.https://gist.github.com.helper ""
-  git config --global --add credential.https://gist.github.com.helper "!$gh_path auth git-credential"
+  # --replace-all makes this idempotent: a plain set fails once more than one
+  # helper value exists, which happens after gh auth setup-git or a re-run.
+  git config --global --replace-all credential.https://github.com.helper "!$gh_path auth git-credential"
+  git config --global --replace-all credential.https://gist.github.com.helper "!$gh_path auth git-credential"
 fi
 
 # Box-only tmux config. The Mac keeps its own ~/.tmux.conf symlink, so this
