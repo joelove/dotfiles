@@ -12,5 +12,8 @@
   "packages": [
     "npm:pi-mcp-adapter@5.4.0",
     "../../Projects/pi-plan-build"
+  ],
+  "extensions": [
+    "-builtin:mcp"
   ]
 }
