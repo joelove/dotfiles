@@ -77,16 +77,21 @@ apply_defaults() {
   DEV_NAME="${DEV_NAME:-$(basename "$DEV_ROOT" | tr '[:upper:]' '[:lower:]')}"
   DEV_AGENT_DIR="${DEV_AGENT_DIR:-$DEV_ROOT}"
   DEV_AGENT_CMD="${DEV_AGENT_CMD-pi}"
-  DEV_AGENT_PANES="${DEV_AGENT_PANES:-2}"
   DEV_AGENT_SESSION="${DEV_AGENT_SESSION:-$DEV_NAME-agent}"
   # local | remote. A remote agent view keeps a local tmux session whose panes
   # each attach to the box's tmux over SSM; the editor session is always local.
+  # A remote view defaults to one pane: the box owns its own pane layout, so a
+  # second local pane would attach a second client to the same box window and
+  # duplicate the view. A local view keeps the profile's pane count (default 2).
   DEV_AGENT_TARGET="${DEV_AGENT_TARGET:-local}"
   DEV_AGENT_REMOTE_CMD="${DEV_AGENT_REMOTE_CMD:-}"
   DEV_AGENT_REMOTE_SESSION="${DEV_AGENT_REMOTE_SESSION:-}"
   DEV_AGENT_REMOTE_HOST="${DEV_AGENT_REMOTE_HOST:-}"
   if [ -n "${TARGET_OVERRIDE:-}" ]; then
     DEV_AGENT_TARGET="$TARGET_OVERRIDE"
+  fi
+  if [ -z "${DEV_AGENT_PANES:-}" ]; then
+    if [ "$DEV_AGENT_TARGET" = "remote" ]; then DEV_AGENT_PANES=1; else DEV_AGENT_PANES=2; fi
   fi
   DEV_EDITOR_DIR="${DEV_EDITOR_DIR:-$DEV_ROOT}"
   DEV_EDITOR_CMD="${DEV_EDITOR_CMD:-croft}"
