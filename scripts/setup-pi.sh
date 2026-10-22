@@ -4,7 +4,7 @@
 # is moved to a timestamped backup before it is replaced with a symlink.
 set -eu
 
-DOTFILES="$(cd "$(dirname "$0")" && pwd)"
+DOTFILES="$(cd "$(dirname "$0")/.." && pwd)"
 PI_SRC="$DOTFILES/.pi/agent"
 PI_DEST="$HOME/.pi/agent"
 
@@ -24,7 +24,7 @@ link() {
 }
 
 mkdir -p "$PI_DEST"
-for entry in settings.json keybindings.json mcp.json AGENTS.md agents themes extensions skills; do
+for entry in settings.json keybindings.json mcp.json AGENTS.md agents themes extensions; do
   link "$PI_SRC/$entry" "$PI_DEST/$entry"
 done
 

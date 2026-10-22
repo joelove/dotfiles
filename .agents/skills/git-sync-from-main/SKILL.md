@@ -17,7 +17,7 @@ enforces it.
 
 ## Resolve the issue
 
-1. Identify the issue (`TEAM-XXXX`); search with `list_issues` if unknown.
+1. Identify the issue (for example `<TEAM>-123`); search with `list_issues` if unknown.
 2. If none exists, create one first: read linear-project-tracking.
 3. `get_issue` and copy `gitBranchName` exactly.
 4. Mark it In Progress.

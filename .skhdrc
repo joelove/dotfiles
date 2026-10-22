@@ -56,7 +56,7 @@ cmd + alt + shift - up    : yabai -m window --focus north 2>/dev/null || yabai -
 cmd + alt + shift - down  : yabai -m window --focus south 2>/dev/null || yabai -m display --focus south 2>/dev/null
 
 ## Open the Ghostty workspace (was: switch space on focused display)
-cmd + alt - tab : company-workspace open
+cmd + alt - tab : dev-workspace open
 
 ## Switch space on display with mouse cursor
 cmd + alt + shift - tab : focus_display_with_mouse; \

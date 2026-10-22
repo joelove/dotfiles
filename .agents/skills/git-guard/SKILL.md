@@ -32,7 +32,7 @@ instead of stashing.
 
 ## The hook
 
-- `core.hooksPath = $HOME/.config/git/hooks`.
+- `core.hooksPath = ~/.config/git/hooks`.
 - `pre-commit` refuses a commit when HEAD is `main` or `master`.
 - `pre-push` refuses a push to `refs/heads/main` or `refs/heads/master`.
 - `~/Projects/dotfiles` is exempt: it commits to `main` by design.

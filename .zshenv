@@ -8,7 +8,7 @@ if [ -z "${LC_CTYPE:-}" ] || [ "${LC_CTYPE}" = "C" ] || [ "${LC_CTYPE}" = "POSIX
   export LC_CTYPE=en_US.UTF-8
 fi
 
-source $HOME/.automations.sh
-source $HOME/.secrets
+[ -f "$HOME/.automations.sh" ] && source "$HOME/.automations.sh"
+[ -f "$HOME/.secrets" ] && source "$HOME/.secrets"
 
 alias assume=". assume"

@@ -40,7 +40,9 @@ A PR links to an issue through the issue id in its branch name or title, or a
 magic word plus id in its description. The closing words are close, fix, resolve,
 complete, implement, and "linear issue"; the non-closing words are ref, part of,
 contributes to, toward, and updates. The branch id alone is a link, so keep the
-`CAN-XXXX` id in every PR for the issue and add `Closes CAN-XXXX` to the body.
+`<TEAM>-XXXX` id in every PR for the issue and add `Closes <TEAM>-XXXX` to the
+body. The team key, the org, and the repo list for a company workspace come from
+the private company reference skill in `agent-skills`, not this public skill.
 
 Missed closes are rare (a dropped webhook). Reconcile from GitHub, where the
 merged PR is the source of truth: see references/tracking.md.

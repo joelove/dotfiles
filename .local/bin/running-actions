@@ -20,24 +20,18 @@
 #   uses `gh api --cache` so repeated polls reuse a cached response.
 # - Redraws only when the rendered content actually changed (no idle flicker).
 #
-# Repos default to the Company set. Override by passing repos as arguments or
-# setting RUNNING_ACTIONS_REPOS (space-separated).
+# Repos are required: pass them as arguments or set RUNNING_ACTIONS_REPOS
+# (space-separated). A dev-workspace profile supplies its own list.
 #
 set -uo pipefail
 
 repos=("$@")
+if [ "${#repos[@]}" -eq 0 ] && [ -n "${RUNNING_ACTIONS_REPOS:-}" ]; then
+  read -r -a repos <<<"$RUNNING_ACTIONS_REPOS"
+fi
 if [ "${#repos[@]}" -eq 0 ]; then
-  if [ -n "${RUNNING_ACTIONS_REPOS:-}" ]; then
-    read -r -a repos <<<"$RUNNING_ACTIONS_REPOS"
-  else
-    repos=(
-      Company-Org/company-match
-      Company-Org/company-eval
-      Company-Org/company-orchestrator
-      Company-Org/company-infra
-      Company-Org/company-cms
-    )
-  fi
+  printf 'running-actions: no repos (pass owner/repo args or set RUNNING_ACTIONS_REPOS)\n' >&2
+  exit 2
 fi
 tick="${RUNNING_ACTIONS_TICK:-1}"
 interval="${RUNNING_ACTIONS_INTERVAL:-30}"

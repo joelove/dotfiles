@@ -10,7 +10,7 @@ prSections:
 
 # Map local checkouts so checkout/diff work from the TUI.
 repoPaths:
-  joelove/dotfiles: $HOME/Projects/dotfiles
+  joelove/dotfiles: ~/Projects/dotfiles
 
 defaults:
   view: prs
@@ -34,4 +34,4 @@ theme:
 keybindings:
   prs:
     - key: l
-      command: $HOME/.local/bin/dev-workspace open-review --path "{{.RepoPath}}" --repo "{{.RepoName}}" --pr "{{.PrNumber}}"
+      command: dev-workspace open-review --path "{{.RepoPath}}" --repo "{{.RepoName}}" --pr "{{.PrNumber}}"

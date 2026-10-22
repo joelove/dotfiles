@@ -2,6 +2,10 @@
 
 ### Install
 
+> These are the vendors' documented installers. Review them before running.
+> This repo does not ship a bootstrap script that pipes unpinned or plain-HTTP
+> scripts into a shell.
+
 https://brew.sh/
 
 ```sh
@@ -51,7 +55,7 @@ git clone --branch personal https://github.com/joelove/lumen.git ~/Projects/lume
 - [lumen](https://github.com/jnsahaj/lumen) PR diff/review TUI (built from the `joelove/lumen` fork branch `personal`, which adds the `ansi` theme so it matches the terminal palette; config symlinked from `.config/lumen`)
 - [mdcat](https://github.com/BIRSAx2/mdcat) markdown renderer, `brew install mdcat` (config symlinked from `.config/mdcat`; `mdpick`/`mdless` wrappers in `.local/bin`)
 - `repo-review` review-tab picker: fzf over a profile's gh-dash `repoPaths`, then a per-repo worktree picker (primary checkout plus linked worktrees; Esc keeps the current branch), then `lumen diff` in the chosen directory (symlinked from `.local/bin`)
-- `dev-workspace` tmux/Ghostty workspace engine with per-project profiles (symlinked from `.local/bin` and `.config/dev-workspace`); needs `tmux`, `jq`, `yabai`. Shell launchers `ws [DIR]` (default `~/Projects`, or root the same layout at DIR) and `cws` (company) open or focus the workspace windows
+- `dev-workspace` tmux/Ghostty workspace engine with per-project profiles (symlinked from `.local/bin`; profiles live in `~/.config/dev-workspace`); needs `tmux`, `jq`, `yabai`. Shell launcher `ws [DIR]` (default `~/Projects`, or root the same layout at DIR) opens or focuses the workspace windows. Project profiles, for example a company workspace, come from the private overlay below
 
 ### Symlinks
 
@@ -59,7 +63,7 @@ git clone --branch personal https://github.com/joelove/lumen.git ~/Projects/lume
 ln -s ~/Projects/dotfiles/.zshrc ~/.zshrc
 ln -s ~/Projects/dotfiles/.zprofile ~/.zprofile
 ln -s ~/Projects/dotfiles/.zshenv ~/.zshenv
-ln -s ~/Projects/dotfiles/.skhdrc ~/.skhdrc
+ln -s ~/Projects/dotfiles/.skhdrc ~/.skhdrc   # overlay/link.sh regenerates it
 ln -s ~/Projects/dotfiles/.yabairc ~/.yabairc
 ln -s ~/Projects/dotfiles/.automations.sh ~/.automations.sh
 ln -s ~/Projects/dotfiles/.gitconfig ~/.gitconfig
@@ -70,7 +74,7 @@ mkdir -p ~/.config
 ln -s ~/Projects/dotfiles/.config/ghostty ~/.config/ghostty
 ln -s ~/Projects/dotfiles/.config/croft ~/.config/croft
 ln -s ~/Projects/dotfiles/.config/gh-dash ~/.config/gh-dash
-ln -s ~/Projects/dotfiles/.config/dev-workspace ~/.config/dev-workspace
+mkdir -p ~/.config/dev-workspace   # dev-workspace profiles (private overlay)
 ln -s ~/Projects/dotfiles/.config/lumen ~/.config/lumen
 ln -s ~/Projects/dotfiles/.config/mdcat ~/.config/mdcat
 mkdir -p ~/.local/bin
@@ -82,6 +86,8 @@ ln -s ~/Projects/dotfiles/.local/bin/mdpick ~/.local/bin/mdpick
 ln -s ~/Projects/dotfiles/.local/bin/mdless ~/.local/bin/mdless
 ln -s ~/Projects/dotfiles/.local/bin/running-actions ~/.local/bin/running-actions
 ln -s ~/Projects/dotfiles/.local/bin/audit-agent-context.mjs ~/.local/bin/audit-agent-context
+# pi agent config and the git-guard hooks (idempotent; backs up any real file).
+sh ~/Projects/dotfiles/scripts/setup-pi.sh
 # All public skills live in dotfiles; pi discovers ~/.agents/skills natively, so
 # symlink every skill directory back. Do not mirror into ~/.pi/agent/skills.
 mkdir -p ~/.agents/skills
@@ -95,6 +101,41 @@ for d in ~/Projects/agent-skills/.agents/skills/*/; do
   ln -sfn "$d" "$HOME/.agents/skills/$(basename "$d")"
 done
 ```
+
+### Skills: public vs private
+
+- **Public** skills live in `dotfiles/.agents/skills` and are safe to publish.
+- **Private** skills live in the private `agent-skills` repo under
+  `.agents/skills`. Company specifics, production access, and anything unsafe
+  (an auth bypass, internal hostnames, repo lists) belong here, never in
+  `dotfiles`. Examples: the app design loop, the local dev environment, and the
+  company workflow skills.
+- Both repos are symlinked into `~/.agents/skills`, so pi discovers them the
+  same way. Do not mirror skills into `~/.pi/agent/skills`.
+
+### Private overlay
+
+The public configs stay generic and compose with a private overlay from the
+`agent-skills` repo (`overlay/`). Run `agent-skills/overlay/link.sh` to install
+it. Include points:
+
+- `.zshrc` conditionally sources `~/.config/dotfiles/private.zsh`
+- `.tmux.conf` runs `source-file -q ~/.config/dotfiles/tmux.conf`
+- `.config/ghostty/config` has `config-file = ?~/.config/dotfiles/ghostty.conf`
+- `dev-workspace` reads profiles from `~/.config/dev-workspace/`
+- skhd has no include, so `link.sh` generates `~/.skhdrc` from
+  `dotfiles/.skhdrc` plus the private fragment
+
+Every include is absent-safe: without the overlay the public configs load
+unchanged and simply lack the company bindings.
+
+### Forks
+
+Heavily customized tools run from a fork with a `personal` branch, and the
+upstream stays read-only (never merged or rebased). This keeps local changes
+from being overwritten and limits exposure to upstream supply-chain changes.
+`croft`, `lumen`, and `pi-plan-build` follow this shape: `origin` is the
+`joelove` fork, `upstream` is the original.
 
 ### Agent context
 

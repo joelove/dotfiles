@@ -339,13 +339,11 @@ alias tma='tmux attach'
 alias tmd='tmux detach'
 alias tml='tmux list-panes -a -F "#{pane_tty} #{session_name}"'
 
-# dev-box: attach to the cloud pi tmux session over SSM (no port 22).
-alias pba='remote-attach'
-
 # workspace
 # Launch a dev-workspace in new Ghostty windows (focus the existing windows
 # when already open). `ws` is the default ~/Projects workspace; `ws DIR` roots
-# the same layout at DIR; `cws` is the company workspace.
+# the same layout at DIR. Project profiles (for example a company workspace)
+# are supplied by the private overlay, not this public repo.
 ws() {
   local root
   if [[ -n "${1:-}" ]]; then
@@ -356,14 +354,6 @@ ws() {
     dev-workspace --root "$root" open
   else
     dev-workspace open
-  fi
-}
-
-cws() {
-  if [ "$#" -gt 0 ]; then
-    dev-workspace "$@" company open
-  else
-    company-workspace open
   fi
 }
 
@@ -410,3 +400,9 @@ alias grhh='scb && git reset --hard "origin/${current_branch}"'
 alias gs='git status'
 alias gst='git stash'
 alias gstk='git stash --keep-index'
+
+# Private / company overlay (optional). Kept out of this public repo; see the
+# agent-skills repo overlay/ and overlay/link.sh.
+if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/private.zsh" ]; then
+  source "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/private.zsh"
+fi

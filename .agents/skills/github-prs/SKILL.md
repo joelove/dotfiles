@@ -30,14 +30,14 @@ Every PR names the Linear issue it belongs to. The branch name or the issue id i
 the title is what links the PR, and the team's "On PR or commit merge" automation
 moves a linked issue when the PR merges (Done in this workspace).
 
-- Keep the `CAN-XXXX` id in the branch name and the title. The branch id alone
+- Keep the `<TEAM>-XXXX` id in the branch name and the title. The branch id alone
   links the PR, so a later body edit cannot unlink it.
-- Put `Closes CAN-XXXX` in the PR body as well. It states the intent and closes
+- Put `Closes <TEAM>-XXXX` in the PR body as well. It states the intent and closes
   the issue even if the branch or title loses the id.
 - List each issue on its own line when a PR closes more than one.
 - A multi-repo feature closes on the first linked PR that merges. If the issue
   should stay open until the last PR, keep the id out of the earlier branches and
-  titles and use `Refs CAN-XXXX` in their bodies.
+  titles and use `Refs <TEAM>-XXXX` in their bodies.
 - Set the issue In Review while the PR is open, and confirm Done after the merge.
   See linear-project-tracking.
 
@@ -56,8 +56,8 @@ A draft PR is where shipping normally ends. Leave it there.
       gh pr ready <ref>
       gh pr merge <ref> --auto --squash
 
-  Auto-merge is available on the Company repos except `company-qa`. Where the
-  repo does not allow it, watch checks and then squash merge:
+  Auto-merge is available where the repo allows it. Where it does not, watch
+  checks and then squash merge:
 
       gh pr checks <ref> --watch
       gh pr merge <ref> --squash

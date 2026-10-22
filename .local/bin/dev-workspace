@@ -82,8 +82,8 @@ apply_defaults() {
   # local | remote. A remote agent view keeps a local tmux session whose panes
   # each attach to the box's tmux over SSM; the editor session is always local.
   DEV_AGENT_TARGET="${DEV_AGENT_TARGET:-local}"
-  DEV_AGENT_REMOTE_CMD="${DEV_AGENT_REMOTE_CMD:-remote-attach}"
-  DEV_AGENT_REMOTE_SESSION="${DEV_AGENT_REMOTE_SESSION:-company-pi}"
+  DEV_AGENT_REMOTE_CMD="${DEV_AGENT_REMOTE_CMD:-}"
+  DEV_AGENT_REMOTE_SESSION="${DEV_AGENT_REMOTE_SESSION:-}"
   DEV_AGENT_REMOTE_HOST="${DEV_AGENT_REMOTE_HOST:-}"
   if [ -n "${TARGET_OVERRIDE:-}" ]; then
     DEV_AGENT_TARGET="$TARGET_OVERRIDE"
@@ -142,9 +142,9 @@ all_profiles() {
 
 # --- session builders -------------------------------------------------------
 
-# The command each agent pane runs. A remote target wraps the box's session
-# over SSM with remote-attach; local runs the agent directly. The editor stays
-# local in both cases.
+# The command each agent pane runs. A remote target wraps the profile's remote
+# command (set in the private overlay) over a tunnel; local runs the agent
+# directly. The editor stays local in both cases.
 agent_start_cmd() {
   if [ "$DEV_AGENT_TARGET" = "remote" ]; then
     if [ -n "$DEV_AGENT_REMOTE_HOST" ]; then

@@ -4,9 +4,9 @@
 # then fixes the gh credential helper for the Linux install path.
 set -eu
 
-DOTFILES="$(cd "$(dirname "$0")" && pwd)"
+DOTFILES="$(cd "$(dirname "$0")/.." && pwd)"
 
-sh "$DOTFILES/setup-pi.sh"
+sh "$DOTFILES/scripts/setup-pi.sh"
 
 if command -v gh >/dev/null 2>&1; then
   gh_path="$(command -v gh)"

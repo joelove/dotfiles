@@ -34,7 +34,7 @@
 - Issue identifiers look like `TEAM-123`; use them for `id`, `parentId`, and so
   on.
 - `get_issue` returns `gitBranchName` (for example
-  `joe/team-XXXX-rename-aws-resources-and-terraform-stacks`). That is the only
+  `joe/team-453-short-description`). That is the only
   allowed feature-branch name. See git-sync-from-main.
 - Prefer updating existing issues over creating duplicates; search first.
 - Required on every new issue: `assignee: "Joe Love"` and `estimate`
@@ -63,22 +63,22 @@ The GitHub integration closes issues on merge, so closing is not an agent step.
 When it misses one (a dropped webhook, or a PR that never linked), find it from
 GitHub, where the merged PR is the source of truth.
 
-1. List merged PRs in the window and collect every `CAN-XXXX` id from the branch,
-   title, and body. Run from the workspace root:
+1. List merged PRs in the window and collect every `<TEAM>-XXXX` id from the
+   branch, title, and body. The org and repo list come from the private company
+   reference; substitute them below. Run from the workspace root:
 
-       for repo in company-eval company-orchestrator company-cms company-ui \
-                   company-materials company-infra company-qa; do
-         gh pr list --repo Company-Org/$repo --state merged --limit 200 \
+       for repo in <REPO> <REPO>; do
+         gh pr list --repo <ORG>/$repo --state merged --limit 200 \
            --json number,title,headRefName,mergedAt,body \
            --jq '.[] | [.mergedAt, "'$repo'", (.number|tostring), .headRefName, .title, (.body // "")] | @tsv'
-       done | grep -E '2026-09-2[3-9]' | grep -oiE 'can-[0-9]+' | tr 'a-z' 'A-Z' | sort -u
+       done | grep -E '<DATE-WINDOW>' | grep -oiE '<team>-[0-9]+' | tr 'a-z' 'A-Z' | sort -u
 
 2. For each id, read the issue with the Linear MCP `get_issue`. For the gateway
    the issue JSON is in `data.content[0].text`. If `statusType` is `completed` or
    `canceled`, leave it.
 
 3. For each remaining id, confirm the merged PR is the primary link: the id is in
-   the branch or title, or the body has a `Closes CAN-XXXX` line. A follow-up
+   the branch or title, or the body has a `Closes <TEAM>-XXXX` line. A follow-up
    mention in a body is not a close. Close a genuine miss with `save_issue`
    (`id`, `state: "Done"`).
 
@@ -87,10 +87,7 @@ GitHub, where the merged PR is the source of truth.
    and note the PR in a comment.
 
 Expected result: no genuine misses. An id a PR body merely mentions without
-linking (no id in the branch or title, no `Closes` line) stays as it is. In the
-current workspace the last seven days flag only follow-ups (TEAM-XXXX, TEAM-XXXX,
-TEAM-XXXX, TEAM-XXXX) and the duplicate TEAM-XXXX; every linked merged PR already
-closed its issue.
+linking (no id in the branch or title, no `Closes` line) stays as it is.
 
 ### Auto-close settings
 

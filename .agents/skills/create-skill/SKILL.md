@@ -38,6 +38,12 @@ Use pi's `question` tool for fixed choices (location, whether to include scripts
 
 Prefer `~/.agents/skills/` for skills pi, Claude Code, and other Agent Skills harnesses should share. `~/.pi/agent/skills/` is pi-only.
 
+Where the file lives decides who can read it. `~/Projects/dotfiles/.agents/skills/`
+is a **public** repo: never put company names, internal hostnames, production
+access, or anything unsafe (an auth bypass) there. Private/company or unsafe
+skills live in the private `~/Projects/agent-skills/.agents/skills/` repo. Both
+are symlinked into `~/.agents/skills/`, so pi discovers them the same way.
+
 pi also loads skills from packages, the `skills` array in settings, and `--skill <path>`. Do not create the same skill name in two discovered locations: pi warns on name collisions and keeps the first found.
 
 ## Structure
