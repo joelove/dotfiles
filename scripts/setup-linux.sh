@@ -16,4 +16,13 @@ if command -v gh >/dev/null 2>&1; then
   git config --global --add credential.https://gist.github.com.helper "!$gh_path auth git-credential"
 fi
 
+# Box-only tmux config. The Mac keeps its own ~/.tmux.conf symlink, so this
+# link lives here rather than in setup-pi.sh. A real file is backed up first.
+if [ -e "$DOTFILES/.config/tmux/box.conf" ]; then
+  if [ -e "$HOME/.tmux.conf" ] && [ ! -L "$HOME/.tmux.conf" ]; then
+    mv "$HOME/.tmux.conf" "$HOME/.tmux.conf.bak-$(date +%s)"
+  fi
+  ln -sfn "$DOTFILES/.config/tmux/box.conf" "$HOME/.tmux.conf"
+fi
+
 echo "pi box dotfiles install complete"
