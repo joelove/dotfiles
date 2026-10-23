@@ -4,7 +4,7 @@
 # Builds the joelove/whisper.cpp fork, fetches the large-v3-turbo-q5_0 model,
 # links the binaries into ~/.local/bin, and installs/loads the LaunchAgent that
 # serves the recogniser on 127.0.0.1:8080. pi-speech reaches it through
-# PI_SPEECH_STT_URL (exported in .zshrc). Idempotent: re-run after a pull to
+# PI_SPEECH_STT_URL (exported in .zshenv). Idempotent: re-run after a pull to
 # rebuild. See README.md and .config/whisper/.
 set -eu
 
