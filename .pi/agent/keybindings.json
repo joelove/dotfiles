@@ -3,5 +3,6 @@
   "tui.altScreen.search": "super+f",
   "tui.altScreen.previousPrompt": "super+up",
   "tui.altScreen.nextPrompt": "super+down",
-  "app.session.tree": "super+t"
+  "app.session.tree": "super+t",
+  "tui.editor.deleteWordForward": ["alt+delete"]
 }
