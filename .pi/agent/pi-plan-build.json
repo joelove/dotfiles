@@ -1,0 +1,6 @@
+{
+  "shortcuts": {
+    "toggleMode": ["ctrl+alt+m"],
+    "toggleModeInEditor": ["tab"]
+  }
+}

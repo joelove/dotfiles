@@ -24,7 +24,7 @@ link() {
 }
 
 mkdir -p "$PI_DEST"
-for entry in settings.json keybindings.json mcp.json AGENTS.md agents themes extensions; do
+for entry in settings.json keybindings.json mcp.json pi-plan-build.json AGENTS.md agents themes extensions; do
   link "$PI_SRC/$entry" "$PI_DEST/$entry"
 done
 
