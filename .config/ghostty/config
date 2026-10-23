@@ -254,3 +254,12 @@ keybind = super+o=text:\x01\x16o
 # managed croft block so they win: a later keybind overrides an earlier one.
 keybind = cmd+f=text:\x01\x16g
 keybind = cmd+t=text:\x01\x16t
+
+# Native Mac copy/paste. The managed croft block above forwards cmd+c (and other
+# cmd+ keys) to the focused app for croft's own copy/paste, which does nothing in
+# tmux or pi. Re-assert the Ghostty defaults after it so cmd+c copies the
+# terminal selection and cmd+v pastes it everywhere, including the box session.
+# Keep these last, and re-add them if `croft setup-ghostty` ever runs again:
+# a later keybind overrides an earlier one.
+keybind = cmd+c=copy_to_clipboard
+keybind = cmd+v=paste_from_clipboard
