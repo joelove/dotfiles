@@ -1,5 +1,6 @@
 {
-  "lastChangelogVersion": "0.87.1",
+  "lastChangelogVersion": "1.4.0",
+  "shellPath": "/bin/zsh",
   "theme": "monokai",
   "defaultProvider": "openrouter",
   "defaultModel": "deepseek/deepseek-v4.1-flash",
@@ -11,7 +12,8 @@
   "oauthCredentialStore": "encrypted-file",
   "packages": [
     "npm:pi-mcp-adapter@5.4.0",
-    "../../Projects/pi-plan-build"
+    "../../Projects/pi-plan-build",
+    "../../Projects/pi-mobile/packages/pi-speech"
   ],
   "extensions": [
     "-builtin:mcp"

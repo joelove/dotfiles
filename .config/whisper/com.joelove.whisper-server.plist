@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.joelove.whisper-server</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/joelove/.local/bin/whisper-server</string>
+		<string>-m</string>
+		<string>/Users/joelove/Projects/whisper.cpp/models/ggml-large-v3-turbo-q5_0.bin</string>
+		<string>--host</string>
+		<string>127.0.0.1</string>
+		<string>--port</string>
+		<string>8080</string>
+		<string>--inference-path</string>
+		<string>/audio/transcriptions</string>
+		<string>--convert</string>
+		<string>-nt</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>WorkingDirectory</key>
+	<string>/tmp</string>
+	<key>ProcessType</key>
+	<string>Interactive</string>
+	<key>StandardOutPath</key>
+	<string>/tmp/whisper-server.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>/tmp/whisper-server.err.log</string>
+</dict>
+</plist>

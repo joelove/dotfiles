@@ -124,6 +124,10 @@ keybind = super+n=csi:110;9u
 # and Cmd+F (find). Forward the real Alt+Left/Right so croft's word motion runs.
 keybind = alt+arrow_left=csi:1;3D
 keybind = alt+arrow_right=csi:1;3C
+# Dictation transport. On the British layout option-as-alt defaults false, so
+# option+m would send "µ". Forward Alt+M (CSI-u: 109 = m, 3 = alt) so pi's
+# alt+m binding fires; skhd's cmd+alt+d synthesizes it. See .skhdrc.
+keybind = alt+m=csi:109;3u
 keybind = super+left=text:\x01\x161
 keybind = super+right=text:\x01\x162
 keybind = super+up=text:\x01\x163

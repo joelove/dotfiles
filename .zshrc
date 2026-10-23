@@ -120,6 +120,14 @@ export GIT_SEQUENCE_EDITOR="croft-edit"
 export PI_SKIP_VERSION_CHECK=1
 export PI_OFFLINE=1
 
+# Local, offline speech recognition for pi-speech (pi-mobile's dictation
+# extension). PI_SPEECH_STT_URL points it at the whisper.cpp server run by
+# .config/whisper/com.joelove.whisper-server.plist; the key is a placeholder
+# the local server does not check. Without these, pi-speech falls back to
+# Apple/OpenAI recognition.
+export PI_SPEECH_STT_URL="http://127.0.0.1:8080"
+export PI_SPEECH_STT_KEY="local"
+
 bold=$(tput bold)
 italic=$(tput sitm)
 normal=$(tput sgr0)

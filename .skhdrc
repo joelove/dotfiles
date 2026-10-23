@@ -70,3 +70,8 @@ hyper - 1 : open ~/Projects/dotfiles/qmk/current-preview.png
 hyper - 2 : open -a "iTerm"
 hyper - 3 : open -a "Visual Studio Code"
 hyper - 4 : open -a "Google Chrome"
+
+## Dictation: start/finish pi-speech voice input in the focused pi. skhd has
+## no hotkey for it, so synthesize pi's alt+m; Ghostty forwards Alt+M as CSI-u
+## on the British layout (see .config/ghostty).
+cmd + alt - d : skhd -k "alt - m"
