@@ -124,6 +124,11 @@ keybind = super+n=csi:110;9u
 # and Cmd+F (find). Forward the real Alt+Left/Right so croft's word motion runs.
 keybind = alt+arrow_left=csi:1;3D
 keybind = alt+arrow_right=csi:1;3C
+# Treat Option as Alt for every key, so Alt chords reach the terminal without
+# per-key bindings. pi-speech dictation is alt+d; pi-plan-build's mode toggle is
+# alt+m; croft's Alt chords are unaffected. Trade-off: Option no longer types
+# Unicode (µ, ∂) in the terminal.
+macos-option-as-alt = true
 keybind = super+left=text:\x01\x161
 keybind = super+right=text:\x01\x162
 keybind = super+up=text:\x01\x163
@@ -231,6 +236,20 @@ keybind = cmd+l=csi:108;9u
 keybind = cmd+n=csi:110;9u
 keybind = cmd+t=csi:116;9u
 # <<< croft keybindings (managed by `croft setup-ghostty`) <<<
+
+# ---------------------------------------------------------------------------
+# Font size reset
+# ---------------------------------------------------------------------------
+# Cmd+= / Cmd+- are Ghostty's own increase_font_size / decrease_font_size (the
+# managed croft block does not touch them). Restore the configured default
+# (font-size = 14) with Cmd+0.
+#
+# Kept after the managed block on purpose: that block forwards cmd+0 to croft
+# (its Cmd+digit vim counts), and a later keybind wins over an earlier one.
+# Re-add this line if `croft setup-ghostty` is ever run again; the managed
+# cmd+0 line sits above it and loses. Trade-off: croft no longer receives
+# Cmd+0. It is a Ghostty-level chord, so it works in every tmux pane.
+keybind = cmd+0=reset_font_size
 
 # Cmd+Ctrl+R resets the current dev-workspace (same as prefix R): one chord
 # instead of the tmux prefix, for picking up a build or config change. Sent as

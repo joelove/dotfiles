@@ -43,6 +43,10 @@ git clone --branch personal https://github.com/joelove/croft.git ~/Projects/crof
 # lumen: the personal fork (joelove/lumen, branch personal) with an ANSI theme
 git clone --branch personal https://github.com/joelove/lumen.git ~/Projects/lumen
 (cd ~/Projects/lumen && cargo install --path . --locked)
+
+# whisper.cpp: local, offline dictation for pi-speech (joelove/whisper.cpp fork)
+brew install cmake ffmpeg
+sh ~/Projects/dotfiles/scripts/setup-whisper.sh   # build, model, ~/.local/bin, LaunchAgent
 ```
 
 ### Configure
@@ -54,6 +58,7 @@ git clone --branch personal https://github.com/joelove/lumen.git ~/Projects/lume
 - [croft](https://docs.croft.software) VS Code-style terminal editor (built from the `joelove/croft` fork branch `personal`; config symlinked from `.config/croft`; run `croft setup-ghostty` once for the Cmd chords)
 - [lumen](https://github.com/jnsahaj/lumen) PR diff/review TUI (built from the `joelove/lumen` fork branch `personal`, which adds the `ansi` theme so it matches the terminal palette; config symlinked from `.config/lumen`)
 - [mdcat](https://github.com/BIRSAx2/mdcat) markdown renderer, `brew install mdcat` (config symlinked from `.config/mdcat`; `mdpick`/`mdless` wrappers in `.local/bin`)
+- [pi-speech](https://github.com/jkeskikangas/pi-mobile/tree/main/packages/pi-speech) dictation for pi (installed from the `joelove/pi-mobile` fork branch `personal`, which adds the `PI_SPEECH_STT_URL` override and rebinds dictation to `alt+d`); recognition runs against the local `whisper-server` from `scripts/setup-whisper.sh`, so it is free and offline. Start it with `alt+d` in pi; pi then distils the speech into a clean prompt (or a structured draft) in the editor
 - `repo-review` review-tab picker: fzf over a profile's gh-dash `repoPaths`, then a per-repo worktree picker (primary checkout plus linked worktrees; Esc keeps the current branch), then `lumen diff` in the chosen directory (symlinked from `.local/bin`)
 - `dev-workspace` tmux/Ghostty workspace engine with per-project profiles (symlinked from `.local/bin`; profiles live in `~/.config/dev-workspace`); needs `tmux`, `jq`, `yabai`. Shell launcher `ws [DIR]` (default `~/Projects`, or root the same layout at DIR) opens or focuses the workspace windows. Project profiles, for example a company workspace, come from the private overlay below
 
