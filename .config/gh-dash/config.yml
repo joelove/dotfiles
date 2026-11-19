@@ -29,8 +29,9 @@ theme:
       showSeparator: false
 
 # Stock gh-dash keys: `o` opens the PR in the browser, `enter` views it.
-# `l` loads the selected PR into the lumen review tab of the dev-workspace swap
-# pane (see `.local/bin/dev-workspace open-review`); `o` still opens the browser.
+# `l` opens the selected PR in lumen in a tmux popup (the dev-workspace swap
+# pane's mode 2 is now terminal-browser; see `.local/bin/dev-workspace
+# open-review`); `o` still opens the browser.
 keybindings:
   prs:
     - key: l

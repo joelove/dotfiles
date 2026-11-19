@@ -17,6 +17,11 @@ fi
 export PI_SPEECH_STT_URL="http://127.0.0.1:8080"
 export PI_SPEECH_STT_KEY="local"
 
+# terminal-browser (the editor swap tab's browser) collects usage and crash
+# telemetry. The config is also set to off, but this env var covers the daemon
+# and any fresh install in a shell that starts before the config is read.
+export TERMINAL_BROWSER_NO_TELEMETRY=1
+
 [ -f "$HOME/.automations.sh" ] && source "$HOME/.automations.sh"
 [ -f "$HOME/.secrets" ] && source "$HOME/.secrets"
 

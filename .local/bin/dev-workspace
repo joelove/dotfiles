@@ -21,9 +21,10 @@
 #   attach-only [session] attach without touching sessions or layout
 #   review-pane           (re)launch the review pane command only if it is closed
 #   swap [mode] [--session NAME]   cycle/select the swappable pane tab
-#                         (next|prev|editor|review|docs; default next)
+#                         (next|prev|editor|browser|docs; default next)
+#   review [--session NAME]  open the lumen/review picker in a tmux popup
 #   open-review [--session NAME] [--path DIR] [--repo O/R] --pr N
-#                         load PR N into the lumen review tab and raise it
+#                         open PR N in lumen in a tmux popup
 #   open-file [--session NAME] [--root DIR]
 #                         fzf a file under ~/Projects in a tmux popup and open
 #                         it in the croft hosting the editor session (Cmd+O)
@@ -63,7 +64,7 @@ reset_profile() {
     DEV_AGENT_TARGET DEV_AGENT_REMOTE_CMD DEV_AGENT_REMOTE_SESSION DEV_AGENT_REMOTE_HOST \
     DEV_EDITOR_DIR DEV_EDITOR_CMD DEV_EDITOR_SESSION DEV_REVIEW_CMD DEV_REVIEW_SUB_CMD \
     DEV_REVIEW_SUB_LINES DEV_GH_COLS DEV_BOTTOM_LINES DEV_TERM_DIRS DEV_TERM_PATHS DEV_TERM_CMDS \
-    DEV_SWAP_DEFAULT DEV_SWAP_REVIEW_CMD DEV_SWAP_DOCS_CMD DEV_SWAP_POOL_WINDOW
+    DEV_SWAP_DEFAULT DEV_SWAP_BROWSER_CMD DEV_SWAP_REVIEW_CMD DEV_SWAP_DOCS_CMD DEV_SWAP_POOL_WINDOW
 }
 
 apply_defaults() {
@@ -98,9 +99,12 @@ apply_defaults() {
   DEV_GH_COLS="${DEV_GH_COLS:-76}"
   DEV_BOTTOM_LINES="${DEV_BOTTOM_LINES:-14}"
   # Swappable pane: the leftmost top pane cycles through editor (croft),
-  # review (lumen) and docs (mdpick/mdcat). The non-visible modes live in a
-  # detached pool window so they stay alive across switches.
+  # browser (terminal-browser) and docs (mdpick/mdcat). The non-visible modes
+  # live in a detached pool window so they stay alive across switches.
   DEV_SWAP_DEFAULT="${DEV_SWAP_DEFAULT:-editor}"
+  DEV_SWAP_BROWSER_CMD="${DEV_SWAP_BROWSER_CMD:-terminal-browser}"
+  # The review command is no longer a swap mode; the popup paths (open-review
+  # and `dev-workspace review`) use it. candela overrides it with repo-review.
   DEV_SWAP_REVIEW_CMD="${DEV_SWAP_REVIEW_CMD:-lumen diff}"
   DEV_SWAP_DOCS_CMD="${DEV_SWAP_DOCS_CMD:-dev-docs}"
   DEV_SWAP_POOL_WINDOW="${DEV_SWAP_POOL_WINDOW:-_pool}"
@@ -420,7 +424,7 @@ normalize_editor_all_debounced() {
 #
 # The leftmost top pane of the editor window is a swap slot; the other modes
 # live in a detached pool window in the same session so they stay alive. Pane
-# options: @dev_swap=1 on every mode pane, @dev_swap_mode=editor|review|docs,
+# options: @dev_swap=1 on every mode pane, @dev_swap_mode=editor|browser|docs,
 # @dev_swap_cmd=<command> (for respawn), @dev_swap_visible=1 on the one shown.
 
 swap_status_format() {
@@ -430,11 +434,11 @@ swap_status_format() {
   # black bar. sep is U+E0B8, the same glyph as @nova-nerdfonts-left (octal so
   # this works on bash 3.2).
   sep=$(printf '\356\202\270')
-  for name in editor review docs; do
+  for name in editor browser docs; do
     case "$name" in
-      editor) label=edit ;;
-      review) label=review ;;
-      docs)   label=docs ;;
+      editor)  label=edit ;;
+      browser) label=browser ;;
+      docs)    label=docs ;;
     esac
     i=$((i + 1))
     if [ "$name" = "$active" ]; then
@@ -477,7 +481,7 @@ swap_pane_option() {
 build_swap_pool() {
   # $1 is the visible editor pane, already running DEV_EDITOR_CMD.
   have "$DEV_EDITOR_SESSION" || return 0
-  local slot="$1" pool review docs
+  local slot="$1" pool browser docs
   swap_pane_option "$slot" editor "$DEV_EDITOR_CMD" 1
 
   pool=$("$TMUX_BIN" new-window -d -t "$DEV_EDITOR_SESSION" -n "$DEV_SWAP_POOL_WINDOW" \
@@ -485,10 +489,10 @@ build_swap_pool() {
   # Keep quit apps as dead panes instead of letting tmux close them, so the tab
   # layout survives and swap_to can respawn them.
   "$TMUX_BIN" set-window-option -t "${DEV_EDITOR_SESSION}:${DEV_SWAP_POOL_WINDOW}" remain-on-exit on 2>/dev/null || true
-  review="$pool"
-  docs=$("$TMUX_BIN" split-window -h -t "$review" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}' 2>/dev/null) || docs=""
-  "$TMUX_BIN" send-keys -t "$review" "$DEV_SWAP_REVIEW_CMD" Enter 2>/dev/null || true
-  swap_pane_option "$review" review "$DEV_SWAP_REVIEW_CMD" 0
+  browser="$pool"
+  docs=$("$TMUX_BIN" split-window -h -t "$browser" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}' 2>/dev/null) || docs=""
+  "$TMUX_BIN" send-keys -t "$browser" "$DEV_SWAP_BROWSER_CMD" Enter 2>/dev/null || true
+  swap_pane_option "$browser" browser "$DEV_SWAP_BROWSER_CMD" 0
   if [ -n "$docs" ]; then
     "$TMUX_BIN" send-keys -t "$docs" "$DEV_SWAP_DOCS_CMD" Enter 2>/dev/null || true
     swap_pane_option "$docs" docs "$DEV_SWAP_DOCS_CMD" 0
@@ -537,17 +541,17 @@ swap_cycle() {
   [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
   [ -n "$session" ] || return 0
   # A session with no swap pane (the agent view next door) has nothing to
-  # cycle: Ctrl+Tab there is a no-op, not a "no swap pane for review" error.
+  # cycle: Ctrl+Tab there is a no-op, not a "no swap pane for browser" error.
   if ! "$TMUX_BIN" list-panes -s -t "$session" -F '#{@dev_swap}' 2>/dev/null | grep -qx 1; then
     return 0
   fi
   active=$("$TMUX_BIN" list-panes -s -t "$session" -F '#{@dev_swap_mode} #{@dev_swap_visible}' 2>/dev/null \
     | awk '$2 == 1 { print $1; exit }')
   case "$active" in
-    editor) next=review; prev=docs ;;
-    review) next=docs;   prev=editor ;;
-    docs)   next=editor; prev=review ;;
-    *)      next=review; prev=docs ;;
+    editor)  next=browser; prev=docs ;;
+    browser) next=docs;    prev=editor ;;
+    docs)    next=editor;  prev=browser ;;
+    *)       next=browser; prev=docs ;;
   esac
   if [ "$dir" = "prev" ]; then swap_to "$prev" "$session"; else swap_to "$next" "$session"; fi
 }
@@ -563,8 +567,8 @@ swap_cmd() {
   done
   case "$mode" in
     next|prev) swap_cycle "$mode" "$session" ;;
-    editor|review|docs) swap_to "$mode" "$session" ;;
-    *) echo "usage: dev-workspace swap [next|prev|editor|review|docs] [--session NAME]" >&2; return 1 ;;
+    editor|browser|docs) swap_to "$mode" "$session" ;;
+    *) echo "usage: dev-workspace swap [next|prev|editor|browser|docs] [--session NAME]" >&2; return 1 ;;
   esac
 }
 
@@ -582,21 +586,38 @@ open_review() {
   [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
   [ -n "$session" ] || return 0
   [ -n "$pr" ] || { echo "dev-workspace open-review: --pr is required" >&2; return 1; }
-  local review cmd
-  review=$("$TMUX_BIN" list-panes -s -t "$session" -F '#{pane_id} #{@dev_swap_mode}' 2>/dev/null \
-    | awk '$2 == "review" { print $1; exit }')
-  [ -n "$review" ] || { echo "dev-workspace open-review: no review pane" >&2; return 1; }
+  local cmd popup_dir
   cmd="lumen diff --pr $pr"
   if [ -n "$repo" ]; then
     cmd="$cmd --origin $repo"
   fi
+  popup_dir="$DEV_EDITOR_DIR"
   if [ -n "$path" ] && [ -d "$path" ]; then
-    cmd="cd $(printf '%q' "$path") && $cmd"
+    popup_dir="$path"
   fi
-  # Leave @dev_swap_cmd at the review default (the repo picker) so quitting the
-  # PR returns to the picker instead of reloading the PR.
-  "$TMUX_BIN" respawn-pane -k -t "$review" "$cmd" 2>/dev/null || return 1
-  swap_to review "$session"
+  # lumen reviews now live in a popup, not a swap pane, so the browser tab can
+  # own mode 2. -E closes the popup when lumen exits.
+  "$TMUX_BIN" display-popup -E -w 90% -h 90% -d "$popup_dir" -T ' review ' "$cmd" 2>/dev/null || {
+    echo "dev-workspace open-review: could not open popup" >&2
+    return 1
+  }
+}
+
+review_cmd() {
+  # The repo picker / plain lumen diff, also in a popup. repo-review is started
+  # with --popup so Esc exits instead of dropping into a login shell.
+  local session=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      *)         shift ;;
+    esac
+  done
+  local cmd="$DEV_SWAP_REVIEW_CMD"
+  case "$cmd" in
+    repo-review*) cmd="$cmd --popup" ;;
+  esac
+  "$TMUX_BIN" display-popup -E -w 90% -h 90% -d "$DEV_EDITOR_DIR" -T ' review ' "$cmd"
 }
 
 # --- open-file picker -------------------------------------------------------
@@ -1008,7 +1029,7 @@ if [ "$#" -eq 0 ]; then
   REST=()
 else
   case "$1" in
-    open|build|ensure|attach|attach-only|review-pane|normalize-editor|post-restore|restart|swap|open-review|open-file|list|print-config)
+    open|build|ensure|attach|attach-only|review-pane|normalize-editor|post-restore|restart|swap|review|open-review|open-file|list|print-config)
       PROFILE="$DEFAULT_PROFILE"
       CMD="$1"
       REST=("${@:2}")
@@ -1031,6 +1052,7 @@ case "$CMD" in
   attach-only) attach_only "${REST[0]:-}" ;;
   review-pane) ensure_review_pane ;;
   swap)        swap_cmd ${REST[@]+"${REST[@]}"} ;;
+  review)      review_cmd ${REST[@]+"${REST[@]}"} ;;
   open-review) open_review ${REST[@]+"${REST[@]}"} ;;
   open-file)   open_file ${REST[@]+"${REST[@]}"} ;;
   normalize-editor)
@@ -1072,6 +1094,7 @@ case "$CMD" in
     printf 'DEV_GH_COLS=%s\n' "$DEV_GH_COLS"
     printf 'DEV_BOTTOM_LINES=%s\n' "$DEV_BOTTOM_LINES"
     printf 'DEV_SWAP_DEFAULT=%s\n' "$DEV_SWAP_DEFAULT"
+    printf 'DEV_SWAP_BROWSER_CMD=%s\n' "$DEV_SWAP_BROWSER_CMD"
     printf 'DEV_SWAP_REVIEW_CMD=%s\n' "$DEV_SWAP_REVIEW_CMD"
     printf 'DEV_SWAP_DOCS_CMD=%s\n' "$DEV_SWAP_DOCS_CMD"
     printf 'DEV_SWAP_POOL_WINDOW=%s\n' "$DEV_SWAP_POOL_WINDOW"

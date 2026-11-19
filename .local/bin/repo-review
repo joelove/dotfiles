@@ -7,14 +7,23 @@
 # repo's git worktrees (primary checkout first, then linked worktrees under
 # `worktrees/`), and opens `lumen diff` there. Picking nothing at the worktree
 # prompt falls back to the repo's current branch. Picking again after lumen
-# exits; Esc at the repo prompt drops to a login shell so the swap pane stays
-# alive.
+# exits; Esc at the repo prompt drops to a login shell so a swap pane stays
+# alive. With --popup (used by `dev-workspace review`) Esc exits the process
+# instead, so the tmux popup closes.
 #
-# Usage: repo-review <gh-dash-config.yml>
+# Usage: repo-review [--popup] <gh-dash-config.yml>
 #
 set -uo pipefail
 
-config="${1:-}"
+popup=0
+config=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --popup) popup=1; shift ;;
+    -*)      printf 'repo-review: unknown option: %s\n' "$1" >&2; exit 2 ;;
+    *)       [ -n "$config" ] || config="$1"; shift ;;
+  esac
+done
 export BAT_THEME="${BAT_THEME:-ansi}"
 
 repos() {
@@ -64,6 +73,7 @@ worktrees() {
 
 if [ ! -f "$config" ]; then
   printf 'repo-review: config not found: %s\n' "${config:-<none>}" >&2
+  [ "$popup" = "1" ] && exit 1
   exec "${SHELL:-/bin/zsh}" -l
 fi
 
@@ -100,4 +110,7 @@ while true; do
   ( cd "$workdir" && exec lumen diff ) || true
 done
 
+# In a popup (--popup) Esc should close the popup, not drop into a login shell
+# that keeps it open; a swap pane needs the shell to stay alive.
+[ "$popup" = "1" ] && exit 0
 exec "${SHELL:-/bin/zsh}" -l
