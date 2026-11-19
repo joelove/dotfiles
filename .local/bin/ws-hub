@@ -236,10 +236,17 @@ do_goto_worktree() {
   fi
   slug=$(printf '%s' "$branch" | tr '/ ' '--')
   target="$primary/worktrees/$slug"
-  git -C "$primary" fetch origin "$branch" >/dev/null 2>&1 || true
-  if git -C "$primary" worktree add "$target" "$branch" >/dev/null 2>&1; then
+  if [ -d "$target" ]; then
     dev-workspace cd "$target" >/dev/null 2>&1 || true
+    return 0
   fi
+  git -C "$primary" fetch origin "$branch" >/dev/null 2>&1 || true
+  if git -C "$primary" show-ref --verify --quiet "refs/heads/$branch"; then
+    git -C "$primary" worktree add "$target" "$branch" >/dev/null 2>&1 || return 0
+  else
+    git -C "$primary" worktree add "$target" -b "$branch" --track "origin/$branch" >/dev/null 2>&1 || return 0
+  fi
+  dev-workspace cd "$target" >/dev/null 2>&1 || true
 }
 
 # --- main ------------------------------------------------------------------
