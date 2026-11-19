@@ -22,6 +22,17 @@ export PI_SPEECH_STT_KEY="local"
 # and any fresh install in a shell that starts before the config is read.
 export TERMINAL_BROWSER_NO_TELEMETRY=1
 
+# terminal-browser probes for kitty graphics support by sending a wrapped query
+# and waiting for the terminal's reply. Inside tmux the DA1 reply comes back
+# first (tmux answers it itself) while the kitty reply round-trips through
+# Ghostty, so the probe races and reports "unsupported" even though Ghostty
+# supports it and passthrough rendering works (allow-passthrough on in
+# .tmux.conf). Skip the probe under tmux only, so a genuinely unsupported
+# terminal outside tmux still shows terminal-browser's own error.
+if [ -n "${TMUX:-}" ]; then
+  export PIXEL_SKIP_GRAPHICS_CHECK=1
+fi
+
 [ -f "$HOME/.automations.sh" ] && source "$HOME/.automations.sh"
 [ -f "$HOME/.secrets" ] && source "$HOME/.secrets"
 
