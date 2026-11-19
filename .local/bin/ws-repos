@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+#
+# ws-repos - discover git repositories and their worktrees under a directory.
+#
+# Walks a root for `.git` entries (a directory for a primary checkout, a file
+# for a linked worktree), groups them by their common git directory so each
+# repository is read once, and lists `git worktree list` so every worktree
+# (including one outside the searched root) is reported. The GitHub `origin`
+# remote becomes an owner/repo slug.
+#
+# Output (TSV): owner/repo <TAB> kind <TAB> branch <TAB> path
+#   kind is primary for the main worktree and worktree for the rest.
+#   owner/repo is "-" when there is no GitHub origin.
+# --json emits the same rows as an array of objects.
+#
+set -uo pipefail
+
+ws_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+. "$ws_dir/ws-lib.sh"
+
+PRUNE_DIRS=(node_modules target dist build .venv venv .svn .hg __pycache__ .next .turbo .cache)
+
+usage() {
+  cat >&2 <<'EOF'
+usage: ws-repos [--root DIR] [--json]
+  --root DIR   directory to search (default: current directory)
+  --json       emit JSON instead of TSV
+EOF
+}
+
+root=""
+json=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --root) root="${2:-}"; shift 2 ;;
+    --json) json=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) root="$1"; shift ;;
+  esac
+done
+[ -n "$root" ] || root="."
+root=$(cd "$root" 2>/dev/null && pwd -P) || { printf 'ws-repos: no such directory: %s\n' "$root" >&2; exit 1; }
+
+# Build the find expression that prunes heavy directories then matches `.git`.
+find_args=( "$root" )
+for d in "${PRUNE_DIRS[@]}"; do
+  find_args+=( -name "$d" -prune -o )
+done
+find_args+=( -name .git -prune -print )
+
+rows=""
+seen_common=$'\n'
+while IFS= read -r gitpath; do
+  [ -n "$gitpath" ] || continue
+  repo="${gitpath%/.git}"
+  toplevel=$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null) || continue
+  [ -n "$toplevel" ] || continue
+  common=$(git -C "$toplevel" rev-parse --git-common-dir 2>/dev/null) || continue
+  case "$common" in /*) ;; *) common="$toplevel/$common" ;; esac
+  case "$seen_common" in *$'\n'"$common"$'\n'*) continue ;; esac
+  seen_common="$seen_common$common"$'\n'
+
+  remote=$(git -C "$toplevel" remote get-url origin 2>/dev/null || true)
+  slug=$(ws_normalize_remote "$remote")
+  [ -n "$slug" ] || slug="-"
+
+  idx=0
+  wt_path=""
+  wt_branch=""
+  flush() {
+    [ -n "$wt_path" ] || return 0
+    [ -n "$wt_branch" ] || wt_branch="(detached)"
+    local kind=worktree
+    [ "$idx" -eq 0 ] && kind=primary
+    rows="$rows$(printf '%s\t%s\t%s\t%s' "$slug" "$kind" "$wt_branch" "$wt_path")"$'\n'
+    idx=$((idx + 1))
+    wt_path=""
+    wt_branch=""
+  }
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*) flush; wt_path="${line#worktree }" ;;
+      "branch "*)   wt_branch="${line#branch refs/heads/}" ;;
+      "detached")   wt_branch="(detached)" ;;
+      "")           flush ;;
+    esac
+  done < <(git -C "$toplevel" worktree list --porcelain 2>/dev/null; printf '\n')
+  flush
+done < <(find "${find_args[@]}" 2>/dev/null)
+
+rows=$(printf '%s' "$rows" | sort -u)
+
+if [ "$json" = "1" ]; then
+  printf '%s' "$rows" | python3 -c '
+import json, sys
+out = []
+for line in sys.stdin:
+    line = line.rstrip("\n")
+    if not line:
+        continue
+    repo, kind, branch, path = line.split("\t")
+    out.append({"repo": repo, "kind": kind, "branch": branch, "path": path})
+print(json.dumps(out))
+'
+else
+  [ -n "$rows" ] && printf '%s\n' "$rows"
+  true
+fi

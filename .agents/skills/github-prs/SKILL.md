@@ -74,9 +74,10 @@ A draft PR is where shipping normally ends. Leave it there.
     gh pr view OWNER/repo#123 --web
     gh pr view https://github.com/OWNER/repo/pull/123 --web
 
-In the tmux dev-workspace, the gh-dash review pane opens PRs too: its stock `o`
-opens the selected PR in the browser. (The old `o`-to-octo.nvim diff editing was
-removed with Neovim.)
+In the tmux dev-workspace, the `ws-hub` pane lists PRs for the active context:
+`enter` opens the selected PR in the browser and `alt-l` loads it into the
+context-aware review tab. (The old `o`-to-octo.nvim diff editing was removed
+with Neovim.)
 
 ## After creating a PR
 

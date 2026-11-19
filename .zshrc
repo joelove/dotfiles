@@ -341,9 +341,10 @@ alias tml='tmux list-panes -a -F "#{pane_tty} #{session_name}"'
 
 # workspace
 # Launch a dev-workspace in new Ghostty windows (focus the existing windows
-# when already open). `ws` is the default ~/Projects workspace; `ws DIR` roots
-# the same layout at DIR. Project profiles (for example a company workspace)
-# are supplied by the private overlay, not this public repo.
+# when already open). `ws DIR` roots the same layout at DIR; `ws` with no
+# argument opens an fzf picker over ~/Projects so the workspace root is chosen
+# at launch. Project profiles (for example a company workspace) are supplied by
+# the private overlay, not this public repo.
 ws() {
   local root
   if [[ -n "${1:-}" ]]; then
@@ -351,10 +352,11 @@ ws() {
       print -u2 "ws: no such directory: $1"
       return 1
     }
-    dev-workspace --root "$root" open
   else
-    dev-workspace open
+    root="$(dev-workspace dir-pick "$HOME/Projects")"
+    [[ -n "$root" ]] || root="$HOME/Projects"
   fi
+  dev-workspace --root "$root" open
 }
 
 # terraform

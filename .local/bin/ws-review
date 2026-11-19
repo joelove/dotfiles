@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+#
+# ws-review - the context-aware lumen review tab.
+#
+# Reads the workspace context from tmux session env, then runs lumen on the
+# active working tree: the open PR whose head branch matches the current branch
+# when one exists, otherwise a plain working-tree diff. When the context has no
+# repo (a workspace rooted at a parent directory), it offers an fzf repo picker
+# first. `--print` shows the command without running it (used by the checks).
+#
+set -uo pipefail
+
+ws_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+. "$ws_dir/ws-lib.sh"
+
+session=""
+print=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --session) session="${2:-}"; shift 2 ;;
+    --print)   print=1; shift ;;
+    *)         shift ;;
+  esac
+done
+[ -n "$session" ] || session=$(tmux display-message -p '#S' 2>/dev/null || true)
+
+get_env() {
+  [ -n "$session" ] || return 1
+  local out
+  out=$(tmux show-environment -t "$session" "$1" 2>/dev/null) || return 1
+  case "$out" in "$1="*) printf '%s' "${out#*=}" ;; *) return 1 ;; esac
+}
+
+repo=$(get_env DEV_CTX_REPO || true)
+branch=$(get_env DEV_CTX_BRANCH || true)
+worktree=$(get_env DEV_CTX_WORKTREE || true)
+root=$(get_env DEV_CTX_ROOT || true)
+dir=$(get_env DEV_CTX_DIR || true)
+
+# Fall back to deriving from the cwd when no context is stored.
+if [ -z "$dir" ]; then
+  derived=$(ws_derive_context "$PWD") || derived=""
+  dir=$(printf '%s\n' "$derived" | sed -n 's/^DEV_CTX_DIR=//p')
+  [ -n "$repo" ]   || repo=$(printf '%s\n' "$derived" | sed -n 's/^DEV_CTX_REPO=//p')
+  [ -n "$branch" ] || branch=$(printf '%s\n' "$derived" | sed -n 's/^DEV_CTX_BRANCH=//p')
+  [ -n "$worktree" ] || worktree=$(printf '%s\n' "$derived" | sed -n 's/^DEV_CTX_WORKTREE=//p')
+fi
+[ -n "$worktree" ] || worktree="$dir"
+[ -n "$dir" ] || dir="$PWD"
+
+pr=""
+case "$branch" in
+  ""|"(detached"*) ;;
+  *)
+    [ -n "$repo" ] && pr=$(gh pr list --repo "$repo" --head "$branch" --state open \
+      --json number --jq '.[0].number' 2>/dev/null || true)
+    ;;
+esac
+
+if [ -z "$pr" ] && [ -z "$repo" ] && [ "$print" != "1" ] && [ -t 0 ]; then
+  pick=$(ws-repos --root "${root:-${worktree:-$dir}}" 2>/dev/null \
+    | awk -F'\t' '$2 == "primary" { print $1 "\t" $4 }' \
+    | fzf --prompt='review repo> ' --delimiter='\t' --with-nth=1 2>/dev/null || true)
+  if [ -n "$pick" ]; then
+    repo=$(printf '%s' "$pick" | cut -f1)
+    worktree=$(printf '%s' "$pick" | cut -f2)
+  fi
+fi
+
+if [ -n "$pr" ] && [ "$pr" != "null" ]; then
+  set -- lumen diff --pr "$pr" --origin "$repo"
+else
+  set -- lumen diff
+fi
+
+if [ "$print" = "1" ]; then
+  printf '%s\n' "$*"
+  exit 0
+fi
+
+cd "$worktree" 2>/dev/null || cd "$dir" 2>/dev/null || true
+exec "$@"

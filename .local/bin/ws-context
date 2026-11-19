@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+#
+# ws-context - read and write the dev-workspace context in tmux session env.
+#
+# Keys: DEV_CTX_ROOT, DEV_CTX_DIR, DEV_CTX_REPO, DEV_CTX_WORKTREE and
+# DEV_CTX_BRANCH. Any pane can read them with `tmux show-environment -t S KEY`,
+# so the context needs no per-pane configuration.
+#
+set -uo pipefail
+
+ws_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+. "$ws_dir/ws-lib.sh"
+
+usage() {
+  cat >&2 <<'EOF'
+usage:
+  ws-context get [--session NAME]... [--json]
+  ws-context set --dir DIR [--root ROOT] [--session NAME]...
+  ws-context derive DIR
+EOF
+}
+
+cmd="get"
+if [ "$#" -gt 0 ]; then cmd="$1"; shift; fi
+
+sessions=()
+dir=""
+root=""
+json=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --session) sessions+=("${2:-}"); shift 2 ;;
+    --dir)     dir="${2:-}"; shift 2 ;;
+    --root)    root="${2:-}"; shift 2 ;;
+    --json)    json=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *)         [ -z "$dir" ] && dir="$1"; shift ;;
+  esac
+done
+
+if [ "${#sessions[@]}" -eq 0 ]; then
+  s=$(tmux display-message -p '#S' 2>/dev/null || true)
+  [ -n "$s" ] && sessions=("$s")
+fi
+
+read_env() {
+  local key="$1" s out
+  for s in ${sessions[@]+"${sessions[@]}"}; do
+    [ -n "$s" ] || continue
+    out=$(tmux show-environment -t "$s" "$key" 2>/dev/null) || continue
+    case "$out" in "$key="*) printf '%s' "${out#*=}"; return 0 ;; esac
+  done
+  return 1
+}
+
+get_context() {
+  local k v out="" stored
+  stored=$(read_env DEV_CTX_DIR || true)
+  if [ -z "$stored" ]; then
+    derived=$(ws_derive_context "$PWD") || derived=""
+    dtop=$(printf '%s\n' "$derived" | sed -n 's/^DEV_CTX_WORKTREE=//p')
+    printf 'DEV_CTX_ROOT=%s\n' "${dtop:-$PWD}"
+    printf '%s\n' "$derived"
+    return 0
+  fi
+  for k in DEV_CTX_ROOT DEV_CTX_DIR DEV_CTX_REPO DEV_CTX_WORKTREE DEV_CTX_BRANCH; do
+    v=$(read_env "$k" || true)
+    out="$out$k=$v"$'\n'
+  done
+  printf '%s' "$out"
+}
+
+emit_json() {
+  python3 -c '
+import json, sys
+ctx = {}
+for line in sys.stdin:
+    line = line.rstrip("\n")
+    if "=" in line:
+        k, v = line.split("=", 1)
+        ctx[k] = v
+print(json.dumps(ctx))
+'
+}
+
+case "$cmd" in
+  derive)
+    ws_derive_context "${dir:-.}"
+    ;;
+  get)
+    if [ "$json" = "1" ]; then get_context | emit_json; else get_context; fi
+    ;;
+  set)
+    [ -n "$dir" ] || { usage; exit 1; }
+    dir=$(cd "$dir" 2>/dev/null && pwd -P) || { printf 'ws-context: no such directory: %s\n' "$dir" >&2; exit 1; }
+    derived=$(ws_derive_context "$dir") || exit 1
+    [ -n "$root" ] || root=$(read_env DEV_CTX_ROOT || true)
+    if [ -z "$root" ]; then
+      root=$(printf '%s\n' "$derived" | sed -n 's/^DEV_CTX_WORKTREE=//p')
+      [ -n "$root" ] || root="$dir"
+    fi
+    for s in ${sessions[@]+"${sessions[@]}"}; do
+      [ -n "$s" ] || continue
+      tmux set-environment -t "$s" DEV_CTX_ROOT "$root" 2>/dev/null || true
+      while IFS= read -r kv; do
+        [ -n "$kv" ] || continue
+        tmux set-environment -t "$s" "${kv%%=*}" "${kv#*=}" 2>/dev/null || true
+      done <<<"$derived"
+    done
+    ;;
+  *)
+    usage; exit 1 ;;
+esac
