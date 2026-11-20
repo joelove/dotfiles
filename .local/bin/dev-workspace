@@ -985,7 +985,8 @@ ctx_get() {
   case "$out" in "$key="*) printf '%s' "${out#*=}" ;; *) return 1 ;; esac
 }
 
-# Store the context for DIR on the workspace's editor (and agent) sessions.
+# Store the context for DIR on the invoking session, its editor session, and
+# (when the profile matches) the agent session.
 ctx_set() {
   local dir="$1" root="${2:-}" session="${3:-}"
   [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
@@ -993,14 +994,20 @@ ctx_set() {
   local editor
   editor=$(find_croft_session "$session")
   [ -n "$editor" ] || editor="$session"
-  local -a sessions=("$editor")
-  if [ "$DEV_AGENT_TARGET" != "remote" ] && have "$DEV_AGENT_SESSION"; then
+  local -a sessions=("$session")
+  [ "$editor" = "$session" ] || sessions+=("$editor")
+  # Only mirror onto the agent session when find_croft_session loaded the
+  # owning profile; its fallback path leaves another profile's fields set.
+  if [ "$DEV_EDITOR_SESSION" = "$editor" ] && [ "$DEV_AGENT_TARGET" != "remote" ] && have "$DEV_AGENT_SESSION"; then
     sessions+=("$DEV_AGENT_SESSION")
   fi
+  local -a sess_args=()
+  local s
+  for s in "${sessions[@]}"; do sess_args+=(--session "$s"); done
   if [ -n "$root" ]; then
-    ws-context set --dir "$dir" --root "$root" --session ${sessions[@]+"${sessions[@]}"} 2>/dev/null || true
+    ws-context set --dir "$dir" --root "$root" "${sess_args[@]}" 2>/dev/null || true
   else
-    ws-context set --dir "$dir" --session ${sessions[@]+"${sessions[@]}"} 2>/dev/null || true
+    ws-context set --dir "$dir" "${sess_args[@]}" 2>/dev/null || true
   fi
 }
 
@@ -1011,18 +1018,26 @@ ctx_bootstrap() {
   ctx_get "$DEV_EDITOR_SESSION" DEV_CTX_DIR >/dev/null 2>&1 && return 0
   local dir="$DEV_ROOT"
   [ -d "$DEV_EDITOR_DIR" ] && dir="$DEV_EDITOR_DIR"
-  local -a sessions=("$DEV_EDITOR_SESSION")
+  local -a sessions=("$DEV_EDITOR_SESSION") sess_args=()
   if [ "$DEV_AGENT_TARGET" != "remote" ] && have "$DEV_AGENT_SESSION"; then
     sessions+=("$DEV_AGENT_SESSION")
   fi
-  ws-context set --dir "$dir" --root "$DEV_ROOT" --session ${sessions[@]+"${sessions[@]}"} 2>/dev/null || true
+  local s
+  for s in "${sessions[@]}"; do sess_args+=(--session "$s"); done
+  ws-context set --dir "$dir" --root "$DEV_ROOT" "${sess_args[@]}" 2>/dev/null || true
 }
 
 # Relaunch the context-aware panes: the hub, the docs and review tabs, and move
 # idle bottom shells to the new directory. This replaces a full `prefix R`
 # rebuild for context-only changes.
 refresh_workspace() {
-  local session="${1:-}"
+  local session=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      *)         [ -z "$session" ] && session="${1:-}"; shift ;;
+    esac
+  done
   [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
   [ -n "$session" ] || return 0
   local editor dir hub pane mode cmd
@@ -1086,22 +1101,29 @@ cd_cmd() {
     esac
   done
   [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
-  local root
+  local root base
   root=$(ctx_get "$session" DEV_CTX_ROOT 2>/dev/null || true)
   [ -n "$root" ] || root="$HOME/Projects"
+  # The picker searches the whole projects container, not just the context
+  # root, so a repo-rooted workspace can still move back up out of its tree.
+  base="$HOME/Projects"
+  case "$root" in "$base"|"$base"/*) ;; *) base="$root" ;; esac
   if [ -z "$dir" ]; then
     # No DIR: pick one in a popup. display-popup has no stdout, so the picker
     # writes its choice to a temp file.
     local tmp
     tmp=$(mktemp)
     "$TMUX_BIN" display-popup -E -w 80% -h 70% -T ' cd ' \
-      "$DEV_SELF dir-pick '$root' >'$tmp'" 2>/dev/null || true
+      "$DEV_SELF dir-pick '$base' >'$tmp'" 2>/dev/null || true
     dir=$(cat "$tmp" 2>/dev/null || true)
     rm -f "$tmp"
     [ -n "$dir" ] || return 0
   fi
   dir=$(cd "$dir" 2>/dev/null && pwd -P) || { printf 'dev-workspace cd: no such directory: %s\n' "$dir" >&2; return 1; }
+  # Moving outside the current root widens it to the picker's container, so
+  # the hub keeps discovering repos around the new working tree.
   [ -n "$root" ] || root="$dir"
+  case "$dir" in "$root"|"$root"/*) ;; *) root="$base" ;; esac
   ctx_set "$dir" "$root" "$session"
   refresh_workspace "$session"
 }
@@ -1233,7 +1255,7 @@ case "$CMD" in
   ctx)         ctx_cmd ${REST[@]+"${REST[@]}"} ;;
   repos)       repos_cmd ${REST[@]+"${REST[@]}"} ;;
   worktrees)   worktrees_cmd ${REST[@]+"${REST[@]}"} ;;
-  refresh)     refresh_workspace "${REST[0]:-}" ;;
+  refresh)     refresh_workspace ${REST[@]+"${REST[@]}"} ;;
   dir-pick)    dir_pick "${REST[0]:-}" ;;
   normalize-editor)
     if [ "${REST[0]:-}" = "--all" ]; then

@@ -34,7 +34,7 @@ while [ "$#" -gt 0 ]; do
     --root)    root="${2:-}"; shift 2 ;;
     --json)    json=1; shift ;;
     -h|--help) usage; exit 0 ;;
-    *)         [ -z "$dir" ] && dir="$1"; shift ;;
+    *)         if [ -z "$dir" ]; then dir="$1"; else sessions+=("$1"); fi; shift ;;
   esac
 done
 
