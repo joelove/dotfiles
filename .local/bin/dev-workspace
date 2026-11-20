@@ -341,6 +341,11 @@ ensure_hub_pane() {
     hub=$("$TMUX_BIN" split-window -h -t "$editor" -l "$DEV_GH_COLS" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
     "$TMUX_BIN" set-option -p -t "$hub" @dev_hub 1 2>/dev/null || true
     recreated=1
+  elif [ "$("$TMUX_BIN" show-options -p -t "$hub" -qv @dev_hub 2>/dev/null || true)" != "1" ]; then
+    # Pre-hub workspace: the right column still holds the old review pane
+    # (gh-dash, a shell after it quit, or something else). Repurpose it.
+    "$TMUX_BIN" respawn-pane -k -t "$hub" -c "$DEV_EDITOR_DIR" "$DEV_HUB_CMD" 2>/dev/null || true
+    "$TMUX_BIN" set-option -p -t "$hub" @dev_hub 1 2>/dev/null || true
   fi
   send_if_shell "$hub" "$DEV_HUB_CMD"
   [ "$recreated" = "1" ] && normalize_editor
@@ -728,6 +733,7 @@ ensure_unlocked() {
   build
   normalize_editor
   rebuild_swap
+  ensure_hub_pane
 }
 
 ensure() {
