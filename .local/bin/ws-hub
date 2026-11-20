@@ -7,8 +7,8 @@
 # `dev-workspace cd` without a rebuild.
 #
 # Views:
-#   prs      open pull requests for the active repo, or every repo under the
-#            root when no repo is active
+#   prs      the 20 most recent open pull requests across every repo under the
+#            workspace root, most recently updated first
 #   actions  running and recently finished Actions runs across the same repos
 #
 # Modes:
@@ -22,7 +22,7 @@ set -uo pipefail
 ws_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$ws_dir/ws-lib.sh"
 
-PR_LIMIT="${WS_HUB_PR_LIMIT:-30}"
+PR_LIMIT="${WS_HUB_PR_LIMIT:-20}"
 ACTION_LIMIT="${WS_HUB_ACTION_LIMIT:-20}"
 ACTION_CACHE="${WS_HUB_ACTION_CACHE:-60s}"
 ACTION_RECENT="${WS_HUB_ACTION_RECENT:-900}"
@@ -68,10 +68,8 @@ ctx_dir=$(get_env DEV_CTX_DIR || true)
 [ -n "$ctx_root" ] || ctx_root="${ctx_dir:-$PWD}"
 
 hub_repos() {
-  if [ -n "$ctx_repo" ]; then
-    printf '%s\n' "$ctx_repo"
-    return 0
-  fi
+  # PRs and Actions span every repo discovered under the workspace root, not
+  # just the active repo, so the hub is a workspace overview.
   ws-repos --root "$ctx_root" 2>/dev/null | cut -f1 | grep -v '^-$' | sort -u
 }
 
@@ -87,26 +85,38 @@ checks_symbol() {
   esac
 }
 
+fetch_repo_prs() {
+  local r="$1" num title author branch updated checks
+  gh pr list --repo "$r" --state open --limit "$PR_LIMIT" \
+    --search 'sort:updated-desc' \
+    --json number,title,author,headRefName,updatedAt,statusCheckRollup \
+    --jq '.[] | [.number, .title, .author.login, .headRefName, .updatedAt,
+      ([.statusCheckRollup[]? | .conclusion // .state // "PENDING"] | join(",") | if . == "" then "-" else . end)] | @tsv' 2>/dev/null \
+  | while IFS=$'\t' read -r num title author branch updated checks; do
+      [ -n "$num" ] || continue
+      printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$r" "$num" "$title" "$author" "$branch" "$checks" "$updated"
+    done
+}
+
+# Query every discovered repo in parallel; the caller sorts the merged rows.
 fetch_prs() {
-  local r num title author branch updated checks
-  for r in $(hub_repos); do
-    gh pr list --repo "$r" --state open --limit "$PR_LIMIT" \
-      --json number,title,author,headRefName,updatedAt,statusCheckRollup \
-      --jq '.[] | [.number, .title, .author.login, .headRefName, .updatedAt,
-        ([.statusCheckRollup[]? | .conclusion // .state // "PENDING"] | join(","))] | @tsv' 2>/dev/null \
-    | while IFS=$'\t' read -r num title author branch updated checks; do
-        [ -n "$num" ] || continue
-        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$r" "$num" "$title" "$author" "$branch" "$checks"
-      done
-  done
+  export PR_LIMIT
+  export -f fetch_repo_prs
+  hub_repos | xargs -P "${WS_HUB_JOBS:-8}" -I{} bash -c 'fetch_repo_prs "$@"' _ {}
+}
+
+# The whole workspace's newest open PRs, most recently updated first.
+recent_prs() {
+  fetch_prs | sort -t$'\t' -k7,7r | head -n "$PR_LIMIT"
 }
 
 pr_rows() {
-  local r num title author branch checks sym updated
-  fetch_prs | while IFS=$'\t' read -r r num title author branch checks; do
+  local r num title author branch checks updated sym age
+  recent_prs | while IFS=$'\t' read -r r num title author branch checks updated; do
     sym=$(checks_symbol "$checks")
+    age=$(fmt_age "$updated")
     printf '%s#%s %s %s  %s  %s\tpr\t%s\t%s\t%s\t%s\n' \
-      "$sym" "$num" "$r" "$title" "$branch" "$author" "$r" "$num" "$branch" "$title"
+      "$sym" "$num" "$r" "$title" "$branch" "$age" "$r" "$num" "$branch" "$title"
   done
 }
 
@@ -118,29 +128,43 @@ fmt_dur() {
   else printf '%02d:%02d' "$((s/60))" "$((s%60))"; fi
 }
 
-fetch_actions() {
-  local r out now
+# A compact "how long ago" for the PR list.
+fmt_age() {
+  local iso="$1" then now d
+  then=$(epoch "$iso"); now=$(date +%s)
+  [ "${then:-0}" -gt 0 ] 2>/dev/null || { printf -- '-'; return; }
+  d=$((now - then)); [ "$d" -lt 0 ] && d=0
+  if [ "$d" -lt 60 ]; then printf '%ds' "$d"
+  elif [ "$d" -lt 3600 ]; then printf '%dm' "$((d / 60))"
+  elif [ "$d" -lt 86400 ]; then printf '%dh' "$((d / 3600))"
+  else printf '%dd' "$((d / 86400))"; fi
+}
+
+fetch_repo_actions() {
+  local r="$1" out now seen wid name br status conclusion started updated url epoch_end
   now=$(date +%s)
-  for r in $(hub_repos); do
-    out=$(gh api --cache "$ACTION_CACHE" \
-      "/repos/$r/actions/runs?per_page=$ACTION_LIMIT" \
-      --jq '.workflow_runs[] | [.workflow_id, .name, (.head_branch // "-"), .status, (.conclusion // "none"), (.run_started_at // .created_at), (.updated_at), .html_url] | @tsv' 2>/dev/null) || continue
-    seen=$'\n'
-    while IFS=$'\t' read -r wid name br status conclusion started updated url; do
-      [ -n "$name" ] || continue
-      case "$seen" in *$'\n'"$wid"$'\n'*) continue ;; esac
-      seen="$seen$wid"$'\n'
-      if [ "$status" = "completed" ]; then
-        local end epoch_end
-        end="$conclusion"
-        epoch_end=$(epoch "$updated")
-        [ $((now - epoch_end)) -gt "$ACTION_RECENT" ] && continue
-        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$r" "$name" "$br" "$end" "$started" "$url"
-      else
-        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$r" "$name" "$br" "running" "$started" "$url"
-      fi
-    done <<<"$out"
-  done
+  out=$(gh api --cache "$ACTION_CACHE" \
+    "/repos/$r/actions/runs?per_page=$ACTION_LIMIT" \
+    --jq '.workflow_runs[] | [.workflow_id, .name, (.head_branch // "-"), .status, (.conclusion // "none"), (.run_started_at // .created_at), (.updated_at), .html_url] | @tsv' 2>/dev/null) || return 0
+  seen=$'\n'
+  while IFS=$'\t' read -r wid name br status conclusion started updated url; do
+    [ -n "$name" ] || continue
+    case "$seen" in *$'\n'"$wid"$'\n'*) continue ;; esac
+    seen="$seen$wid"$'\n'
+    if [ "$status" = "completed" ]; then
+      epoch_end=$(epoch "$updated")
+      [ $((now - epoch_end)) -gt "$ACTION_RECENT" ] && continue
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$r" "$name" "$br" "$conclusion" "$started" "$url"
+    else
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$r" "$name" "$br" "running" "$started" "$url"
+    fi
+  done <<<"$out"
+}
+
+fetch_actions() {
+  export ACTION_CACHE ACTION_LIMIT ACTION_RECENT
+  export -f fetch_repo_actions epoch
+  hub_repos | xargs -P "${WS_HUB_JOBS:-8}" -I{} bash -c 'fetch_repo_actions "$@"' _ {}
 }
 
 action_rows() {
@@ -262,8 +286,8 @@ case "$mode" in
         printf '%s\t%s\t%s\t%s\n' "$r" "$name" "$br" "$state"
       done
     else
-      fetch_prs | while IFS=$'\t' read -r r num title author branch checks; do
-        printf '%s\t%s\t%s\t%s\t%s\n' "$r" "$num" "$title" "$branch" "$author"
+      recent_prs | while IFS=$'\t' read -r r num title author branch checks updated; do
+        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$r" "$num" "$title" "$branch" "$author" "$updated"
       done
     fi
     exit 0
