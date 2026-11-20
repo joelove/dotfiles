@@ -26,7 +26,8 @@ PR_LIMIT="${WS_HUB_PR_LIMIT:-20}"
 ACTION_LIMIT="${WS_HUB_ACTION_LIMIT:-20}"
 ACTION_CACHE="${WS_HUB_ACTION_CACHE:-60s}"
 ACTION_RECENT="${WS_HUB_ACTION_RECENT:-900}"
-TICK="${WS_HUB_TICK:-30}"
+ACTION_TOP="${WS_HUB_ACTION_TOP:-5}"
+TICK="${WS_HUB_TICK:-60}"
 
 usage() {
   cat >&2 <<'EOF'
@@ -141,8 +142,7 @@ fmt_age() {
 }
 
 fetch_repo_actions() {
-  local r="$1" out now seen wid name br status conclusion started updated url epoch_end
-  now=$(date +%s)
+  local r="$1" out seen wid name br status conclusion started updated url state
   out=$(gh api --cache "$ACTION_CACHE" \
     "/repos/$r/actions/runs?per_page=$ACTION_LIMIT" \
     --jq '.workflow_runs[] | [.workflow_id, .name, (.head_branch // "-"), .status, (.conclusion // "none"), (.run_started_at // .created_at), (.updated_at), .html_url] | @tsv' 2>/dev/null) || return 0
@@ -151,33 +151,44 @@ fetch_repo_actions() {
     [ -n "$name" ] || continue
     case "$seen" in *$'\n'"$wid"$'\n'*) continue ;; esac
     seen="$seen$wid"$'\n'
-    if [ "$status" = "completed" ]; then
-      epoch_end=$(epoch "$updated")
-      [ $((now - epoch_end)) -gt "$ACTION_RECENT" ] && continue
-      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$r" "$name" "$br" "$conclusion" "$started" "$url"
-    else
-      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$r" "$name" "$br" "running" "$started" "$url"
-    fi
+    if [ "$status" = "completed" ]; then state="$conclusion"; else state="running"; fi
+    # repo, name, branch, state, start (ISO), updated (epoch), url
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$r" "$name" "$br" "$state" "$started" "$(epoch "$updated")" "$url"
   done <<<"$out"
 }
 
 fetch_actions() {
-  export ACTION_CACHE ACTION_LIMIT ACTION_RECENT
+  export ACTION_CACHE ACTION_LIMIT
   export -f fetch_repo_actions epoch
   hub_repos | xargs -P "${WS_HUB_JOBS:-8}" -I{} bash -c 'fetch_repo_actions "$@"' _ {}
 }
 
+# The rows the Actions view shows: every running or recently finished run, and
+# always the newest ACTION_TOP completed runs whatever their age. Dedupe, then
+# order running first and the rest newest-first.
+selected_actions() {
+  local all now
+  all=$(fetch_actions)
+  [ -n "$all" ] || return 0
+  now=$(date +%s)
+  {
+    printf '%s\n' "$all" | awk -F'\t' -v now="$now" -v recent="$ACTION_RECENT" \
+      '$4 == "running" || (now - $6) <= recent'
+    printf '%s\n' "$all" | awk -F'\t' '$4 != "running"' | sort -t$'\t' -k6,6nr | head -n "$ACTION_TOP"
+  } | awk '!seen[$0]++' \
+    | awk -F'\t' 'BEGIN{OFS="\t"}{ print ($4 == "running" ? 0 : 1), $0 }' \
+    | sort -t$'\t' -k1,1n -k7,7nr | cut -f2-
+}
+
 action_rows() {
-  local r name br state started url sym dur
-  fetch_actions | while IFS=$'\t' read -r r name br state started url; do
+  local r name br state started updated url sym dur now
+  now=$(date +%s)
+  selected_actions | while IFS=$'\t' read -r r name br state started updated url; do
     case "$state" in
       success) sym="+" ;; failure) sym="x" ;; running) sym="o" ;; *) sym="-" ;;
     esac
-    if [ "$state" = "running" ]; then
-      dur=$(( $(date +%s) - $(epoch "$started") ))
-    else
-      dur=0
-    fi
+    if [ "$state" = "running" ]; then dur=$(( now - $(epoch "$started") )); else dur=0; fi
     printf '%s %s %s %s %s\t%s\t%s\t%s\t%s\t%s\n' \
       "$sym" "$r" "$name" "$br" "$(fmt_dur "$dur")" \
       "action" "$r" "$name" "$br" "$url"
@@ -282,7 +293,7 @@ case "$mode" in
     ;;
   once)
     if [ "$view" = "actions" ]; then
-      fetch_actions | while IFS=$'\t' read -r r name br state started url; do
+      selected_actions | while IFS=$'\t' read -r r name br state started updated url; do
         printf '%s\t%s\t%s\t%s\n' "$r" "$name" "$br" "$state"
       done
     else
@@ -298,23 +309,39 @@ case "$mode" in
     ;;
 esac
 
-# Interactive surface.
+# Interactive surface. The ticker refreshes the rows in the background and only
+# asks fzf to re-render when the row set actually changes, so an idle refresh
+# does not flash the list or interrupt typing and selection. The current view is
+# shared through a file so the ticker follows a `tab` toggle.
+state=$(mktemp -d 2>/dev/null || printf '/tmp/ws-hub.%s' "$$")
+mkdir -p "$state"
+rows_file="$state/rows"
+view_file="$state/view"
+printf 'prs' > "$view_file"
 port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()' 2>/dev/null || true)
 ticker=""
 if [ -n "$port" ] && [ "${TICK}" -gt 0 ]; then
   (
     while kill -0 "$$" 2>/dev/null; do
       sleep "$TICK"
-      curl -s -m 2 -XPOST "http://127.0.0.1:$port" \
-        -d "reload($0 --rows --view $view)" >/dev/null 2>&1 || true
+      v=$(cat "$view_file" 2>/dev/null || printf 'prs')
+      new=$("$0" --rows --view "$v" 2>/dev/null || true)
+      old=$(cat "$rows_file" 2>/dev/null || true)
+      if [ "$new" != "$old" ]; then
+        printf '%s\n' "$new" > "$rows_file.tmp" && mv "$rows_file.tmp" "$rows_file"
+        curl -s -m 2 -XPOST "http://127.0.0.1:$port" \
+          -d "reload(cat '$rows_file')" >/dev/null 2>&1 || true
+      fi
     done
   ) &
   ticker=$!
-  trap '[ -n "$ticker" ] && kill "$ticker" 2>/dev/null' EXIT
+  trap '[ -n "$ticker" ] && kill "$ticker" 2>/dev/null; rm -rf "$state"' EXIT
 fi
 
 while true; do
   rows=$(rows_for "$view")
+  printf '%s' "$view" > "$view_file"
+  printf '%s\n' "$rows" > "$rows_file.tmp" && mv "$rows_file.tmp" "$rows_file"
   header="$(context_header)   [$view]   enter open | alt-l review | alt-w branch | alt-g repo | alt-r reload | tab view"
   out=$(
     printf '%s\n' "$rows" | fzf --ansi --no-multi --no-sort \

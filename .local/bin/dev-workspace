@@ -111,7 +111,9 @@ apply_defaults() {
   DEV_SWAP_REVIEW_CMD="${DEV_SWAP_REVIEW_CMD:-ws-review}"
   DEV_SWAP_DOCS_CMD="${DEV_SWAP_DOCS_CMD:-dev-docs}"
   DEV_SWAP_POOL_WINDOW="${DEV_SWAP_POOL_WINDOW:-_pool}"
-  declare -p DEV_TERM_DIRS >/dev/null 2>&1 || DEV_TERM_DIRS=("$DEV_ROOT")
+  # The default bottom row is two side-by-side shells at the root; profiles
+  # override DEV_TERM_DIRS for project-specific panes.
+  declare -p DEV_TERM_DIRS >/dev/null 2>&1 || DEV_TERM_DIRS=("$DEV_ROOT" "$DEV_ROOT")
   DEV_TERM_PATHS=()
   local d
   for d in "${DEV_TERM_DIRS[@]}"; do
