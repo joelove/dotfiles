@@ -19,15 +19,16 @@
 #   ensure                restore missing sessions, then re-pin the layout
 #   attach [session]      ensure, then attach (default: editor session)
 #   attach-only [session] attach without touching sessions or layout
-#   review-pane           (re)launch the review pane command only if it is closed
+#   hub-pane              (re)launch the hub pane command only if it is closed
 #   swap [mode] [--session NAME]   cycle/select the swappable pane tab
-#                         (next|prev|editor|review|docs; default next)
+#                         (next|prev|editor|browser|review|docs; default next)
+#   review [--session NAME]  open the context-aware review (ws-review) in a popup
 #   open-review [--session NAME] [--path DIR] [--repo O/R] --pr N
-#                         load PR N into the lumen review tab and raise it
+#                         load PR N into the review swap tab
 #   open-file [--session NAME] [--root DIR]
 #                         fzf a file under ~/Projects in a tmux popup and open
 #                         it in the croft hosting the editor session (Cmd+O)
-#   normalize-editor [--all]   re-pin the pane sizes and review-pane tag
+#   normalize-editor [--all]   re-pin the pane sizes and hub-pane tag
 #   post-restore [--all]       resurrect hook: restart the agent and normalize
 #   restart [--session NAME] [--all] [--editor-only]
 #                         reset a workspace in place: rebuild each session
@@ -35,6 +36,13 @@
 #                         layout. --editor-only spares the agent session
 #                         (and its live conversations)
 #   list                  list profiles
+#   cd [DIR] [--session NAME]   set the workspace context from DIR, then refresh
+#                         the hub, docs and review tabs and the bottom shells
+#   root [DIR] [--session NAME] get or set the context root
+#   ctx [--session NAME] [--json]  print the current context
+#   repos|worktrees [--session NAME]  list the repos/worktrees under the context
+#   refresh [--session NAME]    re-run the context-aware panes
+#   dir-pick [DIR]        fzf pick a directory under the context root (popup)
 #   print-config          print the resolved profile fields
 #
 set -euo pipefail
@@ -61,9 +69,9 @@ have_client() { "$TMUX_BIN" list-clients -t "$1" -F '#{client_tty}' 2>/dev/null 
 reset_profile() {
   unset DEV_NAME DEV_ROOT DEV_AGENT_DIR DEV_AGENT_CMD DEV_AGENT_PANES DEV_AGENT_SESSION \
     DEV_AGENT_TARGET DEV_AGENT_REMOTE_CMD DEV_AGENT_REMOTE_SESSION DEV_AGENT_REMOTE_HOST \
-    DEV_EDITOR_DIR DEV_EDITOR_CMD DEV_EDITOR_SESSION DEV_REVIEW_CMD DEV_REVIEW_SUB_CMD \
-    DEV_REVIEW_SUB_LINES DEV_GH_COLS DEV_BOTTOM_LINES DEV_TERM_DIRS DEV_TERM_PATHS DEV_TERM_CMDS \
-    DEV_SWAP_DEFAULT DEV_SWAP_REVIEW_CMD DEV_SWAP_DOCS_CMD DEV_SWAP_POOL_WINDOW
+    DEV_EDITOR_DIR DEV_EDITOR_CMD DEV_EDITOR_SESSION DEV_HUB_CMD DEV_GH_COLS \
+    DEV_BOTTOM_LINES DEV_TERM_DIRS DEV_TERM_PATHS DEV_TERM_CMDS \
+    DEV_SWAP_DEFAULT DEV_SWAP_BROWSER_CMD DEV_SWAP_REVIEW_CMD DEV_SWAP_DOCS_CMD DEV_SWAP_POOL_WINDOW
 }
 
 apply_defaults() {
@@ -92,19 +100,20 @@ apply_defaults() {
   DEV_EDITOR_DIR="${DEV_EDITOR_DIR:-$DEV_ROOT}"
   DEV_EDITOR_CMD="${DEV_EDITOR_CMD:-croft}"
   DEV_EDITOR_SESSION="${DEV_EDITOR_SESSION:-$DEV_NAME-editor}"
-  DEV_REVIEW_CMD="${DEV_REVIEW_CMD-gh dash}"
-  DEV_REVIEW_SUB_CMD="${DEV_REVIEW_SUB_CMD-}"
-  DEV_REVIEW_SUB_LINES="${DEV_REVIEW_SUB_LINES:-5}"
+  DEV_HUB_CMD="${DEV_HUB_CMD-ws-hub}"
   DEV_GH_COLS="${DEV_GH_COLS:-76}"
   DEV_BOTTOM_LINES="${DEV_BOTTOM_LINES:-14}"
   # Swappable pane: the leftmost top pane cycles through editor (croft),
-  # review (lumen) and docs (mdpick/mdcat). The non-visible modes live in a
-  # detached pool window so they stay alive across switches.
+  # browser (terminal-browser), review (lumen) and docs (mdpick/mdcat). The
+  # non-visible modes live in a detached pool window so they stay alive.
   DEV_SWAP_DEFAULT="${DEV_SWAP_DEFAULT:-editor}"
-  DEV_SWAP_REVIEW_CMD="${DEV_SWAP_REVIEW_CMD:-lumen diff}"
+  DEV_SWAP_BROWSER_CMD="${DEV_SWAP_BROWSER_CMD:-terminal-browser}"
+  DEV_SWAP_REVIEW_CMD="${DEV_SWAP_REVIEW_CMD:-ws-review}"
   DEV_SWAP_DOCS_CMD="${DEV_SWAP_DOCS_CMD:-dev-docs}"
   DEV_SWAP_POOL_WINDOW="${DEV_SWAP_POOL_WINDOW:-_pool}"
-  declare -p DEV_TERM_DIRS >/dev/null 2>&1 || DEV_TERM_DIRS=("$DEV_ROOT")
+  # The default bottom row is two side-by-side shells at the root; profiles
+  # override DEV_TERM_DIRS for project-specific panes.
+  declare -p DEV_TERM_DIRS >/dev/null 2>&1 || DEV_TERM_DIRS=("$DEV_ROOT" "$DEV_ROOT")
   DEV_TERM_PATHS=()
   local d
   for d in "${DEV_TERM_DIRS[@]}"; do
@@ -177,7 +186,7 @@ build_agent() {
 
 build_editor() {
   have "$DEV_EDITOR_SESSION" && return 0
-  local top bottom top_right review_sub n j pane
+  local top bottom top_right n j pane
   local -a bottom_panes=()
   top=$("$TMUX_BIN" new-session -d -s "$DEV_EDITOR_SESSION" -n editor -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
 
@@ -194,25 +203,16 @@ build_editor() {
     done
   fi
 
-  # review pane on the right of the top row
+  # hub pane on the right of the top row: context-driven PRs and Actions
   top_right=""
-  if [ -n "$DEV_REVIEW_CMD" ]; then
+  if [ -n "$DEV_HUB_CMD" ]; then
     top_right=$("$TMUX_BIN" split-window -h -t "$top" -l "$DEV_GH_COLS" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
-  fi
-
-  # optional pane directly below the review pane (e.g. a live actions readout)
-  review_sub=""
-  if [ -n "$top_right" ] && [ -n "$DEV_REVIEW_SUB_CMD" ]; then
-    review_sub=$("$TMUX_BIN" split-window -v -t "$top_right" -l "$DEV_REVIEW_SUB_LINES" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
+    "$TMUX_BIN" set-option -p -t "$top_right" @dev_hub 1 2>/dev/null || true
   fi
 
   "$TMUX_BIN" send-keys -t "$top" "$DEV_EDITOR_CMD" Enter
   if [ -n "$top_right" ]; then
-    "$TMUX_BIN" send-keys -t "$top_right" "$DEV_REVIEW_CMD" Enter
-  fi
-  if [ -n "$review_sub" ]; then
-    "$TMUX_BIN" send-keys -t "$review_sub" "$DEV_REVIEW_SUB_CMD" Enter
-    "$TMUX_BIN" set-option -p -t "$review_sub" @dev_review_sub_started 1
+    "$TMUX_BIN" send-keys -t "$top_right" "$DEV_HUB_CMD" Enter
   fi
   j=0
   if [ "${#bottom_panes[@]}" -gt 0 ]; then
@@ -230,6 +230,13 @@ build_editor() {
   build_swap_pool "$top"
 }
 
+# terminal-browser's graphics probe races under tmux and reports "unsupported".
+# `.zshenv` covers login shells, but panes started with respawn-pane do not
+# source it, so keep the skip in the tmux environment too.
+ensure_server_env() {
+  "$TMUX_BIN" set-environment -g PIXEL_SKIP_GRAPHICS_CHECK 1 2>/dev/null || true
+}
+
 build() {
   build_agent
   build_editor
@@ -237,6 +244,8 @@ build() {
   # workspace. Only consulted when no profile matches the session.
   "$TMUX_BIN" set-option -t "$DEV_AGENT_SESSION" @dev_root "$DEV_ROOT" 2>/dev/null || true
   "$TMUX_BIN" set-option -t "$DEV_EDITOR_SESSION" @dev_root "$DEV_ROOT" 2>/dev/null || true
+  ensure_server_env
+  ctx_bootstrap
 }
 
 # --- ensure -----------------------------------------------------------------
@@ -284,34 +293,21 @@ send_if_shell() {
   esac
 }
 
-# Restart the editor and review commands in a restored editor session. resurrect
-# cannot restore commands with arguments (the review pane uses a per-profile
-# `gh dash --config`), so it leaves those panes as shells and this fills them in.
+# Restart the editor and hub commands in a restored editor session. resurrect
+# cannot restore commands with arguments, so it leaves those panes as shells and
+# this fills them in.
 start_views_in_shells() {
   have "$DEV_EDITOR_SESSION" || return 0
-  local panes top_min top_sorted editor review
+  local panes top_min top_sorted editor hub
   panes=$("$TMUX_BIN" list-panes -t "${DEV_EDITOR_SESSION}:editor" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
   [ -n "$panes" ] || return 0
   top_min=$(printf '%s\n' "$panes" | awk '{ print $2 }' | sort -n | head -n1)
   top_sorted=$(printf '%s\n' "$panes" | awk -v t="$top_min" '$2 == t { print $3, $1 }' | sort -n)
   editor=$(printf '%s\n' "$top_sorted" | head -n1 | awk '{ print $2 }')
-  review=$(printf '%s\n' "$top_sorted" | tail -n1 | awk '{ print $2 }')
+  hub=$(printf '%s\n' "$top_sorted" | tail -n1 | awk '{ print $2 }')
   send_if_shell "$editor" "$DEV_EDITOR_CMD"
-  if [ "$review" != "$editor" ]; then
-    send_if_shell "$review" "$DEV_REVIEW_CMD"
-  fi
-  # Restart the pane below the review pane, identified by geometry.
-  if [ -n "$DEV_REVIEW_SUB_CMD" ] && [ -n "$review" ] && [ "$review" != "$editor" ]; then
-    local review_left sub mark
-    review_left=$(printf '%s\n' "$top_sorted" | tail -n1 | awk '{ print $1 }')
-    sub=$(printf '%s\n' "$panes" | awk -v l="$review_left" -v t="$top_min" '$3 == l && $2 > t { print $2, $1 }' | sort -n | head -n1 | awk '{ print $2 }')
-    if [ -n "$sub" ]; then
-      mark=$("$TMUX_BIN" show-options -p -t "$sub" -qv @dev_review_sub_started 2>/dev/null || true)
-      if [ "$mark" != "1" ]; then
-        send_if_shell "$sub" "$DEV_REVIEW_SUB_CMD"
-        "$TMUX_BIN" set-option -p -t "$sub" @dev_review_sub_started 1
-      fi
-    fi
+  if [ "$hub" != "$editor" ]; then
+    send_if_shell "$hub" "$DEV_HUB_CMD"
   fi
   # Restart bottom-strip commands (left to right) that resurrect left as shells.
   # Commands are positional, so only act when the restored bottom row matches
@@ -337,31 +333,31 @@ start_views_in_shells() {
   fi
 }
 
-# Bring the review pane back without disturbing anything else. Idempotent:
-# - review command already running: no-op
+# Bring the hub pane back without disturbing anything else. Idempotent:
+# - hub command already running: no-op
 # - pane fell back to a shell after the TUI quit: relaunch the command
 # - pane was killed: split it back off the editor pane, then re-pin the layout
-ensure_review_pane() {
-  [ -n "$DEV_REVIEW_CMD" ] || return 0
+ensure_hub_pane() {
+  [ -n "$DEV_HUB_CMD" ] || return 0
   have "$DEV_EDITOR_SESSION" || return 0
-  local panes top_min top_sorted editor review recreated=0
+  local panes top_min top_sorted editor hub recreated=0
   panes=$("$TMUX_BIN" list-panes -t "${DEV_EDITOR_SESSION}:editor" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
   [ -n "$panes" ] || return 0
   top_min=$(printf '%s\n' "$panes" | awk '{ print $2 }' | sort -n | head -n1)
   top_sorted=$(printf '%s\n' "$panes" | awk -v t="$top_min" '$2 == t { print $3, $1 }' | sort -n)
   editor=$(printf '%s\n' "$top_sorted" | head -n1 | awk '{ print $2 }')
-  review=$(printf '%s\n' "$top_sorted" | tail -n1 | awk '{ print $2 }')
-  if [ "$review" = "$editor" ]; then
-    review=$("$TMUX_BIN" split-window -h -t "$editor" -l "$DEV_GH_COLS" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
+  hub=$(printf '%s\n' "$top_sorted" | tail -n1 | awk '{ print $2 }')
+  if [ "$hub" = "$editor" ]; then
+    hub=$("$TMUX_BIN" split-window -h -t "$editor" -l "$DEV_GH_COLS" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
+    "$TMUX_BIN" set-option -p -t "$hub" @dev_hub 1 2>/dev/null || true
     recreated=1
-  elif [ "$("$TMUX_BIN" show-options -p -t "$review" -qv @dev_review_sub_started 2>/dev/null || true)" = "1" ]; then
-    # The rightmost top pane is the review-sub pane, so the review pane was
-    # killed and the sub pane expanded into its place. Recreate the review pane
-    # above the sub pane, keeping the two stacked in the right column.
-    review=$("$TMUX_BIN" split-window -v -b -t "$review" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}')
-    recreated=1
+  elif [ "$("$TMUX_BIN" show-options -p -t "$hub" -qv @dev_hub 2>/dev/null || true)" != "1" ]; then
+    # Pre-hub workspace: the right column still holds the old review pane
+    # (gh-dash, a shell after it quit, or something else). Repurpose it.
+    "$TMUX_BIN" respawn-pane -k -t "$hub" -c "$DEV_EDITOR_DIR" "$DEV_HUB_CMD" 2>/dev/null || true
+    "$TMUX_BIN" set-option -p -t "$hub" @dev_hub 1 2>/dev/null || true
   fi
-  send_if_shell "$review" "$DEV_REVIEW_CMD"
+  send_if_shell "$hub" "$DEV_HUB_CMD"
   [ "$recreated" = "1" ] && normalize_editor
   return 0
 }
@@ -371,7 +367,7 @@ ensure_review_pane() {
 # sizes.
 normalize_editor() {
   have "$DEV_EDITOR_SESSION" || return 0
-  local panes top_min bot_max top_sorted editor review bottom review_left review_sub
+  local panes top_min bot_max top_sorted editor review bottom
   panes=$("$TMUX_BIN" list-panes -t "${DEV_EDITOR_SESSION}:editor" -F '#{pane_id} #{pane_top} #{pane_left}' 2>/dev/null) || return 0
   [ -n "$panes" ] || return 0
 
@@ -385,11 +381,6 @@ normalize_editor() {
 
   if [ -n "$review" ]; then
     "$TMUX_BIN" resize-pane -t "$review" -x "$DEV_GH_COLS" 2>/dev/null || true
-    review_left=$(printf '%s\n' "$top_sorted" | tail -n1 | awk '{ print $1 }')
-    review_sub=$(printf '%s\n' "$panes" | awk -v l="$review_left" -v t="$top_min" '$3 == l && $2 > t { print $2, $1 }' | sort -n | head -n1 | awk '{ print $2 }')
-    if [ -n "$review_sub" ]; then
-      "$TMUX_BIN" resize-pane -t "$review_sub" -y "$DEV_REVIEW_SUB_LINES" 2>/dev/null || true
-    fi
   fi
   if [ -n "$bottom" ]; then
     "$TMUX_BIN" resize-pane -t "$bottom" -y "$DEV_BOTTOM_LINES" 2>/dev/null || true
@@ -420,7 +411,7 @@ normalize_editor_all_debounced() {
 #
 # The leftmost top pane of the editor window is a swap slot; the other modes
 # live in a detached pool window in the same session so they stay alive. Pane
-# options: @dev_swap=1 on every mode pane, @dev_swap_mode=editor|review|docs,
+# options: @dev_swap=1 on every mode pane, @dev_swap_mode=editor|browser|docs,
 # @dev_swap_cmd=<command> (for respawn), @dev_swap_visible=1 on the one shown.
 
 swap_status_format() {
@@ -430,11 +421,12 @@ swap_status_format() {
   # black bar. sep is U+E0B8, the same glyph as @nova-nerdfonts-left (octal so
   # this works on bash 3.2).
   sep=$(printf '\356\202\270')
-  for name in editor review docs; do
+  for name in editor browser review docs; do
     case "$name" in
-      editor) label=edit ;;
-      review) label=review ;;
-      docs)   label=docs ;;
+      editor)  label=edit ;;
+      browser) label=browser ;;
+      review)  label=review ;;
+      docs)    label=docs ;;
     esac
     i=$((i + 1))
     if [ "$name" = "$active" ]; then
@@ -477,7 +469,7 @@ swap_pane_option() {
 build_swap_pool() {
   # $1 is the visible editor pane, already running DEV_EDITOR_CMD.
   have "$DEV_EDITOR_SESSION" || return 0
-  local slot="$1" pool review docs
+  local slot="$1" pool browser review docs
   swap_pane_option "$slot" editor "$DEV_EDITOR_CMD" 1
 
   pool=$("$TMUX_BIN" new-window -d -t "$DEV_EDITOR_SESSION" -n "$DEV_SWAP_POOL_WINDOW" \
@@ -485,10 +477,15 @@ build_swap_pool() {
   # Keep quit apps as dead panes instead of letting tmux close them, so the tab
   # layout survives and swap_to can respawn them.
   "$TMUX_BIN" set-window-option -t "${DEV_EDITOR_SESSION}:${DEV_SWAP_POOL_WINDOW}" remain-on-exit on 2>/dev/null || true
-  review="$pool"
-  docs=$("$TMUX_BIN" split-window -h -t "$review" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}' 2>/dev/null) || docs=""
-  "$TMUX_BIN" send-keys -t "$review" "$DEV_SWAP_REVIEW_CMD" Enter 2>/dev/null || true
-  swap_pane_option "$review" review "$DEV_SWAP_REVIEW_CMD" 0
+  browser="$pool"
+  review=$("$TMUX_BIN" split-window -h -t "$browser" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}' 2>/dev/null) || review=""
+  docs=$("$TMUX_BIN" split-window -h -t "$browser" -c "$DEV_EDITOR_DIR" -P -F '#{pane_id}' 2>/dev/null) || docs=""
+  "$TMUX_BIN" send-keys -t "$browser" "$DEV_SWAP_BROWSER_CMD" Enter 2>/dev/null || true
+  swap_pane_option "$browser" browser "$DEV_SWAP_BROWSER_CMD" 0
+  if [ -n "$review" ]; then
+    "$TMUX_BIN" send-keys -t "$review" "$DEV_SWAP_REVIEW_CMD" Enter 2>/dev/null || true
+    swap_pane_option "$review" review "$DEV_SWAP_REVIEW_CMD" 0
+  fi
   if [ -n "$docs" ]; then
     "$TMUX_BIN" send-keys -t "$docs" "$DEV_SWAP_DOCS_CMD" Enter 2>/dev/null || true
     swap_pane_option "$docs" docs "$DEV_SWAP_DOCS_CMD" 0
@@ -505,7 +502,7 @@ swap_respawn_if_dead() {
   [ "$("$TMUX_BIN" display-message -p -t "$pane" '#{pane_dead}' 2>/dev/null || echo 0)" = "1" ] || return 0
   cmd=$("$TMUX_BIN" show-options -p -t "$pane" -qv @dev_swap_cmd 2>/dev/null || true)
   [ -n "$cmd" ] || return 0
-  "$TMUX_BIN" respawn-pane -k -t "$pane" "$cmd" 2>/dev/null || true
+  "$TMUX_BIN" respawn-pane -k -t "$pane" -e PIXEL_SKIP_GRAPHICS_CHECK=1 "$cmd" 2>/dev/null || true
 }
 
 swap_to() {
@@ -537,17 +534,18 @@ swap_cycle() {
   [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
   [ -n "$session" ] || return 0
   # A session with no swap pane (the agent view next door) has nothing to
-  # cycle: Ctrl+Tab there is a no-op, not a "no swap pane for review" error.
+  # cycle: Ctrl+Tab there is a no-op, not a "no swap pane for browser" error.
   if ! "$TMUX_BIN" list-panes -s -t "$session" -F '#{@dev_swap}' 2>/dev/null | grep -qx 1; then
     return 0
   fi
   active=$("$TMUX_BIN" list-panes -s -t "$session" -F '#{@dev_swap_mode} #{@dev_swap_visible}' 2>/dev/null \
     | awk '$2 == 1 { print $1; exit }')
   case "$active" in
-    editor) next=review; prev=docs ;;
-    review) next=docs;   prev=editor ;;
-    docs)   next=editor; prev=review ;;
-    *)      next=review; prev=docs ;;
+    editor)  next=browser; prev=docs ;;
+    browser) next=review;  prev=editor ;;
+    review)  next=docs;    prev=browser ;;
+    docs)    next=editor;  prev=review ;;
+    *)       next=browser; prev=docs ;;
   esac
   if [ "$dir" = "prev" ]; then swap_to "$prev" "$session"; else swap_to "$next" "$session"; fi
 }
@@ -563,8 +561,8 @@ swap_cmd() {
   done
   case "$mode" in
     next|prev) swap_cycle "$mode" "$session" ;;
-    editor|review|docs) swap_to "$mode" "$session" ;;
-    *) echo "usage: dev-workspace swap [next|prev|editor|review|docs] [--session NAME]" >&2; return 1 ;;
+    editor|browser|review|docs) swap_to "$mode" "$session" ;;
+    *) echo "usage: dev-workspace swap [next|prev|editor|browser|review|docs] [--session NAME]" >&2; return 1 ;;
   esac
 }
 
@@ -580,23 +578,39 @@ open_review() {
     esac
   done
   [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
-  [ -n "$session" ] || return 0
   [ -n "$pr" ] || { echo "dev-workspace open-review: --pr is required" >&2; return 1; }
-  local review cmd
-  review=$("$TMUX_BIN" list-panes -s -t "$session" -F '#{pane_id} #{@dev_swap_mode}' 2>/dev/null \
+  local editor target cmd
+  editor=$(find_croft_session "$session")
+  [ -n "$editor" ] || editor="$DEV_EDITOR_SESSION"
+  target=$("$TMUX_BIN" list-panes -s -t "$editor" -F '#{pane_id} #{@dev_swap_mode}' 2>/dev/null \
     | awk '$2 == "review" { print $1; exit }')
-  [ -n "$review" ] || { echo "dev-workspace open-review: no review pane" >&2; return 1; }
+  [ -n "$target" ] || { echo "dev-workspace open-review: no review tab" >&2; return 1; }
   cmd="lumen diff --pr $pr"
-  if [ -n "$repo" ]; then
-    cmd="$cmd --origin $repo"
-  fi
-  if [ -n "$path" ] && [ -d "$path" ]; then
-    cmd="cd $(printf '%q' "$path") && $cmd"
-  fi
-  # Leave @dev_swap_cmd at the review default (the repo picker) so quitting the
-  # PR returns to the picker instead of reloading the PR.
-  "$TMUX_BIN" respawn-pane -k -t "$review" "$cmd" 2>/dev/null || return 1
-  swap_to review "$session"
+  [ -n "$repo" ] && cmd="$cmd --origin $repo"
+  # Load the PR into the review swap tab and raise it, so the hub's `l` key
+  # lands in the context-aware review surface rather than a popup.
+  "$TMUX_BIN" set-option -p -t "$target" @dev_swap_cmd "$cmd" 2>/dev/null || true
+  "$TMUX_BIN" respawn-pane -k -t "$target" -c "${path:-$DEV_EDITOR_DIR}" "$cmd" 2>/dev/null || true
+  swap_to review "$editor" >/dev/null 2>&1 || true
+  "$TMUX_BIN" select-window -t "${editor}:editor" 2>/dev/null || true
+}
+
+review_cmd() {
+  # The context-aware review command, in a popup. repo-review (a profile
+  # override) is started with --popup so Esc exits instead of dropping into a
+  # login shell; the default ws-review derives the PR or diff from the context.
+  local session=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      *)         shift ;;
+    esac
+  done
+  local cmd="$DEV_SWAP_REVIEW_CMD"
+  case "$cmd" in
+    repo-review*) cmd="$cmd --popup" ;;
+  esac
+  "$TMUX_BIN" display-popup -E -w 90% -h 90% -d "$DEV_EDITOR_DIR" -T ' review ' "$cmd"
 }
 
 # --- open-file picker -------------------------------------------------------
@@ -665,6 +679,7 @@ open_file() {
       *)         shift ;;
     esac
   done
+  [ -n "$root" ] || root=$(ctx_get "$DEV_EDITOR_SESSION" DEV_CTX_DIR 2>/dev/null || true)
   [ -n "$root" ] || root="${DEV_ROOT:-$HOME/Projects}"
   if [ "$pick" = 1 ]; then
     open_file_pick "$root"
@@ -705,6 +720,7 @@ rebuild_swap() {
 
 ensure_unlocked() {
   "$TMUX_BIN" start-server 2>/dev/null || true
+  ensure_server_env
   local missing=0
   if [ -n "$DEV_AGENT_CMD" ] && ! have "$DEV_AGENT_SESSION"; then missing=1; fi
   if ! have "$DEV_EDITOR_SESSION"; then missing=1; fi
@@ -728,6 +744,7 @@ ensure_unlocked() {
   build
   normalize_editor
   rebuild_swap
+  ensure_hub_pane
 }
 
 ensure() {
@@ -893,7 +910,7 @@ reset_session_in_place() {
 # Reset one workspace (both sessions of the loaded profile, or just the editor
 # with RESTART_EDITOR_ONLY=1). Each session is rebuilt in place so its Ghostty
 # window is reused, and the resurrect save is skipped on purpose: a reset must
-# restore gh-dash/review and every bottom shell even when the save is stale or
+# restore the hub and every bottom shell even when the save is stale or
 # was written from a broken layout.
 restart_profile() {
   reset_session_in_place "$DEV_EDITOR_SESSION" editor
@@ -972,6 +989,222 @@ post_restore_all() {
   done
 }
 
+# --- workspace context ------------------------------------------------------
+#
+# The git-derived context (DEV_CTX_ROOT/DIR/REPO/WORKTREE/BRANCH) lives in tmux
+# session env, so any pane and the hub can read it. `dev-workspace cd DIR`
+# re-derives it and pokes the context-aware panes; croft and pi cannot follow a
+# live cwd change, so they stay at the root they were launched with.
+
+ctx_get() {
+  local session="$1" key="$2" out
+  out=$("$TMUX_BIN" show-environment -t "$session" "$key" 2>/dev/null) || return 1
+  case "$out" in "$key="*) printf '%s' "${out#*=}" ;; *) return 1 ;; esac
+}
+
+# Store the context for DIR on the invoking session, its editor session, and
+# (when the profile matches) the agent session.
+ctx_set() {
+  local dir="$1" root="${2:-}" session="${3:-}"
+  [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
+  [ -n "$session" ] || return 0
+  local editor
+  editor=$(find_croft_session "$session")
+  [ -n "$editor" ] || editor="$session"
+  local -a sessions=("$session")
+  [ "$editor" = "$session" ] || sessions+=("$editor")
+  # Only mirror onto the agent session when find_croft_session loaded the
+  # owning profile; its fallback path leaves another profile's fields set.
+  if [ "$DEV_EDITOR_SESSION" = "$editor" ] && [ "$DEV_AGENT_TARGET" != "remote" ] && have "$DEV_AGENT_SESSION"; then
+    sessions+=("$DEV_AGENT_SESSION")
+  fi
+  local -a sess_args=()
+  local s
+  for s in "${sessions[@]}"; do sess_args+=(--session "$s"); done
+  if [ -n "$root" ]; then
+    ws-context set --dir "$dir" --root "$root" "${sess_args[@]}" 2>/dev/null || true
+  else
+    ws-context set --dir "$dir" "${sess_args[@]}" 2>/dev/null || true
+  fi
+}
+
+# Seed the context at build time from the launch root, unless a `cd` already
+# set one (ensure/build must not clobber the user's working directory).
+ctx_bootstrap() {
+  have "$DEV_EDITOR_SESSION" || return 0
+  ctx_get "$DEV_EDITOR_SESSION" DEV_CTX_DIR >/dev/null 2>&1 && return 0
+  local dir="$DEV_ROOT"
+  [ -d "$DEV_EDITOR_DIR" ] && dir="$DEV_EDITOR_DIR"
+  local -a sessions=("$DEV_EDITOR_SESSION") sess_args=()
+  if [ "$DEV_AGENT_TARGET" != "remote" ] && have "$DEV_AGENT_SESSION"; then
+    sessions+=("$DEV_AGENT_SESSION")
+  fi
+  local s
+  for s in "${sessions[@]}"; do sess_args+=(--session "$s"); done
+  ws-context set --dir "$dir" --root "$DEV_ROOT" "${sess_args[@]}" 2>/dev/null || true
+}
+
+# Relaunch the context-aware panes: the hub, the docs and review tabs, and move
+# idle bottom shells to the new directory. This replaces a full `prefix R`
+# rebuild for context-only changes.
+refresh_workspace() {
+  local session=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      *)         [ -z "$session" ] && session="${1:-}"; shift ;;
+    esac
+  done
+  [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
+  [ -n "$session" ] || return 0
+  local editor dir hub pane mode cmd
+  editor=$(find_croft_session "$session")
+  [ -n "$editor" ] || return 0
+  dir=$(ctx_get "$editor" DEV_CTX_DIR 2>/dev/null || true)
+  [ -n "$dir" ] || dir=$(ctx_get "$session" DEV_CTX_DIR 2>/dev/null || true)
+
+  hub=$("$TMUX_BIN" list-panes -s -t "$editor" -F '#{pane_id} #{@dev_hub}' 2>/dev/null \
+    | awk '$2 == 1 { print $1; exit }')
+  if [ -n "$hub" ]; then
+    "$TMUX_BIN" respawn-pane -k -t "$hub" -c "$DEV_EDITOR_DIR" "$DEV_HUB_CMD" 2>/dev/null || true
+  fi
+
+  while IFS=' ' read -r pane mode; do
+    case "$mode" in
+      docs|review)
+        cmd=$("$TMUX_BIN" show-options -p -t "$pane" -qv @dev_swap_cmd 2>/dev/null || true)
+        [ -n "$cmd" ] || continue
+        "$TMUX_BIN" respawn-pane -k -t "$pane" -c "${dir:-$DEV_EDITOR_DIR}" "$cmd" 2>/dev/null || true
+        ;;
+    esac
+  done < <("$TMUX_BIN" list-panes -s -t "$editor" -F '#{pane_id} #{@dev_swap_mode}' 2>/dev/null)
+
+  if [ -n "$dir" ]; then
+    local bcmd
+    while IFS= read -r pane; do
+      bcmd=$("$TMUX_BIN" display-message -p -t "$pane" '#{pane_current_command}' 2>/dev/null || echo '')
+      case "$bcmd" in
+        zsh|bash|sh|-zsh|-bash)
+          "$TMUX_BIN" send-keys -t "$pane" "cd '$dir'" Enter 2>/dev/null || true
+          ;;
+      esac
+    done < <("$TMUX_BIN" list-panes -t "${editor}:editor" -F '#{pane_id}' 2>/dev/null)
+  fi
+}
+
+ctx_cmd() {
+  local session="" json=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      --json)    json=1; shift ;;
+      *)         shift ;;
+    esac
+  done
+  [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
+  if [ "$json" = "1" ]; then
+    ws-context get --session "$session" --json
+  else
+    ws-context get --session "$session"
+  fi
+}
+
+cd_cmd() {
+  local session="" dir=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      *)         [ -z "$dir" ] && dir="${1:-}"; shift ;;
+    esac
+  done
+  [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
+  local root base
+  root=$(ctx_get "$session" DEV_CTX_ROOT 2>/dev/null || true)
+  [ -n "$root" ] || root="$HOME/Projects"
+  # The picker searches the whole projects container, not just the context
+  # root, so a repo-rooted workspace can still move back up out of its tree.
+  base="$HOME/Projects"
+  case "$root" in "$base"|"$base"/*) ;; *) base="$root" ;; esac
+  if [ -z "$dir" ]; then
+    # No DIR: pick one in a popup. display-popup has no stdout, so the picker
+    # writes its choice to a temp file.
+    local tmp
+    tmp=$(mktemp)
+    "$TMUX_BIN" display-popup -E -w 80% -h 70% -T ' cd ' \
+      "$DEV_SELF dir-pick '$base' >'$tmp'" 2>/dev/null || true
+    dir=$(cat "$tmp" 2>/dev/null || true)
+    rm -f "$tmp"
+    [ -n "$dir" ] || return 0
+  fi
+  dir=$(cd "$dir" 2>/dev/null && pwd -P) || { printf 'dev-workspace cd: no such directory: %s\n' "$dir" >&2; return 1; }
+  # Moving outside the current root widens it to the picker's container, so
+  # the hub keeps discovering repos around the new working tree.
+  [ -n "$root" ] || root="$dir"
+  case "$dir" in "$root"|"$root"/*) ;; *) root="$base" ;; esac
+  ctx_set "$dir" "$root" "$session"
+  refresh_workspace "$session"
+}
+
+root_cmd() {
+  local session="" root=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      *)         [ -z "$root" ] && root="${1:-}"; shift ;;
+    esac
+  done
+  [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
+  if [ -z "$root" ]; then
+    ctx_get "$session" DEV_CTX_ROOT; printf '\n'; return 0
+  fi
+  root=$(cd "$root" 2>/dev/null && pwd -P) || { printf 'dev-workspace root: no such directory: %s\n' "$root" >&2; return 1; }
+  local dir
+  dir=$(ctx_get "$session" DEV_CTX_DIR 2>/dev/null || true)
+  case "$dir" in "$root"|"$root"/*) ;; *) dir="$root" ;; esac
+  ctx_set "$dir" "$root" "$session"
+  refresh_workspace "$session"
+}
+
+repos_cmd() {
+  local session="" root
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      *)         shift ;;
+    esac
+  done
+  [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
+  root=$(ctx_get "$session" DEV_CTX_ROOT 2>/dev/null || true)
+  ws-repos --root "${root:-$PWD}" 2>/dev/null | awk -F'\t' '$2 == "primary" { print $1 "\t" $4 }' | sort -u
+}
+
+worktrees_cmd() {
+  local session="" root
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      *)         shift ;;
+    esac
+  done
+  [ -n "$session" ] || session=$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)
+  root=$(ctx_get "$session" DEV_CTX_ROOT 2>/dev/null || true)
+  ws-repos --root "${root:-$PWD}" 2>/dev/null
+}
+
+dir_pick() {
+  local root="${1:-}" sel
+  [ -n "$root" ] || root=$(ctx_get "$DEV_EDITOR_SESSION" DEV_CTX_ROOT 2>/dev/null || true)
+  [ -d "$root" ] || root="$HOME/Projects"
+  sel=$(find "$root" -maxdepth 4 -type d \
+    -not -path '*/.git*' -not -path '*/node_modules*' -not -path '*/target*' \
+    -not -path '*/worktrees/*' -not -path '*/dist/*' 2>/dev/null \
+    | fzf --prompt='dir> ' --reverse --no-multi \
+        --preview='git -C {} status -sb 2>/dev/null | head -15; echo; git -C {} remote -v 2>/dev/null | head -2; echo; ls -la {} 2>/dev/null | head -30' \
+        --preview-window='right:50%,border-left' 2>/dev/null || true)
+  [ -n "$sel" ] && printf '%s' "$sel"
+  return 0
+}
+
 # --- dispatch ---------------------------------------------------------------
 
 # Global --root, parsed before the profile/subcommand. Used by the `ws DIR`
@@ -1008,7 +1241,7 @@ if [ "$#" -eq 0 ]; then
   REST=()
 else
   case "$1" in
-    open|build|ensure|attach|attach-only|review-pane|normalize-editor|post-restore|restart|swap|open-review|open-file|list|print-config)
+    open|build|ensure|attach|attach-only|hub-pane|review-pane|normalize-editor|post-restore|restart|swap|review|open-review|open-file|list|print-config|cd|root|ctx|repos|worktrees|refresh|dir-pick)
       PROFILE="$DEFAULT_PROFILE"
       CMD="$1"
       REST=("${@:2}")
@@ -1029,10 +1262,18 @@ case "$CMD" in
   ensure)      ensure ;;
   attach)      attach "${REST[0]:-}" ;;
   attach-only) attach_only "${REST[0]:-}" ;;
-  review-pane) ensure_review_pane ;;
+  hub-pane|review-pane) ensure_hub_pane ;;
   swap)        swap_cmd ${REST[@]+"${REST[@]}"} ;;
+  review)      review_cmd ${REST[@]+"${REST[@]}"} ;;
   open-review) open_review ${REST[@]+"${REST[@]}"} ;;
   open-file)   open_file ${REST[@]+"${REST[@]}"} ;;
+  cd)          cd_cmd ${REST[@]+"${REST[@]}"} ;;
+  root)        root_cmd ${REST[@]+"${REST[@]}"} ;;
+  ctx)         ctx_cmd ${REST[@]+"${REST[@]}"} ;;
+  repos)       repos_cmd ${REST[@]+"${REST[@]}"} ;;
+  worktrees)   worktrees_cmd ${REST[@]+"${REST[@]}"} ;;
+  refresh)     refresh_workspace ${REST[@]+"${REST[@]}"} ;;
+  dir-pick)    dir_pick "${REST[0]:-}" ;;
   normalize-editor)
     if [ "${REST[0]:-}" = "--all" ]; then
       normalize_editor_all_debounced
@@ -1064,14 +1305,13 @@ case "$CMD" in
     printf 'DEV_EDITOR_DIR=%s\n' "$DEV_EDITOR_DIR"
     printf 'DEV_EDITOR_CMD=%s\n' "$DEV_EDITOR_CMD"
     printf 'DEV_EDITOR_SESSION=%s\n' "$DEV_EDITOR_SESSION"
-    printf 'DEV_REVIEW_CMD=%s\n' "$DEV_REVIEW_CMD"
-    printf 'DEV_REVIEW_SUB_CMD=%s\n' "$DEV_REVIEW_SUB_CMD"
-    printf 'DEV_REVIEW_SUB_LINES=%s\n' "$DEV_REVIEW_SUB_LINES"
+    printf 'DEV_HUB_CMD=%s\n' "$DEV_HUB_CMD"
     printf 'DEV_TERM_PATHS=%s\n' "${DEV_TERM_PATHS[*]}"
     printf 'DEV_TERM_CMDS=%s\n' "${DEV_TERM_CMDS[*]}"
     printf 'DEV_GH_COLS=%s\n' "$DEV_GH_COLS"
     printf 'DEV_BOTTOM_LINES=%s\n' "$DEV_BOTTOM_LINES"
     printf 'DEV_SWAP_DEFAULT=%s\n' "$DEV_SWAP_DEFAULT"
+    printf 'DEV_SWAP_BROWSER_CMD=%s\n' "$DEV_SWAP_BROWSER_CMD"
     printf 'DEV_SWAP_REVIEW_CMD=%s\n' "$DEV_SWAP_REVIEW_CMD"
     printf 'DEV_SWAP_DOCS_CMD=%s\n' "$DEV_SWAP_DOCS_CMD"
     printf 'DEV_SWAP_POOL_WINDOW=%s\n' "$DEV_SWAP_POOL_WINDOW"

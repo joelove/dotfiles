@@ -1,0 +1,371 @@
+#!/usr/bin/env bash
+#
+# ws-hub - the dev-workspace PR and Actions surface, driven by the context.
+#
+# Replaces gh-dash (PR pane) and running-actions (sub-pane). It reads
+# DEV_CTX_ROOT and DEV_CTX_REPO from tmux session env, so it follows
+# `dev-workspace cd` without a rebuild.
+#
+# Views:
+#   prs      the 20 most recent open pull requests across every repo under the
+#            workspace root, most recently updated first
+#   actions  running and recently finished Actions runs across the same repos
+#
+# Modes:
+#   --once [--view prs|actions]   print the rows once (for checks)
+#   --rows [--view prs|actions]   print the raw fzf rows (used by reload)
+#   --preview <type> <repo> <key> <branch> <extra>
+#   (none)                        interactive fzf surface
+#
+set -uo pipefail
+
+ws_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+. "$ws_dir/ws-lib.sh"
+
+PR_LIMIT="${WS_HUB_PR_LIMIT:-20}"
+ACTION_LIMIT="${WS_HUB_ACTION_LIMIT:-20}"
+ACTION_CACHE="${WS_HUB_ACTION_CACHE:-60s}"
+ACTION_RECENT="${WS_HUB_ACTION_RECENT:-900}"
+ACTION_TOP="${WS_HUB_ACTION_TOP:-5}"
+TICK="${WS_HUB_TICK:-60}"
+
+usage() {
+  cat >&2 <<'EOF'
+usage: ws-hub [--once|--rows] [--view prs|actions]
+       ws-hub --preview <type> <repo> <key> <branch> <extra>
+EOF
+}
+
+mode="interactive"
+view="prs"
+session_override=""
+preview_args=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --once)    mode="once"; shift ;;
+    --rows)    mode="rows"; shift ;;
+    --view)    view="${2:-prs}"; shift 2 ;;
+    --session) session_override="${2:-}"; shift 2 ;;
+    --preview) mode="preview"; shift; preview_args=("$@"); break ;;
+    -h|--help) usage; exit 0 ;;
+    *)         view="$1"; shift ;;
+  esac
+done
+
+# --- context ---------------------------------------------------------------
+
+session="$session_override"
+[ -n "$session" ] || session=$(tmux display-message -p '#S' 2>/dev/null || true)
+get_env() {
+  [ -n "$session" ] || return 1
+  local out
+  out=$(tmux show-environment -t "$session" "$1" 2>/dev/null) || return 1
+  case "$out" in "$1="*) printf '%s' "${out#*=}" ;; *) return 1 ;; esac
+}
+ctx_root=$(get_env DEV_CTX_ROOT || true)
+ctx_repo=$(get_env DEV_CTX_REPO || true)
+ctx_branch=$(get_env DEV_CTX_BRANCH || true)
+ctx_dir=$(get_env DEV_CTX_DIR || true)
+[ -n "$ctx_root" ] || ctx_root="${ctx_dir:-$PWD}"
+
+hub_repos() {
+  # PRs and Actions span every repo discovered under the workspace root, not
+  # just the active repo, so the hub is a workspace overview.
+  ws-repos --root "$ctx_root" 2>/dev/null | cut -f1 | grep -v '^-$' | sort -u
+}
+
+# --- data ------------------------------------------------------------------
+
+checks_symbol() {
+  local checks="$1"
+  case "$checks" in
+    *FAILURE*|*ERROR*|*CANCELLED*) printf 'x' ;;
+    *SUCCESS*)                     printf '+' ;;
+    *IN_PROGRESS*|*QUEUED*|*PENDING*|*EXPECTED*) printf 'o' ;;
+    *)                             printf '-' ;;
+  esac
+}
+
+fetch_repo_prs() {
+  local r="$1" num title author branch updated checks
+  gh pr list --repo "$r" --state open --limit "$PR_LIMIT" \
+    --search 'sort:updated-desc' \
+    --json number,title,author,headRefName,updatedAt,statusCheckRollup \
+    --jq '.[] | [.number, .title, .author.login, .headRefName, .updatedAt,
+      ([.statusCheckRollup[]? | .conclusion // .state // "PENDING"] | join(",") | if . == "" then "-" else . end)] | @tsv' 2>/dev/null \
+  | while IFS=$'\t' read -r num title author branch updated checks; do
+      [ -n "$num" ] || continue
+      printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$r" "$num" "$title" "$author" "$branch" "$checks" "$updated"
+    done
+}
+
+# Query every discovered repo in parallel; the caller sorts the merged rows.
+fetch_prs() {
+  export PR_LIMIT
+  export -f fetch_repo_prs
+  hub_repos | xargs -P "${WS_HUB_JOBS:-8}" -I{} bash -c 'fetch_repo_prs "$@"' _ {}
+}
+
+# The whole workspace's newest open PRs, most recently updated first.
+recent_prs() {
+  fetch_prs | sort -t$'\t' -k7,7r | head -n "$PR_LIMIT"
+}
+
+pr_rows() {
+  local r num title author branch checks updated sym age
+  recent_prs | while IFS=$'\t' read -r r num title author branch checks updated; do
+    sym=$(checks_symbol "$checks")
+    age=$(fmt_age "$updated")
+    printf '%s#%s %s %s  %s  %s\tpr\t%s\t%s\t%s\t%s\n' \
+      "$sym" "$num" "$r" "$title" "$branch" "$age" "$r" "$num" "$branch" "$title"
+  done
+}
+
+epoch() { date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$1" +%s 2>/dev/null || printf '0'; }
+fmt_dur() {
+  local s="$1"
+  [ "$s" -lt 0 ] && s=0
+  if [ "$s" -ge 3600 ]; then printf '%d:%02d:%02d' "$((s/3600))" "$(((s%3600)/60))" "$((s%60))"
+  else printf '%02d:%02d' "$((s/60))" "$((s%60))"; fi
+}
+
+# A compact "how long ago" for the PR list.
+fmt_age() {
+  local iso="$1" then now d
+  then=$(epoch "$iso"); now=$(date +%s)
+  [ "${then:-0}" -gt 0 ] 2>/dev/null || { printf -- '-'; return; }
+  d=$((now - then)); [ "$d" -lt 0 ] && d=0
+  if [ "$d" -lt 60 ]; then printf '%ds' "$d"
+  elif [ "$d" -lt 3600 ]; then printf '%dm' "$((d / 60))"
+  elif [ "$d" -lt 86400 ]; then printf '%dh' "$((d / 3600))"
+  else printf '%dd' "$((d / 86400))"; fi
+}
+
+fetch_repo_actions() {
+  local r="$1" out seen wid name br status conclusion started updated url state
+  out=$(gh api --cache "$ACTION_CACHE" \
+    "/repos/$r/actions/runs?per_page=$ACTION_LIMIT" \
+    --jq '.workflow_runs[] | [.workflow_id, .name, (.head_branch // "-"), .status, (.conclusion // "none"), (.run_started_at // .created_at), (.updated_at), .html_url] | @tsv' 2>/dev/null) || return 0
+  seen=$'\n'
+  while IFS=$'\t' read -r wid name br status conclusion started updated url; do
+    [ -n "$name" ] || continue
+    case "$seen" in *$'\n'"$wid"$'\n'*) continue ;; esac
+    seen="$seen$wid"$'\n'
+    if [ "$status" = "completed" ]; then state="$conclusion"; else state="running"; fi
+    # repo, name, branch, state, start (ISO), updated (epoch), url
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$r" "$name" "$br" "$state" "$started" "$(epoch "$updated")" "$url"
+  done <<<"$out"
+}
+
+fetch_actions() {
+  export ACTION_CACHE ACTION_LIMIT
+  export -f fetch_repo_actions epoch
+  hub_repos | xargs -P "${WS_HUB_JOBS:-8}" -I{} bash -c 'fetch_repo_actions "$@"' _ {}
+}
+
+# The rows the Actions view shows: every running or recently finished run, and
+# always the newest ACTION_TOP completed runs whatever their age. Dedupe, then
+# order running first and the rest newest-first.
+selected_actions() {
+  local all now
+  all=$(fetch_actions)
+  [ -n "$all" ] || return 0
+  now=$(date +%s)
+  {
+    printf '%s\n' "$all" | awk -F'\t' -v now="$now" -v recent="$ACTION_RECENT" \
+      '$4 == "running" || (now - $6) <= recent'
+    printf '%s\n' "$all" | awk -F'\t' '$4 != "running"' | sort -t$'\t' -k6,6nr | head -n "$ACTION_TOP"
+  } | awk '!seen[$0]++' \
+    | awk -F'\t' 'BEGIN{OFS="\t"}{ print ($4 == "running" ? 0 : 1), $0 }' \
+    | sort -t$'\t' -k1,1n -k7,7nr | cut -f2-
+}
+
+action_rows() {
+  local r name br state started updated url sym dur now
+  now=$(date +%s)
+  selected_actions | while IFS=$'\t' read -r r name br state started updated url; do
+    case "$state" in
+      success) sym="+" ;; failure) sym="x" ;; running) sym="o" ;; *) sym="-" ;;
+    esac
+    if [ "$state" = "running" ]; then dur=$(( now - $(epoch "$started") )); else dur=0; fi
+    printf '%s %s %s %s %s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$sym" "$r" "$name" "$br" "$(fmt_dur "$dur")" \
+      "action" "$r" "$name" "$br" "$url"
+  done
+}
+
+rows_for() {
+  case "$1" in
+    prs)     pr_rows ;;
+    actions) action_rows ;;
+    *)       pr_rows ;;
+  esac
+}
+
+context_header() {
+  printf 'root: %s   repo: %s   branch: %s' \
+    "${ctx_root:-?}" "${ctx_repo:-<all>}" "${ctx_branch:-?}"
+}
+
+# --- preview ---------------------------------------------------------------
+
+do_preview() {
+  local type="$1" repo="$2" key="$3" branch="$4" extra="$5"
+  case "$type" in
+    pr)
+      printf 'PR #%s  %s\n\n' "$key" "$extra"
+      gh pr view "$key" --repo "$repo" 2>&1 | head -60
+      ;;
+    action)
+      printf 'run %s  %s\n%s\n' "$repo" "$key" "$extra"
+      ;;
+    *) printf '%s\n' "$*" ;;
+  esac
+}
+
+# --- actions ---------------------------------------------------------------
+
+primary_path_for() {
+  local repo="$1"
+  ws-repos --root "$ctx_root" 2>/dev/null | awk -F'\t' -v r="$repo" '$1 == r && $2 == "primary" { print $4; exit }'
+}
+
+do_open() {
+  local type="$1" repo="$2" key="$3" branch="$4" extra="$5"
+  case "$type" in
+    pr)     gh pr view "$key" --repo "$repo" --web >/dev/null 2>&1 || true ;;
+    action) [ -n "$extra" ] && open "$extra" >/dev/null 2>&1 || true ;;
+  esac
+}
+
+do_review() {
+  local type="$1" repo="$2" key="$3" branch="$4" extra="$5"
+  case "$type" in
+    pr)
+      local path
+      path=$(primary_path_for "$repo")
+      dev-workspace open-review --repo "$repo" --path "${path:-$ctx_root}" --pr "$key" >/dev/null 2>&1 || true
+      ;;
+  esac
+}
+
+do_goto_repo() {
+  local repo="$1" path
+  path=$(primary_path_for "$repo")
+  [ -n "$path" ] || return 0
+  dev-workspace cd "$path" >/dev/null 2>&1 || true
+}
+
+do_goto_worktree() {
+  # Best effort: reuse a worktree that already has the PR branch, else create
+  # one under <primary>/worktrees/<slug> and set the context to it.
+  local repo="$1" branch="$2" primary existing slug target
+  [ -n "$branch" ] || return 0
+  primary=$(primary_path_for "$repo")
+  [ -n "$primary" ] || return 0
+  existing=$(ws-repos --root "$ctx_root" 2>/dev/null | awk -F'\t' -v r="$repo" -v b="$branch" '$1 == r && $3 == b { print $4; exit }')
+  if [ -n "$existing" ]; then
+    dev-workspace cd "$existing" >/dev/null 2>&1 || true
+    return 0
+  fi
+  slug=$(printf '%s' "$branch" | tr '/ ' '--')
+  target="$primary/worktrees/$slug"
+  if [ -d "$target" ]; then
+    dev-workspace cd "$target" >/dev/null 2>&1 || true
+    return 0
+  fi
+  git -C "$primary" fetch origin "$branch" >/dev/null 2>&1 || true
+  if git -C "$primary" show-ref --verify --quiet "refs/heads/$branch"; then
+    git -C "$primary" worktree add "$target" "$branch" >/dev/null 2>&1 || return 0
+  else
+    git -C "$primary" worktree add "$target" -b "$branch" --track "origin/$branch" >/dev/null 2>&1 || return 0
+  fi
+  dev-workspace cd "$target" >/dev/null 2>&1 || true
+}
+
+# --- main ------------------------------------------------------------------
+
+case "$mode" in
+  preview)
+    do_preview ${preview_args[@]+"${preview_args[@]}"}
+    exit 0
+    ;;
+  once)
+    if [ "$view" = "actions" ]; then
+      selected_actions | while IFS=$'\t' read -r r name br state started updated url; do
+        printf '%s\t%s\t%s\t%s\n' "$r" "$name" "$br" "$state"
+      done
+    else
+      recent_prs | while IFS=$'\t' read -r r num title author branch checks updated; do
+        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$r" "$num" "$title" "$branch" "$author" "$updated"
+      done
+    fi
+    exit 0
+    ;;
+  rows)
+    rows_for "$view"
+    exit 0
+    ;;
+esac
+
+# Interactive surface. The ticker refreshes the rows in the background and only
+# asks fzf to re-render when the row set actually changes, so an idle refresh
+# does not flash the list or interrupt typing and selection. The current view is
+# shared through a file so the ticker follows a `tab` toggle.
+state=$(mktemp -d 2>/dev/null || printf '/tmp/ws-hub.%s' "$$")
+mkdir -p "$state"
+rows_file="$state/rows"
+view_file="$state/view"
+printf 'prs' > "$view_file"
+port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()' 2>/dev/null || true)
+ticker=""
+if [ -n "$port" ] && [ "${TICK}" -gt 0 ]; then
+  (
+    while kill -0 "$$" 2>/dev/null; do
+      sleep "$TICK"
+      v=$(cat "$view_file" 2>/dev/null || printf 'prs')
+      new=$("$0" --rows --view "$v" 2>/dev/null || true)
+      old=$(cat "$rows_file" 2>/dev/null || true)
+      if [ "$new" != "$old" ]; then
+        printf '%s\n' "$new" > "$rows_file.tmp" && mv "$rows_file.tmp" "$rows_file"
+        curl -s -m 2 -XPOST "http://127.0.0.1:$port" \
+          -d "reload(cat '$rows_file')" >/dev/null 2>&1 || true
+      fi
+    done
+  ) &
+  ticker=$!
+  trap '[ -n "$ticker" ] && kill "$ticker" 2>/dev/null; rm -rf "$state"' EXIT
+fi
+
+while true; do
+  rows=$(rows_for "$view")
+  printf '%s' "$view" > "$view_file"
+  printf '%s\n' "$rows" > "$rows_file.tmp" && mv "$rows_file.tmp" "$rows_file"
+  header="$(context_header)   [$view]   enter open | alt-l review | alt-w branch | alt-g repo | alt-r reload | tab view"
+  out=$(
+    printf '%s\n' "$rows" | fzf --ansi --no-multi --no-sort \
+      --delimiter='\t' --with-nth=1 \
+      --header="$header" --header-first \
+      --preview "$0 --preview {2} {3} {4} {5} {6}" \
+      --preview-window='down:60%' \
+      --expect=enter,alt-l,alt-w,alt-g,alt-r,tab \
+      ${port:+--listen "$port"} 2>/dev/null || true
+  )
+  key=$(printf '%s\n' "$out" | sed -n '1p')
+  line=$(printf '%s\n' "$out" | sed -n '2p')
+  [ -n "$line" ] || continue
+  type=$(printf '%s\n' "$line" | cut -f2)
+  repo=$(printf '%s\n' "$line" | cut -f3)
+  pkey=$(printf '%s\n' "$line" | cut -f4)
+  pbranch=$(printf '%s\n' "$line" | cut -f5)
+  pextra=$(printf '%s\n' "$line" | cut -f6)
+  case "$key" in
+    tab)   if [ "$view" = "prs" ]; then view="actions"; else view="prs"; fi ;;
+    enter) do_open "$type" "$repo" "$pkey" "$pbranch" "$pextra" ;;
+    alt-l) do_review "$type" "$repo" "$pkey" "$pbranch" "$pextra" ;;
+    alt-w) do_goto_worktree "$repo" "$pbranch" ;;
+    alt-g) do_goto_repo "$repo" ;;
+    alt-r|"")  : ;;
+  esac
+done
